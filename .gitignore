@@ -1,0 +1,64 @@
+# FURSY .gitignore
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Coverage
+coverage.txt
+coverage.html
+coverage.out
+coverage_*.txt
+*.cov
+
+# Go workspace
+go.work
+
+# Dependencies
+vendor/
+
+# Build
+bin/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Private docs (IMPORTANT!)
+docs/dev/
+INDEX.md
+
+# Private Claude config (IMPORTANT!)
+.claude/
+.goco/
+.goda/
+
+# Temp
+*.tmp
+*.log
+tmp/
+benchmark_results.txt
+
+# OS
+Thumbs.db
+
+# Private notes
+NOTES.md
+TODO.md
+SCRATCH.md
+TASK-*.md
+
+# Env
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,64 @@
+# CODEOWNERS for Fursy HTTP Router
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# This file defines individuals or teams responsible for code in this repository.
+# Code owners are automatically requested for review when someone opens a pull request
+# that modifies code they own.
+
+# Default owner for everything in the repo
+# TODO: Update with actual maintainer GitHub username(s)
+* @kolkov
+
+# Core routing engine - Critical performance and correctness
+/internal/radix/ @kolkov
+/internal/pool/ @kolkov
+
+# Public API files - Breaking changes require careful review
+/router.go @kolkov
+/context.go @kolkov
+/handler.go @kolkov
+/group.go @kolkov
+/error.go @kolkov
+
+# Built-in middleware - Standard middleware implementations
+/middleware/ @kolkov
+
+# Optional plugins - External integrations
+/plugins/ @kolkov
+
+# Examples and usage demonstrations
+/examples/ @kolkov
+
+# Documentation - Keep up to date with code changes
+*.md @kolkov
+/docs/ @kolkov
+
+# GitHub configuration and CI/CD
+/.github/ @kolkov
+
+# Code quality and linting configuration
+/.golangci.yml @kolkov
+/Makefile @kolkov
+
+# Tests - Ensure coverage and reliability
+*_test.go @kolkov
+
+# Benchmarks - Performance validation
+*_bench.go @kolkov
+*_benchmark_test.go @kolkov
+
+# Release management - Version control and changelog
+/CHANGELOG.md @kolkov
+
+# Contributing guidelines
+/CONTRIBUTING.md @kolkov
+
+# Go module files - Dependency management (zero deps policy!)
+/go.mod @kolkov
+/go.sum @kolkov
+
+# Scripts - Build, test, and release automation
+/scripts/ @kolkov
+
+# License
+/LICENSE @kolkov
