@@ -373,6 +373,29 @@ func (c *Context) XML(code int, obj any) error {
 	return encoder.Encode(obj)
 }
 
+// Markdown sends a markdown text response with status 200.
+// Sets Content-Type to "text/markdown; charset=utf-8".
+//
+// This is a convenience method for serving markdown content,
+// particularly useful for AI agents and documentation endpoints.
+//
+// Example:
+//
+//	router.GET("/docs.md", func(c *Context) error {
+//	    md := `# API Documentation
+//
+//	## Endpoints
+//	- GET /users - List all users
+//	- POST /users - Create new user`
+//	    return c.Markdown(md)
+//	})
+func (c *Context) Markdown(content string) error {
+	c.Response.Header().Set("Content-Type", MIMETextMarkdown+"; charset=utf-8")
+	c.Response.WriteHeader(200)
+	_, err := c.Response.Write([]byte(content))
+	return err
+}
+
 // NoContent sends a response with no body.
 // This is commonly used for 204 No Content responses.
 //
@@ -715,6 +738,43 @@ func (c *Context) Negotiate(status int, data any) error {
 	default:
 		return c.Problem(InternalServerError("Unsupported content type: " + format))
 	}
+}
+
+// Accepts returns true if the specified media type is acceptable
+// based on the request's Accept header.
+//
+// This is a convenience wrapper around NegotiateFormat for simple cases
+// where you want to check if a specific media type is acceptable.
+//
+// Example:
+//
+//	if c.Accepts(MIMETextMarkdown) {
+//	    return c.Markdown(renderMarkdown(docs))
+//	}
+//	return c.JSON(200, data)
+func (c *Context) Accepts(mediaType string) bool {
+	format := c.NegotiateFormat(mediaType)
+	return format == mediaType
+}
+
+// AcceptsAny returns the best matching media type from the provided options
+// based on the request's Accept header and quality values (q-values).
+//
+// This is an alias for NegotiateFormat with a more intuitive name for checking
+// multiple media types. Returns empty string if none of the offered types are acceptable.
+//
+// Example:
+//
+//	switch c.AcceptsAny(MIMETextMarkdown, MIMETextHTML, MIMEApplicationJSON) {
+//	case MIMETextMarkdown:
+//	    return c.Markdown(renderMarkdown(data))
+//	case MIMETextHTML:
+//	    return c.HTML(200, renderHTML(data))
+//	default:
+//	    return c.JSON(200, data)
+//	}
+func (c *Context) AcceptsAny(mediaTypes ...string) string {
+	return c.NegotiateFormat(mediaTypes...)
 }
 
 // NotAcceptable creates a 406 Not Acceptable Problem.

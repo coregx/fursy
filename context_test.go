@@ -1031,3 +1031,188 @@ func TestContext_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 		t.Errorf("DELETE status = %d, want 204", w.Code)
 	}
 }
+
+// TestContext_Accepts tests Accept header checking.
+func TestContext_Accepts(t *testing.T) {
+	tests := []struct {
+		name      string
+		accept    string
+		mediaType string
+		want      bool
+	}{
+		{
+			name:      "exact match",
+			accept:    "text/markdown",
+			mediaType: MIMETextMarkdown,
+			want:      true,
+		},
+		{
+			name:      "wildcard match",
+			accept:    "*/*",
+			mediaType: MIMETextMarkdown,
+			want:      true,
+		},
+		{
+			name:      "no match",
+			accept:    "application/json",
+			mediaType: MIMETextMarkdown,
+			want:      false,
+		},
+		{
+			name:      "multiple with match",
+			accept:    "text/html, text/markdown;q=0.8",
+			mediaType: MIMETextMarkdown,
+			want:      true,
+		},
+		{
+			name:      "multiple no match",
+			accept:    "text/html, application/xml",
+			mediaType: MIMETextMarkdown,
+			want:      false,
+		},
+		{
+			name:      "empty accept header",
+			accept:    "",
+			mediaType: MIMETextMarkdown,
+			want:      true, // No Accept header = accept first offered
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", http.NoBody)
+			if tt.accept != "" {
+				req.Header.Set("Accept", tt.accept)
+			}
+			c := newContext()
+			c.Request = req
+
+			got := c.Accepts(tt.mediaType)
+			if got != tt.want {
+				t.Errorf("Accepts(%q) with Accept=%q = %v, want %v",
+					tt.mediaType, tt.accept, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestContext_AcceptsAny tests multiple media type checking.
+func TestContext_AcceptsAny(t *testing.T) {
+	tests := []struct {
+		name       string
+		accept     string
+		mediaTypes []string
+		want       string
+	}{
+		{
+			name:       "first match",
+			accept:     "text/markdown",
+			mediaTypes: []string{MIMETextMarkdown, MIMETextHTML, MIMEApplicationJSON},
+			want:       MIMETextMarkdown,
+		},
+		{
+			name:       "second match",
+			accept:     "text/html",
+			mediaTypes: []string{MIMETextMarkdown, MIMETextHTML, MIMEApplicationJSON},
+			want:       MIMETextHTML,
+		},
+		{
+			name:       "q-value priority",
+			accept:     "text/html;q=0.9, text/markdown;q=1.0",
+			mediaTypes: []string{MIMETextMarkdown, MIMETextHTML, MIMEApplicationJSON},
+			want:       MIMETextMarkdown, // Higher q-value
+		},
+		{
+			name:       "no match",
+			accept:     "application/xml",
+			mediaTypes: []string{MIMETextMarkdown, MIMETextHTML, MIMEApplicationJSON},
+			want:       "",
+		},
+		{
+			name:       "wildcard",
+			accept:     "*/*",
+			mediaTypes: []string{MIMETextMarkdown, MIMETextHTML},
+			want:       MIMETextMarkdown, // First offered
+		},
+		{
+			name:       "empty accept",
+			accept:     "",
+			mediaTypes: []string{MIMETextMarkdown, MIMETextHTML},
+			want:       MIMETextMarkdown, // First offered
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", http.NoBody)
+			if tt.accept != "" {
+				req.Header.Set("Accept", tt.accept)
+			}
+			c := newContext()
+			c.Request = req
+
+			got := c.AcceptsAny(tt.mediaTypes...)
+			if got != tt.want {
+				t.Errorf("AcceptsAny(%v) with Accept=%q = %q, want %q",
+					tt.mediaTypes, tt.accept, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestContext_Markdown tests markdown response.
+func TestContext_Markdown(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name:    "simple markdown",
+			content: "# Hello World",
+		},
+		{
+			name: "multiline markdown",
+			content: `# API Documentation
+
+## Endpoints
+- GET /users
+- POST /users`,
+		},
+		{
+			name:    "empty content",
+			content: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", http.NoBody)
+			w := httptest.NewRecorder()
+			c := newContext()
+			c.init(w, req, nil, nil)
+
+			err := c.Markdown(tt.content)
+			if err != nil {
+				t.Fatalf("Markdown() error = %v", err)
+			}
+
+			// Check status code
+			if w.Code != 200 {
+				t.Errorf("status code = %d, want 200", w.Code)
+			}
+
+			// Check Content-Type
+			contentType := w.Header().Get("Content-Type")
+			want := MIMETextMarkdown + "; charset=utf-8"
+			if contentType != want {
+				t.Errorf("Content-Type = %q, want %q", contentType, want)
+			}
+
+			// Check body
+			body := w.Body.String()
+			if body != tt.content {
+				t.Errorf("body = %q, want %q", body, tt.content)
+			}
+		})
+	}
+}
