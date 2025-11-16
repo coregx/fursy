@@ -26,6 +26,9 @@ import (
 func main() {
     router := fursy.New()
 
+    // Optional: Set validator for automatic validation
+    // router.SetValidator(validator.New())
+
     // Simple text response with convenience method
     router.GET("/", func(c *fursy.Context) error {
         return c.Text("Welcome to FURSY!")  // 200 OK
@@ -142,6 +145,7 @@ go get github.com/coregx/fursy
 
 - ✅ **High Performance Routing** - 256-326 ns/op, 1 alloc/op
 - ✅ **Type-Safe Generic Handlers** - Box[Req, Res] with compile-time safety
+- ✅ **Automatic Validation** - Set once, validate everywhere with 100+ tags
 - ✅ **RFC 9457 Problem Details** - Standardized error responses
 - ✅ **Minimal Dependencies** - Core routing: stdlib only, middleware: minimal deps
 - ✅ **Middleware Pipeline** - Next/Abort pattern, pre-allocated buffers
@@ -244,11 +248,144 @@ router.DELETE[Empty, Empty]("/users/:id", func(b *fursy.Box[Empty, Empty]) error
 
 ---
 
+## 🎯 Automatic Validation
+
+FURSY provides **type-safe automatic validation** through the validator plugin, giving you compile-time type safety combined with runtime validation - a unique combination in the Go ecosystem.
+
+### Why FURSY Validation is Different
+
+Traditional routers require **manual validation** on every handler:
+
+```go
+// ❌ Manual validation (Gin, Echo, Fiber)
+func CreateUser(c *gin.Context) {
+    var req CreateUserRequest
+    if err := c.BindJSON(&req); err != nil {  // No validation!
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Manual validation needed
+    if req.Email == "" || !isValidEmail(req.Email) {
+        c.JSON(400, gin.H{"error": "invalid email"})
+        return
+    }
+    // ... repeat for every field
+}
+```
+
+With FURSY's **type-safe handlers**, validation is **automatic and guaranteed**:
+
+```go
+// ✅ Automatic validation (FURSY)
+router.POST[CreateUserRequest, UserResponse]("/users",
+    func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+        if err := c.Bind(); err != nil {
+            return err  // Automatic RFC 9457 error response
+        }
+
+        // c.ReqBody is ALREADY validated! ✅
+        user := createUser(c.ReqBody)
+        return c.Created("/users/"+user.ID, user)
+    })
+```
+
+**Key advantages:**
+- ✅ **Set once, validate everywhere** - No manual checks per handler
+- ✅ **Compile-time type safety** - Generics ensure request/response types match
+- ✅ **RFC 9457 compliant** - Standard error format with field-level details
+- ✅ **100+ validation tags** - email, URL, UUID, min/max, and more
+
+### Quick Example
+
+```go
+package main
+
+import (
+    "github.com/coregx/fursy"
+    "github.com/coregx/fursy/plugins/validator"
+)
+
+type CreateUserRequest struct {
+    Name  string `json:"name" validate:"required,min=3,max=50"`
+    Email string `json:"email" validate:"required,email"`
+    Age   int    `json:"age" validate:"required,gte=18,lte=120"`
+}
+
+type UserResponse struct {
+    ID    string `json:"id"`
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+func main() {
+    router := fursy.New()
+
+    // Set validator once - applies to ALL handlers
+    router.SetValidator(validator.New())
+
+    // Type-safe handler with automatic validation
+    router.POST[CreateUserRequest, UserResponse]("/users",
+        func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+            if err := c.Bind(); err != nil {
+                return err  // Automatic RFC 9457 response
+            }
+
+            // c.ReqBody is validated and type-safe!
+            user := createUser(c.ReqBody)
+            return c.Created("/users/"+user.ID, user)
+        })
+
+    router.Run(":8080")
+}
+```
+
+### Validation Error Response
+
+When validation fails, FURSY returns **RFC 9457 Problem Details** with field-level errors:
+
+**Request:**
+```bash
+curl -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jo","email":"invalid","age":15}'
+```
+
+**Response (422 Unprocessable Entity):**
+```json
+{
+  "type": "about:blank",
+  "title": "Validation Failed",
+  "status": 422,
+  "detail": "3 field(s) failed validation",
+  "errors": {
+    "name": "Name must be at least 3 characters",
+    "email": "Email must be a valid email address",
+    "age": "Age must be 18 or greater"
+  }
+}
+```
+
+### Comparison with Other Routers
+
+| Feature | FURSY | Gin | Echo | Fiber |
+|---------|-------|-----|------|-------|
+| Type Safety | ✅ Compile-time (`Box[Req, Res]`) | ❌ Runtime only | ❌ Runtime only | ❌ Runtime only |
+| Auto Validation | ✅ Set once, validate all | ❌ Manual per handler | ❌ Manual per handler | ❌ Manual per handler |
+| Error Format | ✅ RFC 9457 (standard) | ❌ Custom JSON | ❌ Custom JSON | ❌ Custom JSON |
+| Setup Complexity | ✅ One line (`SetValidator`) | ❌ Validator + binding per route | ❌ Validator + binding per route | ❌ Validator + binding per route |
+| Field-Level Errors | ✅ Automatic | 🔧 Manual mapping | 🔧 Manual mapping | 🔧 Manual mapping |
+
+**Learn more**: See [Validator Plugin Documentation](plugins/validator/README.md) for custom validators, nested structs, and advanced features.
+
+---
+
 ## 📖 Documentation
 
 **Status**: 🟡 In Development
 
 - [Getting Started](#quick-start) (above)
+- [Validator Plugin](plugins/validator/README.md) - Type-safe validation
 - API Reference (coming soon)
 - Examples (coming soon)
 - Migration Guides (coming soon)
@@ -260,13 +397,14 @@ router.DELETE[Empty, Empty]("/users/:id", func(b *fursy.Box[Empty, Empty]) error
 | Feature | FURSY | Gin | Echo | Chi | Fiber |
 |---------|--------|-----|------|-----|-------|
 | Type-Safe Handlers | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Auto Validation | ✅ | 🔧 Manual | 🔧 Manual | 🔧 Manual | 🔧 Manual |
 | Zero Deps (core) | ✅ | ❌ | ❌ | ✅ | ❌ |
 | OpenAPI Built-in | ✅ | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin |
 | RFC 9457 Errors | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Go Version | 1.25+ | 1.13+ | 1.17+ | 1.16+ | 1.17+ |
 
-**FURSY is unique**: Only router combining furious performance, type-safe generics, OpenAPI, and RFC 9457 with minimal dependencies.
+**FURSY is unique**: Only router combining furious performance, type-safe generics, automatic validation, OpenAPI, and RFC 9457 with minimal dependencies.
 
 ---
 
