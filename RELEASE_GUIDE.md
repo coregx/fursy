@@ -281,15 +281,12 @@ Examples:
 **Current Path**: `v0.y.z` until `v1.0.0`
 
 **Released versions**:
-- `v0.1.0` - Phase 1 (Foundation) - Radix tree routing, basic middleware
-- `v0.2.0` - Phase 2 (API Excellence) - RFC 9457, generics, improved API
-- `v0.3.0` - Phase 3 (Production Features) - Auth, rate limiting, circuit breaker
+- `v0.1.0` - Phase 0-3 (Foundation + Production Features) - Radix tree routing, middleware pipeline, RFC 9457, generics, JWT auth, rate limiting, circuit breaker, context pooling, graceful shutdown
+- `v0.2.0` - Phase 4.1 (Documentation & Examples) - Validator plugin, 11 comprehensive examples, middleware/validation/content-negotiation/observability documentation, AI agent guide (llms.md)
 
 **Future releases** (Phase 4 - Ecosystem):
-- `v0.4.0` - Database middleware + documentation website
-- `v0.5.0` - Cache middleware + community tools
-- `v0.6.0+` - Additional ecosystem components
-- `v1.0.0` - TBD (stable API, production-proven)
+- `v0.3.0+` - Future ecosystem components (Database middleware, Cache middleware, Documentation website, Migration guides)
+- `v1.0.0` - TBD (stable API, production-proven, 6-12 months validation)
 
 **Rationale**:
 - Stay on 0.x.y to allow API evolution

@@ -11,6 +11,7 @@ const (
 	MIMEApplicationXML   = "application/xml"
 	MIMETextXML          = "text/xml"
 	MIMETextPlain        = "text/plain"
+	MIMETextMarkdown     = "text/markdown" // Added for AI agents and documentation
 	MIMEApplicationForm  = "application/x-www-form-urlencoded"
 	MIMEMultipartForm    = "multipart/form-data"
 	MIMEApplicationXYAML = "application/x-yaml"

@@ -1,0 +1,49 @@
+# Prometheus configuration for fursy OpenTelemetry example
+
+global:
+  # How frequently to scrape targets by default
+  scrape_interval: 15s
+
+  # How long until a scrape request times out
+  scrape_timeout: 10s
+
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager)
+  external_labels:
+    monitor: 'fursy-example'
+    cluster: 'local-dev'
+
+# Scrape configurations
+scrape_configs:
+  # Scrape the fursy application
+  - job_name: 'fursy-otel-example'
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+    static_configs:
+      # Note: Use host.docker.internal on Docker Desktop for Mac/Windows
+      # Use 172.17.0.1 on Linux
+      # Or use the host machine's IP address
+      - targets: ['host.docker.internal:8080']
+        labels:
+          service: 'fursy-otel-example'
+          environment: 'development'
+
+  # Scrape Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          environment: 'development'
+
+  # Scrape Jaeger metrics (optional)
+  - job_name: 'jaeger'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['jaeger:14269']
+        labels:
+          service: 'jaeger'
+          environment: 'development'

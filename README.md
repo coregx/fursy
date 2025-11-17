@@ -7,11 +7,11 @@ Next-generation HTTP router for Go with blazing performance, type-safe handlers,
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](https://github.com/coregx/fursy)
 [![Coverage](https://img.shields.io/badge/Coverage-91.7%25-brightgreen.svg)](https://github.com/coregx/fursy)
-[![Version](https://img.shields.io/badge/Version-v0.1.0-blue.svg)](https://github.com/coregx/fursy/releases)
+[![Version](https://img.shields.io/badge/Version-v0.2.0-blue.svg)](https://github.com/coregx/fursy/releases)
 
 ---
 
-## ⚡ Quick Start (v0.1.0)
+## ⚡ Quick Start
 
 ```go
 package main
@@ -25,6 +25,9 @@ import (
 
 func main() {
     router := fursy.New()
+
+    // Optional: Set validator for automatic validation
+    // router.SetValidator(validator.New())
 
     // Simple text response with convenience method
     router.GET("/", func(c *fursy.Context) error {
@@ -142,6 +145,8 @@ go get github.com/coregx/fursy
 
 - ✅ **High Performance Routing** - 256-326 ns/op, 1 alloc/op
 - ✅ **Type-Safe Generic Handlers** - Box[Req, Res] with compile-time safety
+- ✅ **Automatic Validation** - Set once, validate everywhere with 100+ tags
+- ✅ **Content Negotiation** - RFC 9110 compliant, AI agent support
 - ✅ **RFC 9457 Problem Details** - Standardized error responses
 - ✅ **Minimal Dependencies** - Core routing: stdlib only, middleware: minimal deps
 - ✅ **Middleware Pipeline** - Next/Abort pattern, pre-allocated buffers
@@ -153,6 +158,296 @@ go get github.com/coregx/fursy
 - ✅ **Graceful Shutdown** - Connection draining, Kubernetes-ready
 - ✅ **Context Pooling** - Memory-efficient, prevents leaks
 - ✅ **Convenience Methods** - REST-friendly shortcuts (OK, Created, NoContentSuccess)
+
+---
+
+## 🎛️ Middleware
+
+FURSY includes **8 production-ready middleware** with minimal dependencies. Core middleware have **zero external dependencies** (stdlib only), with only 2 exceptions: JWT (golang-jwt/jwt) and RateLimit (x/time).
+
+### Core Middleware (Zero Dependencies)
+
+#### Logger
+
+Structured logging with `log/slog` for comprehensive request tracking.
+
+```go
+import (
+    "log/slog"
+    "github.com/coregx/fursy/middleware"
+)
+
+// Default configuration
+router.Use(middleware.Logger())
+
+// With configuration
+logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+router.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+    Logger: logger,
+    SkipPaths: []string{"/health", "/metrics"},
+}))
+```
+
+**Features**:
+- ✅ Structured logging with `log/slog` (stdlib)
+- ✅ Request method, path, status, latency, bytes written
+- ✅ Client IP extraction (X-Real-IP, X-Forwarded-For)
+- ✅ Skip paths or custom skip function
+- ✅ JSON or text format support
+- ✅ Zero external dependencies
+
+---
+
+#### Recovery
+
+Panic recovery with stack traces and RFC 9457 Problem Details.
+
+```go
+router.Use(middleware.Recovery())
+
+// With stack traces (development)
+router.Use(middleware.RecoveryWithConfig(middleware.RecoveryConfig{
+    IncludeStackTrace: true,
+}))
+```
+
+**Features**:
+- ✅ Automatic panic recovery
+- ✅ Stack trace logging
+- ✅ RFC 9457 error responses
+- ✅ Custom error handler
+- ✅ Production-safe (no stack traces by default)
+- ✅ Zero external dependencies
+
+---
+
+#### CORS
+
+Cross-Origin Resource Sharing (RFC-compliant, OWASP recommended).
+
+```go
+router.Use(middleware.CORS())
+
+// With custom config
+router.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+    AllowOrigins: "https://example.com,https://foo.com",
+    AllowMethods: "GET,POST,PUT,DELETE",
+    AllowHeaders: "Content-Type,Authorization",
+    AllowCredentials: true,
+    MaxAge: 12 * time.Hour,
+}))
+```
+
+**Features**:
+- ✅ Wildcard origins (`*`) support
+- ✅ Preflight requests (OPTIONS) handling
+- ✅ Credentials support
+- ✅ Expose headers configuration
+- ✅ MaxAge caching
+- ✅ Zero external dependencies
+
+---
+
+#### BasicAuth
+
+HTTP Basic Authentication with constant-time comparison.
+
+```go
+router.Use(middleware.BasicAuth(middleware.BasicAuthConfig{
+    Username: "admin",
+    Password: "secret",
+}))
+
+// With custom validator
+router.Use(middleware.BasicAuth(middleware.BasicAuthConfig{
+    Validator: func(username, password string) bool {
+        return checkDatabase(username, password)
+    },
+}))
+```
+
+**Features**:
+- ✅ Simple username/password validation
+- ✅ Custom validator function
+- ✅ Realm configuration
+- ✅ WWW-Authenticate header
+- ✅ Constant-time comparison (timing attack protection)
+- ✅ Zero external dependencies
+
+---
+
+#### Secure
+
+OWASP 2025 security headers for production hardening.
+
+```go
+router.Use(middleware.Secure())
+
+// With custom config
+router.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+    ContentSecurityPolicy:   "default-src 'self'; script-src 'self' 'unsafe-inline'",
+    HSTSMaxAge:             31536000, // 1 year
+    HSTSExcludeSubdomains:  false,
+    XFrameOptions:          "DENY",
+    ContentTypeNosniff:     "nosniff",
+    ReferrerPolicy:         "strict-origin-when-cross-origin",
+}))
+```
+
+**Features (OWASP 2025)**:
+- ✅ Content-Security-Policy (CSP)
+- ✅ Strict-Transport-Security (HSTS)
+- ✅ X-Frame-Options
+- ✅ X-Content-Type-Options: nosniff
+- ✅ X-XSS-Protection (deprecated, not set by default)
+- ✅ Referrer-Policy
+- ✅ Cross-Origin-Embedder-Policy
+- ✅ Cross-Origin-Opener-Policy
+- ✅ Cross-Origin-Resource-Policy
+- ✅ Permissions-Policy
+
+**Coverage**: 100%
+**Dependencies**: Zero (stdlib only)
+
+---
+
+### Authentication & Rate Limiting
+
+#### JWT
+
+JWT token validation with algorithm confusion prevention.
+
+```go
+import "github.com/golang-jwt/jwt/v5"
+
+router.Use(middleware.JWT(middleware.JWTConfig{
+    SigningKey:    []byte("your-secret-key"),
+    SigningMethod: jwt.SigningMethodHS256,
+    TokenLookup:   "header:Authorization",
+}))
+
+// With custom validation
+router.Use(middleware.JWT(middleware.JWTConfig{
+    SigningKey:    []byte("secret"),
+    SigningMethod: jwt.SigningMethodHS256,
+    Issuer:        "my-app",
+    Audience:      []string{"api"},
+}))
+```
+
+**Features**:
+- ✅ Algorithms: HS256, HS384, HS512, RS256, ES256
+- ✅ Token from Header/Query/Cookie
+- ✅ Issuer/Audience validation
+- ✅ Algorithm confusion prevention (forbids "none")
+- ✅ Custom claims support
+- ✅ Expiration time validation
+
+**Dependency**: `github.com/golang-jwt/jwt/v5`
+
+---
+
+#### RateLimit
+
+Token bucket rate limiting with RFC-compliant headers.
+
+```go
+router.Use(middleware.RateLimit(middleware.RateLimitConfig{
+    Rate:  100,  // 100 requests per second
+    Burst: 200,  // burst of 200
+    KeyFunc: middleware.RateLimitByIP,
+}))
+
+// Custom key function
+router.Use(middleware.RateLimit(middleware.RateLimitConfig{
+    Rate:  10,
+    Burst: 20,
+    KeyFunc: func(c *fursy.Context) string {
+        // Rate limit by user ID
+        userID := c.Get("user_id").(string)
+        return userID
+    },
+}))
+```
+
+**Features**:
+- ✅ Token bucket algorithm (`golang.org/x/time/rate`)
+- ✅ Per-IP or custom key function
+- ✅ RFC headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`)
+- ✅ In-memory store with automatic cleanup
+- ✅ Custom error handler
+- ✅ Configurable retry-after header
+
+**Dependency**: `golang.org/x/time/rate`
+
+---
+
+### Resilience
+
+#### CircuitBreaker
+
+Zero-dependency circuit breaker for fault tolerance.
+
+```go
+router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
+    MaxRequests:         100,
+    ConsecutiveFailures: 5,
+    Timeout:             30 * time.Second,
+    ResetTimeout:        60 * time.Second,
+}))
+
+// With ratio-based threshold
+router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
+    MaxRequests:  1000,
+    FailureRatio: 0.25, // Open circuit when 25% of requests fail
+    Timeout:      30 * time.Second,
+    ResetTimeout: 60 * time.Second,
+}))
+```
+
+**Features**:
+- ✅ Zero external dependencies (pure Go)
+- ✅ Consecutive failures threshold
+- ✅ Ratio-based threshold
+- ✅ Time-window threshold
+- ✅ Half-open state with max requests
+- ✅ States: Closed → Open → Half-Open → Closed
+- ✅ Custom error handler
+- ✅ Thread-safe (concurrent request handling)
+
+**Coverage**: 95.5%
+**Dependencies**: Zero (stdlib only)
+
+---
+
+### Middleware Comparison
+
+| Middleware | FURSY | Gin | Echo | Fiber |
+|------------|-------|-----|------|-------|
+| **Logger** | ✅ `log/slog` | ✅ Custom | ✅ Custom | ✅ Custom |
+| **Recovery** | ✅ RFC 9457 | ✅ Basic | ✅ Basic | ✅ Basic |
+| **CORS** | ✅ Built-in (zero deps) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
+| **BasicAuth** | ✅ Built-in | ✅ Built-in | ✅ Built-in | ✅ Built-in |
+| **JWT** | ✅ Built-in | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
+| **Rate Limit** | ✅ Built-in (RFC headers) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
+| **Security Headers** | ✅ OWASP 2025 | ❌ | 🔧 Plugin | ✅ Basic |
+| **Circuit Breaker** | ✅ Zero deps | ❌ | ❌ | ❌ |
+| **Test Coverage** | **88.9%** | ? | ? | ? |
+| **Dependencies** | **Core: 0, JWT: 1, RateLimit: 1** | Multiple | Multiple | Multiple |
+
+**Legend**:
+- ✅ = Built-in with high quality implementation
+- 🔧 = Plugin/third-party required
+- ❌ = Not available
+
+**FURSY advantage**: Production-ready middleware with minimal dependencies, OWASP 2025 compliance, RFC 9457 error responses, and comprehensive test coverage.
+
+---
+
+### Learn More
+
+- **[Middleware Examples](examples/05-middleware/)** - Complete examples for all 8 middleware
+- **[Middleware Source](middleware/)** - Middleware implementations with tests
 
 ---
 
@@ -244,11 +539,470 @@ router.DELETE[Empty, Empty]("/users/:id", func(b *fursy.Box[Empty, Empty]) error
 
 ---
 
+## 🎯 Automatic Validation
+
+FURSY provides **type-safe automatic validation** through the validator plugin, giving you compile-time type safety combined with runtime validation - a unique combination in the Go ecosystem.
+
+### Why FURSY Validation is Different
+
+Traditional routers require **manual validation** on every handler:
+
+```go
+// ❌ Manual validation (Gin, Echo, Fiber)
+func CreateUser(c *gin.Context) {
+    var req CreateUserRequest
+    if err := c.BindJSON(&req); err != nil {  // No validation!
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Manual validation needed
+    if req.Email == "" || !isValidEmail(req.Email) {
+        c.JSON(400, gin.H{"error": "invalid email"})
+        return
+    }
+    // ... repeat for every field
+}
+```
+
+With FURSY's **type-safe handlers**, validation is **automatic and guaranteed**:
+
+```go
+// ✅ Automatic validation (FURSY)
+router.POST[CreateUserRequest, UserResponse]("/users",
+    func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+        if err := c.Bind(); err != nil {
+            return err  // Automatic RFC 9457 error response
+        }
+
+        // c.ReqBody is ALREADY validated! ✅
+        user := createUser(c.ReqBody)
+        return c.Created("/users/"+user.ID, user)
+    })
+```
+
+**Key advantages:**
+- ✅ **Set once, validate everywhere** - No manual checks per handler
+- ✅ **Compile-time type safety** - Generics ensure request/response types match
+- ✅ **RFC 9457 compliant** - Standard error format with field-level details
+- ✅ **100+ validation tags** - email, URL, UUID, min/max, and more
+
+### Quick Example
+
+```go
+package main
+
+import (
+    "github.com/coregx/fursy"
+    "github.com/coregx/fursy/plugins/validator"
+)
+
+type CreateUserRequest struct {
+    Name  string `json:"name" validate:"required,min=3,max=50"`
+    Email string `json:"email" validate:"required,email"`
+    Age   int    `json:"age" validate:"required,gte=18,lte=120"`
+}
+
+type UserResponse struct {
+    ID    string `json:"id"`
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+func main() {
+    router := fursy.New()
+
+    // Set validator once - applies to ALL handlers
+    router.SetValidator(validator.New())
+
+    // Type-safe handler with automatic validation
+    router.POST[CreateUserRequest, UserResponse]("/users",
+        func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+            if err := c.Bind(); err != nil {
+                return err  // Automatic RFC 9457 response
+            }
+
+            // c.ReqBody is validated and type-safe!
+            user := createUser(c.ReqBody)
+            return c.Created("/users/"+user.ID, user)
+        })
+
+    router.Run(":8080")
+}
+```
+
+### Validation Error Response
+
+When validation fails, FURSY returns **RFC 9457 Problem Details** with field-level errors:
+
+**Request:**
+```bash
+curl -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jo","email":"invalid","age":15}'
+```
+
+**Response (422 Unprocessable Entity):**
+```json
+{
+  "type": "about:blank",
+  "title": "Validation Failed",
+  "status": 422,
+  "detail": "3 field(s) failed validation",
+  "errors": {
+    "name": "Name must be at least 3 characters",
+    "email": "Email must be a valid email address",
+    "age": "Age must be 18 or greater"
+  }
+}
+```
+
+### Comparison with Other Routers
+
+| Feature | FURSY | Gin | Echo | Fiber |
+|---------|-------|-----|------|-------|
+| Type Safety | ✅ Compile-time (`Box[Req, Res]`) | ❌ Runtime only | ❌ Runtime only | ❌ Runtime only |
+| Auto Validation | ✅ Set once, validate all | ❌ Manual per handler | ❌ Manual per handler | ❌ Manual per handler |
+| Error Format | ✅ RFC 9457 (standard) | ❌ Custom JSON | ❌ Custom JSON | ❌ Custom JSON |
+| Setup Complexity | ✅ One line (`SetValidator`) | ❌ Validator + binding per route | ❌ Validator + binding per route | ❌ Validator + binding per route |
+| Field-Level Errors | ✅ Automatic | 🔧 Manual mapping | 🔧 Manual mapping | 🔧 Manual mapping |
+
+**Learn more**: See [Validator Plugin Documentation](plugins/validator/README.md) for custom validators, nested structs, and advanced features.
+
+---
+
+## 🌐 Content Negotiation
+
+FURSY provides **RFC 9110 compliant content negotiation**, enabling your API to respond in multiple formats based on the client's `Accept` header. This is essential for building modern APIs that serve both humans (HTML/Markdown) and machines (JSON/XML).
+
+### Why Content Negotiation Matters
+
+Modern APIs need to support multiple clients:
+- **Web Browsers** → HTML
+- **API Clients** → JSON
+- **AI Agents** → Markdown (for better understanding)
+- **Legacy Systems** → XML
+
+FURSY handles this automatically using **RFC 9110** standards with quality values (q-parameters).
+
+### Automatic Format Selection
+
+The simplest approach - FURSY picks the best format automatically:
+
+```go
+router.GET("/users/:id", func(c *fursy.Context) error {
+    user := getUser(c.Param("id"))
+
+    // Automatically selects format based on Accept header
+    // Supports: JSON, HTML, XML, Text, Markdown
+    return c.Negotiate(200, user)
+})
+```
+
+**Client requests:**
+```bash
+# JSON (default)
+curl http://localhost:8080/users/123
+# → Content-Type: application/json
+
+# HTML
+curl -H "Accept: text/html" http://localhost:8080/users/123
+# → Content-Type: text/html
+
+# XML
+curl -H "Accept: application/xml" http://localhost:8080/users/123
+# → Content-Type: application/xml
+```
+
+### Explicit Format Control
+
+For finer control, check what the client accepts:
+
+```go
+router.GET("/docs", func(c *fursy.Context) error {
+    // Check if client accepts markdown
+    if c.Accepts(fursy.MIMETextMarkdown) {
+        docs := generateMarkdownDocs()
+        return c.Markdown(docs)  // AI-friendly format
+    }
+
+    // Fallback to JSON
+    return c.OK(map[string]string{"message": "Use Accept: text/markdown for docs"})
+})
+```
+
+### Quality Values (q-parameter)
+
+RFC 9110 defines quality values to prioritize formats:
+
+```go
+router.GET("/api/data", func(c *fursy.Context) error {
+    data := getData()
+
+    // Client sends: Accept: text/html;q=0.9, application/json;q=1.0
+    // FURSY automatically picks JSON (higher q-value)
+    format := c.AcceptsAny(
+        fursy.MIMEApplicationJSON,  // q=1.0
+        fursy.MIMETextHTML,          // q=0.9
+        fursy.MIMETextMarkdown,      // fallback
+    )
+
+    switch format {
+    case fursy.MIMEApplicationJSON:
+        return c.JSON(200, data)
+    case fursy.MIMETextHTML:
+        return c.HTML(200, renderHTML(data))
+    case fursy.MIMETextMarkdown:
+        return c.Markdown(formatMarkdown(data))
+    default:
+        return c.OK(data)  // Default to JSON
+    }
+})
+```
+
+### Supported Formats
+
+| Format | MIME Type | Constant | Use Case |
+|--------|-----------|----------|----------|
+| JSON | `application/json` | `MIMEApplicationJSON` | API responses (default) |
+| HTML | `text/html` | `MIMETextHTML` | Web browsers |
+| XML | `application/xml` | `MIMEApplicationXML` | Legacy systems |
+| Plain Text | `text/plain` | `MIMETextPlain` | Simple data |
+| Markdown | `text/markdown` | `MIMETextMarkdown` | AI agents, documentation |
+
+### AI Agent Support
+
+FURSY has first-class support for AI agents via Markdown responses:
+
+```go
+router.GET("/api/schema", func(c *fursy.Context) error {
+    // AI agents prefer markdown for better understanding
+    if c.Accepts(fursy.MIMETextMarkdown) {
+        schema := `
+# API Schema
+
+## Users Endpoint
+- **GET** /users - List all users
+- **POST** /users - Create new user
+  - Required: name (string), email (string)
+
+## Authentication
+All endpoints require Bearer token in Authorization header.
+`
+        return c.Markdown(schema)
+    }
+
+    // Regular clients get JSON
+    return c.JSON(200, getOpenAPISchema())
+})
+```
+
+**Why Markdown for AI?**
+- ✅ Better semantic understanding than JSON
+- ✅ Preserves structure (headers, lists, code blocks)
+- ✅ More context for LLMs to understand API behavior
+- ✅ Human-readable for debugging
+
+### Comparison with Other Routers
+
+| Feature | FURSY | Gin | Echo | Fiber |
+|---------|-------|-----|------|-------|
+| RFC 9110 Compliance | ✅ Full | 🔧 Partial | 🔧 Partial | 🔧 Partial |
+| Automatic Negotiation | ✅ `Negotiate()` | ❌ Manual | 🔧 `c.Format()` | ❌ Manual |
+| Quality Values (q) | ✅ Automatic | ❌ No | ❌ No | ❌ No |
+| Accept Helpers | ✅ `Accepts()`, `AcceptsAny()` | ❌ No | ❌ No | ✅ `c.Accepts()` |
+| Markdown Support | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
+| AI Agent Ready | ✅ Yes | ❌ No | ❌ No | ❌ No |
+
+**FURSY advantage**: Only router with full RFC 9110 compliance, automatic q-value handling, and built-in AI agent support.
+
+**Learn more**: See [RFC 9110 - HTTP Semantics (Content Negotiation)](https://datatracker.ietf.org/doc/html/rfc9110#section-12) for the complete specification.
+
+---
+
+## 📊 Observability
+
+FURSY provides **production-ready observability** through the OpenTelemetry plugin, giving you complete visibility into your HTTP services with distributed tracing and metrics.
+
+### Why Observability Matters
+
+Modern distributed systems require:
+- **Distributed Tracing** → Track requests across microservices
+- **Performance Metrics** → Monitor latency, throughput, errors
+- **Error Tracking** → Automatic error recording and status tracking
+- **Production Debugging** → Understand behavior in real-time
+
+FURSY's OpenTelemetry plugin provides all of this with **zero boilerplate** - just add middleware.
+
+### Distributed Tracing
+
+Track every request with W3C Trace Context propagation:
+
+```go
+import (
+    "context"
+    "github.com/coregx/fursy"
+    "github.com/coregx/fursy/plugins/opentelemetry"
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/exporters/jaeger"
+    sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+    // Initialize OpenTelemetry tracer
+    exporter, _ := jaeger.New(jaeger.WithCollectorEndpoint(
+        jaeger.WithEndpoint("http://localhost:14268/api/traces"),
+    ))
+    tp := sdktrace.NewTracerProvider(
+        sdktrace.WithBatcher(exporter),
+    )
+    otel.SetTracerProvider(tp)
+    defer tp.Shutdown(context.Background())
+
+    // Add tracing middleware - that's it!
+    router := fursy.New()
+    router.Use(opentelemetry.Middleware("my-service"))
+
+    router.GET("/users/:id", func(c *fursy.Context) error {
+        // Automatically traced! Span includes:
+        // - HTTP method, path, status
+        // - Request/response headers
+        // - Duration
+        // - Errors (if any)
+        user := getUser(c.Param("id"))
+        return c.OK(user)
+    })
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+**Features**:
+- ✅ **W3C Trace Context** - Automatic propagation across services
+- ✅ **HTTP Semantic Conventions** - Full OpenTelemetry compliance
+- ✅ **Error Recording** - Automatic error and status tracking
+- ✅ **Zero Overhead Filtering** - Skip health checks and metrics endpoints
+
+### Metrics Collection
+
+Track HTTP performance with Prometheus-compatible metrics:
+
+```go
+import (
+    "github.com/coregx/fursy"
+    "github.com/coregx/fursy/plugins/opentelemetry"
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/exporters/prometheus"
+    sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+)
+
+func main() {
+    // Initialize Prometheus exporter
+    exporter, _ := prometheus.New()
+    mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(exporter))
+    otel.SetMeterProvider(mp)
+
+    // Add metrics middleware
+    router := fursy.New()
+    router.Use(opentelemetry.Metrics("my-service"))
+
+    // Metrics automatically collected:
+    // - http.server.request.duration (histogram)
+    // - http.server.request.count (counter)
+    // - http.server.request.size (histogram)
+    // - http.server.response.size (histogram)
+
+    router.GET("/users", func(c *fursy.Context) error {
+        users := getAllUsers()
+        return c.OK(users)
+    })
+
+    // Expose metrics at /metrics
+    router.GET("/metrics", promhttp.Handler())
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+**Available Metrics**:
+
+| Metric | Type | Description | Labels |
+|--------|------|-------------|--------|
+| `http.server.request.duration` | Histogram | Request latency | method, status, server |
+| `http.server.request.count` | Counter | Total requests | method, status |
+| `http.server.request.size` | Histogram | Request body size | method |
+| `http.server.response.size` | Histogram | Response body size | method, status |
+
+**Cardinality Management**: All metrics use low-cardinality labels (method, status, server) to prevent metrics explosion.
+
+### Custom Spans for Business Logic
+
+Add custom spans to trace specific operations:
+
+```go
+import "go.opentelemetry.io/otel"
+
+router.GET("/users/:id", func(c *fursy.Context) error {
+    // HTTP request span is created automatically by middleware
+
+    // Add custom span for database query
+    ctx := c.Request.Context()
+    tracer := otel.Tracer("my-service")
+    ctx, span := tracer.Start(ctx, "database.get_user")
+    defer span.End()
+
+    user := db.GetUser(ctx, c.Param("id"))
+
+    // Add custom span for external API call
+    _, apiSpan := tracer.Start(ctx, "api.enrich_user_data")
+    enrichedData := api.Enrich(user)
+    apiSpan.End()
+
+    return c.OK(enrichedData)
+})
+```
+
+### Jaeger Integration Example
+
+Complete setup with Jaeger for local development:
+
+```bash
+# Start Jaeger all-in-one (includes UI)
+docker run -d --name jaeger \
+  -e COLLECTOR_OTLP_ENABLED=true \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  jaegertracing/all-in-one:latest
+
+# View traces at http://localhost:16686
+```
+
+Your fursy application will automatically send traces to Jaeger. No configuration changes needed!
+
+### Comparison with Other Routers
+
+| Feature | FURSY | Gin | Echo | Fiber |
+|---------|-------|-----|------|-------|
+| OpenTelemetry Built-in | ✅ Plugin | 🔧 Third-party | 🔧 Third-party | 🔧 Third-party |
+| HTTP Semantic Conventions | ✅ Full | 🔧 Partial | 🔧 Partial | 🔧 Partial |
+| Metrics API | ✅ OpenTelemetry | 🔧 Prometheus only | 🔧 Prometheus only | ✅ Built-in |
+| Distributed Tracing | ✅ W3C Trace Context | 🔧 Manual | 🔧 Manual | 🔧 Manual |
+| Cardinality Management | ✅ Automatic | ❌ Manual | ❌ Manual | ✅ Automatic |
+| Zero-config | ✅ One line | ❌ Multiple steps | ❌ Multiple steps | ✅ One line |
+
+**FURSY advantage**: Official OpenTelemetry plugin with full HTTP semantic conventions compliance and zero-config setup.
+
+**Learn more**: See [OpenTelemetry Plugin Documentation](plugins/opentelemetry/README.md) for advanced configuration, custom spans, and production patterns.
+
+---
+
 ## 📖 Documentation
 
 **Status**: 🟡 In Development
 
 - [Getting Started](#quick-start) (above)
+- [Validator Plugin](plugins/validator/README.md) - Type-safe validation
+- [OpenTelemetry Plugin](plugins/opentelemetry/README.md) - Distributed tracing and metrics
 - API Reference (coming soon)
 - Examples (coming soon)
 - Migration Guides (coming soon)
@@ -260,13 +1014,15 @@ router.DELETE[Empty, Empty]("/users/:id", func(b *fursy.Box[Empty, Empty]) error
 | Feature | FURSY | Gin | Echo | Chi | Fiber |
 |---------|--------|-----|------|-----|-------|
 | Type-Safe Handlers | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Auto Validation | ✅ | 🔧 Manual | 🔧 Manual | 🔧 Manual | 🔧 Manual |
+| Content Negotiation | ✅ RFC 9110 | 🔧 Partial | 🔧 Partial | ❌ | 🔧 Partial |
 | Zero Deps (core) | ✅ | ❌ | ❌ | ✅ | ❌ |
 | OpenAPI Built-in | ✅ | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin |
 | RFC 9457 Errors | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Go Version | 1.25+ | 1.13+ | 1.17+ | 1.16+ | 1.17+ |
 
-**FURSY is unique**: Only router combining furious performance, type-safe generics, OpenAPI, and RFC 9457 with minimal dependencies.
+**FURSY is unique**: Only router combining furious performance, type-safe generics, automatic validation, RFC 9110 content negotiation, OpenAPI, and RFC 9457 with minimal dependencies.
 
 ---
 
