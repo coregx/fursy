@@ -119,7 +119,7 @@ func formatFloatPrec(f float64, prec int) string {
 		return formatInt(int(f*10+0.5)) + "." + formatInt(int(f*10+0.5)%10)
 	case 2:
 		whole := int(f)
-		frac := int((f - float64(whole)) * 100 + 0.5)
+		frac := int((f-float64(whole))*100 + 0.5)
 		return formatInt(whole) + "." + formatTwoDigits(frac)
 	default:
 		return formatInt(int(f + 0.5))

@@ -13,54 +13,54 @@ import (
 // Test structs for comprehensive validation tag coverage.
 type TestAllTags struct {
 	// String validations.
-	URL            string `validate:"url"`
-	URI            string `validate:"uri"`
-	Alpha          string `validate:"alpha"`
-	AlphaNum       string `validate:"alphanum"`
-	Numeric        string `validate:"numeric"`
-	Number         string `validate:"number"`
-	Hexadecimal    string `validate:"hexadecimal"`
-	HexColor       string `validate:"hexcolor"`
-	RGB            string `validate:"rgb"`
-	RGBA           string `validate:"rgba"`
-	HSL            string `validate:"hsl"`
-	HSLA           string `validate:"hsla"`
-	UUID           string `validate:"uuid"`
-	UUID3          string `validate:"uuid3"`
-	UUID4          string `validate:"uuid4"`
-	UUID5          string `validate:"uuid5"`
-	ISBN           string `validate:"isbn"`
-	ISBN10         string `validate:"isbn10"`
-	ISBN13         string `validate:"isbn13"`
-	JSON           string `validate:"json"`
-	Latitude       string `validate:"latitude"`
-	Longitude      string `validate:"longitude"`
-	SSN            string `validate:"ssn"`
-	IPv4           string `validate:"ipv4"`
-	IPv6           string `validate:"ipv6"`
-	IP             string `validate:"ip"`
-	MAC            string `validate:"mac"`
-	Contains       string `validate:"contains=test"`
-	ContainsAny    string `validate:"containsany=abc"`
-	Excludes       string `validate:"excludes=test"`
-	ExcludesAll    string `validate:"excludesall=abc"`
-	StartsWith     string `validate:"startswith=prefix"`
-	EndsWith       string `validate:"endswith=suffix"`
-	DateTime       string `validate:"datetime=2006-01-02"`
-	MaxStr         string `validate:"max=10"`
-	LenStr         string `validate:"len=5"`
+	URL         string `validate:"url"`
+	URI         string `validate:"uri"`
+	Alpha       string `validate:"alpha"`
+	AlphaNum    string `validate:"alphanum"`
+	Numeric     string `validate:"numeric"`
+	Number      string `validate:"number"`
+	Hexadecimal string `validate:"hexadecimal"`
+	HexColor    string `validate:"hexcolor"`
+	RGB         string `validate:"rgb"`
+	RGBA        string `validate:"rgba"`
+	HSL         string `validate:"hsl"`
+	HSLA        string `validate:"hsla"`
+	UUID        string `validate:"uuid"`
+	UUID3       string `validate:"uuid3"`
+	UUID4       string `validate:"uuid4"`
+	UUID5       string `validate:"uuid5"`
+	ISBN        string `validate:"isbn"`
+	ISBN10      string `validate:"isbn10"`
+	ISBN13      string `validate:"isbn13"`
+	JSON        string `validate:"json"`
+	Latitude    string `validate:"latitude"`
+	Longitude   string `validate:"longitude"`
+	SSN         string `validate:"ssn"`
+	IPv4        string `validate:"ipv4"`
+	IPv6        string `validate:"ipv6"`
+	IP          string `validate:"ip"`
+	MAC         string `validate:"mac"`
+	Contains    string `validate:"contains=test"`
+	ContainsAny string `validate:"containsany=abc"`
+	Excludes    string `validate:"excludes=test"`
+	ExcludesAll string `validate:"excludesall=abc"`
+	StartsWith  string `validate:"startswith=prefix"`
+	EndsWith    string `validate:"endswith=suffix"`
+	DateTime    string `validate:"datetime=2006-01-02"`
+	MaxStr      string `validate:"max=10"`
+	LenStr      string `validate:"len=5"`
 
 	// Number validations.
-	GT             int     `validate:"gt=10"`
-	LT             int     `validate:"lt=100"`
-	EQ             int     `validate:"eq=42"`
-	NE             int     `validate:"ne=0"`
-	OneOf          string  `validate:"oneof=red green blue"`
+	GT    int    `validate:"gt=10"`
+	LT    int    `validate:"lt=100"`
+	EQ    int    `validate:"eq=42"`
+	NE    int    `validate:"ne=0"`
+	OneOf string `validate:"oneof=red green blue"`
 
 	// Slice validations.
-	MinSlice       []string `validate:"min=2"`
-	MaxSlice       []string `validate:"max=5"`
-	LenSlice       []string `validate:"len=3"`
+	MinSlice []string `validate:"min=2"`
+	MaxSlice []string `validate:"max=5"`
+	LenSlice []string `validate:"len=3"`
 }
 
 // TestDefaultMessage_AllTags tests all validation tag error messages.

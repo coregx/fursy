@@ -67,10 +67,10 @@ func main() {
 
 	// 5. Secure - OWASP 2025 security headers
 	router.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-		XFrameOptions:      middleware.XFrameOptionsSameOrigin,
-		ContentTypeNosniff: middleware.ContentTypeNosniffValue,
-		ReferrerPolicy:     middleware.ReferrerPolicyStrictOrigin,
-		HSTSMaxAge:         31536000, // 1 year (only if using HTTPS)
+		XFrameOptions:         middleware.XFrameOptionsSameOrigin,
+		ContentTypeNosniff:    middleware.ContentTypeNosniffValue,
+		ReferrerPolicy:        middleware.ReferrerPolicyStrictOrigin,
+		HSTSMaxAge:            31536000, // 1 year (only if using HTTPS)
 		ContentSecurityPolicy: "default-src 'self'",
 	}))
 
@@ -171,7 +171,7 @@ func main() {
 		userID := claims["sub"].(string)
 
 		return c.OK(map[string]interface{}{
-			"message":     "List of users",
+			"message":      "List of users",
 			"current_user": userID,
 			"users": []map[string]string{
 				{"id": "1", "name": "Alice"},
@@ -271,10 +271,10 @@ func main() {
 	router.POST("/auth/token", func(c *fursy.Context) error {
 		// Simple token generation (in production, validate credentials!)
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"sub": "user123",           // User ID
-			"iss": "fursy-demo",        // Issuer
+			"sub": "user123",                            // User ID
+			"iss": "fursy-demo",                         // Issuer
 			"exp": time.Now().Add(1 * time.Hour).Unix(), // Expires in 1 hour
-			"iat": time.Now().Unix(),   // Issued at
+			"iat": time.Now().Unix(),                    // Issued at
 		})
 
 		tokenString, err := token.SignedString(jwtSecret)
