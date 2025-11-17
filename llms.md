@@ -3,7 +3,7 @@
 > **DEFINITIVE GUIDE** for AI agents (Claude, ChatGPT, Copilot, etc.) working on fursy HTTP router project.
 >
 > **Project**: fursy - Fast Universal Routing SYstem
-> **Version**: v0.1.0 (Production Ready)
+> **Version**: v0.2.0 (Production Ready + Documentation & Examples)
 > **Go**: 1.25+
 > **Status**: Phase 3 Complete → Phase 4 (Ecosystem)
 
@@ -46,7 +46,7 @@
 
 ### Current Status (2025-11-17)
 
-- **Version**: v0.1.0 (after rebranding from FURY)
+- **Version**: v0.2.0 (Documentation & Examples release)
 - **Phase**: Phase 3 Complete ✅ (Foundation, API Excellence, Production Features)
 - **Next Phase**: Phase 4 - Ecosystem (documentation, community, plugins)
 - **Coverage**: 88.9% core (exceeds >85% target)
@@ -1675,6 +1675,7 @@ import "github.com/coregx/fursy/plugins/validator"
 ### Current Status (2025-11-17)
 
 - **v0.1.0** released (rebranded from FURY)
+- **v0.2.0** released (Documentation & Examples - 11 examples, llms.md, middleware docs)
 - **88.9% test coverage** (150+ tests, 19 benchmarks)
 - **0 linter issues** (golangci-lint strict)
 - **Phase 3 complete** (Foundation, API Excellence, Production Features)
@@ -1712,5 +1713,5 @@ import "github.com/coregx/fursy/plugins/validator"
 
 **Version**: 1.0
 **Last Updated**: 2025-11-17
-**Project Version**: v0.1.0 (Production Ready)
+**Project Version**: v0.2.0 (Production Ready + Documentation & Examples)
 **For Questions**: See `.claude/STATUS.md` and `.claude/CLAUDE.md`
