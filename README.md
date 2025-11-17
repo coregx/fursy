@@ -530,12 +530,189 @@ All endpoints require Bearer token in Authorization header.
 
 ---
 
+## 📊 Observability
+
+FURSY provides **production-ready observability** through the OpenTelemetry plugin, giving you complete visibility into your HTTP services with distributed tracing and metrics.
+
+### Why Observability Matters
+
+Modern distributed systems require:
+- **Distributed Tracing** → Track requests across microservices
+- **Performance Metrics** → Monitor latency, throughput, errors
+- **Error Tracking** → Automatic error recording and status tracking
+- **Production Debugging** → Understand behavior in real-time
+
+FURSY's OpenTelemetry plugin provides all of this with **zero boilerplate** - just add middleware.
+
+### Distributed Tracing
+
+Track every request with W3C Trace Context propagation:
+
+```go
+import (
+    "context"
+    "github.com/coregx/fursy"
+    "github.com/coregx/fursy/plugins/opentelemetry"
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/exporters/jaeger"
+    sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+    // Initialize OpenTelemetry tracer
+    exporter, _ := jaeger.New(jaeger.WithCollectorEndpoint(
+        jaeger.WithEndpoint("http://localhost:14268/api/traces"),
+    ))
+    tp := sdktrace.NewTracerProvider(
+        sdktrace.WithBatcher(exporter),
+    )
+    otel.SetTracerProvider(tp)
+    defer tp.Shutdown(context.Background())
+
+    // Add tracing middleware - that's it!
+    router := fursy.New()
+    router.Use(opentelemetry.Middleware("my-service"))
+
+    router.GET("/users/:id", func(c *fursy.Context) error {
+        // Automatically traced! Span includes:
+        // - HTTP method, path, status
+        // - Request/response headers
+        // - Duration
+        // - Errors (if any)
+        user := getUser(c.Param("id"))
+        return c.OK(user)
+    })
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+**Features**:
+- ✅ **W3C Trace Context** - Automatic propagation across services
+- ✅ **HTTP Semantic Conventions** - Full OpenTelemetry compliance
+- ✅ **Error Recording** - Automatic error and status tracking
+- ✅ **Zero Overhead Filtering** - Skip health checks and metrics endpoints
+
+### Metrics Collection
+
+Track HTTP performance with Prometheus-compatible metrics:
+
+```go
+import (
+    "github.com/coregx/fursy"
+    "github.com/coregx/fursy/plugins/opentelemetry"
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/exporters/prometheus"
+    sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+)
+
+func main() {
+    // Initialize Prometheus exporter
+    exporter, _ := prometheus.New()
+    mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(exporter))
+    otel.SetMeterProvider(mp)
+
+    // Add metrics middleware
+    router := fursy.New()
+    router.Use(opentelemetry.Metrics("my-service"))
+
+    // Metrics automatically collected:
+    // - http.server.request.duration (histogram)
+    // - http.server.request.count (counter)
+    // - http.server.request.size (histogram)
+    // - http.server.response.size (histogram)
+
+    router.GET("/users", func(c *fursy.Context) error {
+        users := getAllUsers()
+        return c.OK(users)
+    })
+
+    // Expose metrics at /metrics
+    router.GET("/metrics", promhttp.Handler())
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+**Available Metrics**:
+
+| Metric | Type | Description | Labels |
+|--------|------|-------------|--------|
+| `http.server.request.duration` | Histogram | Request latency | method, status, server |
+| `http.server.request.count` | Counter | Total requests | method, status |
+| `http.server.request.size` | Histogram | Request body size | method |
+| `http.server.response.size` | Histogram | Response body size | method, status |
+
+**Cardinality Management**: All metrics use low-cardinality labels (method, status, server) to prevent metrics explosion.
+
+### Custom Spans for Business Logic
+
+Add custom spans to trace specific operations:
+
+```go
+import "go.opentelemetry.io/otel"
+
+router.GET("/users/:id", func(c *fursy.Context) error {
+    // HTTP request span is created automatically by middleware
+
+    // Add custom span for database query
+    ctx := c.Request.Context()
+    tracer := otel.Tracer("my-service")
+    ctx, span := tracer.Start(ctx, "database.get_user")
+    defer span.End()
+
+    user := db.GetUser(ctx, c.Param("id"))
+
+    // Add custom span for external API call
+    _, apiSpan := tracer.Start(ctx, "api.enrich_user_data")
+    enrichedData := api.Enrich(user)
+    apiSpan.End()
+
+    return c.OK(enrichedData)
+})
+```
+
+### Jaeger Integration Example
+
+Complete setup with Jaeger for local development:
+
+```bash
+# Start Jaeger all-in-one (includes UI)
+docker run -d --name jaeger \
+  -e COLLECTOR_OTLP_ENABLED=true \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  jaegertracing/all-in-one:latest
+
+# View traces at http://localhost:16686
+```
+
+Your fursy application will automatically send traces to Jaeger. No configuration changes needed!
+
+### Comparison with Other Routers
+
+| Feature | FURSY | Gin | Echo | Fiber |
+|---------|-------|-----|------|-------|
+| OpenTelemetry Built-in | ✅ Plugin | 🔧 Third-party | 🔧 Third-party | 🔧 Third-party |
+| HTTP Semantic Conventions | ✅ Full | 🔧 Partial | 🔧 Partial | 🔧 Partial |
+| Metrics API | ✅ OpenTelemetry | 🔧 Prometheus only | 🔧 Prometheus only | ✅ Built-in |
+| Distributed Tracing | ✅ W3C Trace Context | 🔧 Manual | 🔧 Manual | 🔧 Manual |
+| Cardinality Management | ✅ Automatic | ❌ Manual | ❌ Manual | ✅ Automatic |
+| Zero-config | ✅ One line | ❌ Multiple steps | ❌ Multiple steps | ✅ One line |
+
+**FURSY advantage**: Official OpenTelemetry plugin with full HTTP semantic conventions compliance and zero-config setup.
+
+**Learn more**: See [OpenTelemetry Plugin Documentation](plugins/opentelemetry/README.md) for advanced configuration, custom spans, and production patterns.
+
+---
+
 ## 📖 Documentation
 
 **Status**: 🟡 In Development
 
 - [Getting Started](#quick-start) (above)
 - [Validator Plugin](plugins/validator/README.md) - Type-safe validation
+- [OpenTelemetry Plugin](plugins/opentelemetry/README.md) - Distributed tracing and metrics
 - API Reference (coming soon)
 - Examples (coming soon)
 - Migration Guides (coming soon)
