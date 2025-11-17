@@ -10,6 +10,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Future features and enhancements (Phase 4: Ecosystem)
 
+## [0.2.0] - 2025-01-18
+
+### Added
+
+**Validator Plugin**
+- New `plugins/validator` package with go-playground/validator/v10 integration
+- Automatic request validation with 100+ validation tags
+- RFC 9457 Problem Details error conversion
+- 40+ default error messages for common validation tags
+- Custom error messages support
+- 94.3% test coverage
+
+**Documentation Enhancements**
+- **Middleware Section** in README.md (288 lines)
+  - All 8 built-in middleware documented with examples
+  - Configuration options for each middleware
+  - Comparison table vs Gin/Echo/Fiber
+  - OPUS visibility fix - all middleware now discoverable
+- **Automatic Validation Section** in README.md
+  - Complete guide to request validation
+  - Type-safe Box[Req, Res] validation examples
+  - RFC 9457 error responses
+  - Comparison with other routers
+- **Content Negotiation Section** in README.md
+  - RFC 9110 compliant content negotiation
+  - AI agent support (text/markdown)
+  - Q-value priority examples
+  - Multi-format response examples
+- **Observability Section** in README.md
+  - OpenTelemetry integration guide
+  - Distributed tracing with Jaeger
+  - Metrics collection with Prometheus
+  - Custom spans examples
+- **llms.md** - Complete guide for AI agents (1,716 lines)
+  - Project architecture and structure
+  - Development standards (encoding/json/v2, log/slog, minimal deps)
+  - Testing requirements and git workflow
+  - All 8 middleware documented
+  - Common gotchas with fixes
+  - Contributing guidelines
+
+**Examples** (11 Total)
+- **Basic Examples**
+  - `01-hello-world` - Minimal fursy application (<30 lines)
+  - `02-rest-api-crud` - Complete CRUD API (385 lines)
+- **Advanced Examples**
+  - `04-content-negotiation` - Multi-format responses (1,507 lines)
+    - Accepts(), AcceptsAny(), Markdown() methods
+    - Q-value priority handling
+    - AI agent friendly responses
+  - `05-middleware` - All middleware + custom patterns (1,512 lines)
+    - All 8 built-in middleware demonstrated
+    - 8 custom middleware patterns
+    - Production-ready configurations
+  - `06-opentelemetry` - Distributed tracing (1,270 lines)
+    - OTLP/HTTP integration with Jaeger
+    - Custom spans for DB queries and external calls
+    - Docker Compose for Jaeger + Prometheus
+    - 7 endpoints demonstrating tracing patterns
+- **Validation Examples** (6 examples in validation/ directory)
+  - `validation/01-basic` - Simple validation demo
+  - `validation/02-rest-api-crud` - Full CRUD with validator
+  - `validation/03-custom-validator` - Custom validation functions
+  - `validation/04-nested-structs` - Nested struct validation
+  - `validation/05-custom-messages` - Custom error messages
+  - `validation/06-production` - Production-ready setup
+- **Examples Index**
+  - `examples/README.md` - Navigation guide (602 lines)
+  - Progressive learning path (Beginner → Intermediate → Advanced)
+  - Total learning time: ~3.5 hours
+
+### Improvements
+
+**Developer Experience**
+- Progressive learning path from basic to advanced (11 examples)
+- Complete navigation guide in examples/README.md
+- AI agent friendly documentation (llms.md)
+- All middleware now visible in README (OPUS discoverability fix)
+
+**Statistics**
+- 7,000+ lines of documentation added
+- 5,000+ lines of example code
+- 11 complete working examples
+- 3 new plugins documented (Validator, OpenTelemetry, Metrics)
+
+### Documentation
+
+**Updated Files**
+- README.md - Added 4 major sections (Middleware, Validation, Content Negotiation, Observability)
+- llms.md - Created comprehensive AI agent guide
+- examples/README.md - Created examples navigation index
+
+**Coverage**
+- All 8 middleware now documented
+- All public APIs documented with examples
+- Production patterns demonstrated in examples
+
 ## [0.1.0] - 2025-11-16
 
 ### Added

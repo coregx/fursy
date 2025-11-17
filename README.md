@@ -7,11 +7,11 @@ Next-generation HTTP router for Go with blazing performance, type-safe handlers,
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](https://github.com/coregx/fursy)
 [![Coverage](https://img.shields.io/badge/Coverage-91.7%25-brightgreen.svg)](https://github.com/coregx/fursy)
-[![Version](https://img.shields.io/badge/Version-v0.1.0-blue.svg)](https://github.com/coregx/fursy/releases)
+[![Version](https://img.shields.io/badge/Version-v0.2.0-blue.svg)](https://github.com/coregx/fursy/releases)
 
 ---
 
-## ⚡ Quick Start (v0.1.0)
+## ⚡ Quick Start
 
 ```go
 package main
