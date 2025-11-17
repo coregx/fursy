@@ -146,6 +146,7 @@ go get github.com/coregx/fursy
 - ✅ **High Performance Routing** - 256-326 ns/op, 1 alloc/op
 - ✅ **Type-Safe Generic Handlers** - Box[Req, Res] with compile-time safety
 - ✅ **Automatic Validation** - Set once, validate everywhere with 100+ tags
+- ✅ **Content Negotiation** - RFC 9110 compliant, AI agent support
 - ✅ **RFC 9457 Problem Details** - Standardized error responses
 - ✅ **Minimal Dependencies** - Core routing: stdlib only, middleware: minimal deps
 - ✅ **Middleware Pipeline** - Next/Abort pattern, pre-allocated buffers
@@ -380,6 +381,155 @@ curl -X POST http://localhost:8080/users \
 
 ---
 
+## 🌐 Content Negotiation
+
+FURSY provides **RFC 9110 compliant content negotiation**, enabling your API to respond in multiple formats based on the client's `Accept` header. This is essential for building modern APIs that serve both humans (HTML/Markdown) and machines (JSON/XML).
+
+### Why Content Negotiation Matters
+
+Modern APIs need to support multiple clients:
+- **Web Browsers** → HTML
+- **API Clients** → JSON
+- **AI Agents** → Markdown (for better understanding)
+- **Legacy Systems** → XML
+
+FURSY handles this automatically using **RFC 9110** standards with quality values (q-parameters).
+
+### Automatic Format Selection
+
+The simplest approach - FURSY picks the best format automatically:
+
+```go
+router.GET("/users/:id", func(c *fursy.Context) error {
+    user := getUser(c.Param("id"))
+
+    // Automatically selects format based on Accept header
+    // Supports: JSON, HTML, XML, Text, Markdown
+    return c.Negotiate(200, user)
+})
+```
+
+**Client requests:**
+```bash
+# JSON (default)
+curl http://localhost:8080/users/123
+# → Content-Type: application/json
+
+# HTML
+curl -H "Accept: text/html" http://localhost:8080/users/123
+# → Content-Type: text/html
+
+# XML
+curl -H "Accept: application/xml" http://localhost:8080/users/123
+# → Content-Type: application/xml
+```
+
+### Explicit Format Control
+
+For finer control, check what the client accepts:
+
+```go
+router.GET("/docs", func(c *fursy.Context) error {
+    // Check if client accepts markdown
+    if c.Accepts(fursy.MIMETextMarkdown) {
+        docs := generateMarkdownDocs()
+        return c.Markdown(docs)  // AI-friendly format
+    }
+
+    // Fallback to JSON
+    return c.OK(map[string]string{"message": "Use Accept: text/markdown for docs"})
+})
+```
+
+### Quality Values (q-parameter)
+
+RFC 9110 defines quality values to prioritize formats:
+
+```go
+router.GET("/api/data", func(c *fursy.Context) error {
+    data := getData()
+
+    // Client sends: Accept: text/html;q=0.9, application/json;q=1.0
+    // FURSY automatically picks JSON (higher q-value)
+    format := c.AcceptsAny(
+        fursy.MIMEApplicationJSON,  // q=1.0
+        fursy.MIMETextHTML,          // q=0.9
+        fursy.MIMETextMarkdown,      // fallback
+    )
+
+    switch format {
+    case fursy.MIMEApplicationJSON:
+        return c.JSON(200, data)
+    case fursy.MIMETextHTML:
+        return c.HTML(200, renderHTML(data))
+    case fursy.MIMETextMarkdown:
+        return c.Markdown(formatMarkdown(data))
+    default:
+        return c.OK(data)  // Default to JSON
+    }
+})
+```
+
+### Supported Formats
+
+| Format | MIME Type | Constant | Use Case |
+|--------|-----------|----------|----------|
+| JSON | `application/json` | `MIMEApplicationJSON` | API responses (default) |
+| HTML | `text/html` | `MIMETextHTML` | Web browsers |
+| XML | `application/xml` | `MIMEApplicationXML` | Legacy systems |
+| Plain Text | `text/plain` | `MIMETextPlain` | Simple data |
+| Markdown | `text/markdown` | `MIMETextMarkdown` | AI agents, documentation |
+
+### AI Agent Support
+
+FURSY has first-class support for AI agents via Markdown responses:
+
+```go
+router.GET("/api/schema", func(c *fursy.Context) error {
+    // AI agents prefer markdown for better understanding
+    if c.Accepts(fursy.MIMETextMarkdown) {
+        schema := `
+# API Schema
+
+## Users Endpoint
+- **GET** /users - List all users
+- **POST** /users - Create new user
+  - Required: name (string), email (string)
+
+## Authentication
+All endpoints require Bearer token in Authorization header.
+`
+        return c.Markdown(schema)
+    }
+
+    // Regular clients get JSON
+    return c.JSON(200, getOpenAPISchema())
+})
+```
+
+**Why Markdown for AI?**
+- ✅ Better semantic understanding than JSON
+- ✅ Preserves structure (headers, lists, code blocks)
+- ✅ More context for LLMs to understand API behavior
+- ✅ Human-readable for debugging
+
+### Comparison with Other Routers
+
+| Feature | FURSY | Gin | Echo | Fiber |
+|---------|-------|-----|------|-------|
+| RFC 9110 Compliance | ✅ Full | 🔧 Partial | 🔧 Partial | 🔧 Partial |
+| Automatic Negotiation | ✅ `Negotiate()` | ❌ Manual | 🔧 `c.Format()` | ❌ Manual |
+| Quality Values (q) | ✅ Automatic | ❌ No | ❌ No | ❌ No |
+| Accept Helpers | ✅ `Accepts()`, `AcceptsAny()` | ❌ No | ❌ No | ✅ `c.Accepts()` |
+| Markdown Support | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ Manual |
+| AI Agent Ready | ✅ Yes | ❌ No | ❌ No | ❌ No |
+
+**FURSY advantage**: Only router with full RFC 9110 compliance, automatic q-value handling, and built-in AI agent support.
+
+**Learn more**: See [RFC 9110 - HTTP Semantics (Content Negotiation)](https://datatracker.ietf.org/doc/html/rfc9110#section-12) for the complete specification.
+
+---
+
 ## 📖 Documentation
 
 **Status**: 🟡 In Development
@@ -398,13 +548,14 @@ curl -X POST http://localhost:8080/users \
 |---------|--------|-----|------|-----|-------|
 | Type-Safe Handlers | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Auto Validation | ✅ | 🔧 Manual | 🔧 Manual | 🔧 Manual | 🔧 Manual |
+| Content Negotiation | ✅ RFC 9110 | 🔧 Partial | 🔧 Partial | ❌ | 🔧 Partial |
 | Zero Deps (core) | ✅ | ❌ | ❌ | ✅ | ❌ |
 | OpenAPI Built-in | ✅ | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin |
 | RFC 9457 Errors | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Go Version | 1.25+ | 1.13+ | 1.17+ | 1.16+ | 1.17+ |
 
-**FURSY is unique**: Only router combining furious performance, type-safe generics, automatic validation, OpenAPI, and RFC 9457 with minimal dependencies.
+**FURSY is unique**: Only router combining furious performance, type-safe generics, automatic validation, RFC 9110 content negotiation, OpenAPI, and RFC 9457 with minimal dependencies.
 
 ---
 
