@@ -32,7 +32,7 @@
 
 ## Project Overview
 
-**fursy** is a next-generation HTTP router for Go 1.25+ that combines blazing performance with modern features:
+**FURSY** is a next-generation HTTP router for Go 1.25+ that combines blazing performance with modern features:
 
 ### Key Features
 
