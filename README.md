@@ -161,6 +161,296 @@ go get github.com/coregx/fursy
 
 ---
 
+## 🎛️ Middleware
+
+FURSY includes **8 production-ready middleware** with minimal dependencies. Core middleware have **zero external dependencies** (stdlib only), with only 2 exceptions: JWT (golang-jwt/jwt) and RateLimit (x/time).
+
+### Core Middleware (Zero Dependencies)
+
+#### Logger
+
+Structured logging with `log/slog` for comprehensive request tracking.
+
+```go
+import (
+    "log/slog"
+    "github.com/coregx/fursy/middleware"
+)
+
+// Default configuration
+router.Use(middleware.Logger())
+
+// With configuration
+logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+router.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+    Logger: logger,
+    SkipPaths: []string{"/health", "/metrics"},
+}))
+```
+
+**Features**:
+- ✅ Structured logging with `log/slog` (stdlib)
+- ✅ Request method, path, status, latency, bytes written
+- ✅ Client IP extraction (X-Real-IP, X-Forwarded-For)
+- ✅ Skip paths or custom skip function
+- ✅ JSON or text format support
+- ✅ Zero external dependencies
+
+---
+
+#### Recovery
+
+Panic recovery with stack traces and RFC 9457 Problem Details.
+
+```go
+router.Use(middleware.Recovery())
+
+// With stack traces (development)
+router.Use(middleware.RecoveryWithConfig(middleware.RecoveryConfig{
+    IncludeStackTrace: true,
+}))
+```
+
+**Features**:
+- ✅ Automatic panic recovery
+- ✅ Stack trace logging
+- ✅ RFC 9457 error responses
+- ✅ Custom error handler
+- ✅ Production-safe (no stack traces by default)
+- ✅ Zero external dependencies
+
+---
+
+#### CORS
+
+Cross-Origin Resource Sharing (RFC-compliant, OWASP recommended).
+
+```go
+router.Use(middleware.CORS())
+
+// With custom config
+router.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+    AllowOrigins: "https://example.com,https://foo.com",
+    AllowMethods: "GET,POST,PUT,DELETE",
+    AllowHeaders: "Content-Type,Authorization",
+    AllowCredentials: true,
+    MaxAge: 12 * time.Hour,
+}))
+```
+
+**Features**:
+- ✅ Wildcard origins (`*`) support
+- ✅ Preflight requests (OPTIONS) handling
+- ✅ Credentials support
+- ✅ Expose headers configuration
+- ✅ MaxAge caching
+- ✅ Zero external dependencies
+
+---
+
+#### BasicAuth
+
+HTTP Basic Authentication with constant-time comparison.
+
+```go
+router.Use(middleware.BasicAuth(middleware.BasicAuthConfig{
+    Username: "admin",
+    Password: "secret",
+}))
+
+// With custom validator
+router.Use(middleware.BasicAuth(middleware.BasicAuthConfig{
+    Validator: func(username, password string) bool {
+        return checkDatabase(username, password)
+    },
+}))
+```
+
+**Features**:
+- ✅ Simple username/password validation
+- ✅ Custom validator function
+- ✅ Realm configuration
+- ✅ WWW-Authenticate header
+- ✅ Constant-time comparison (timing attack protection)
+- ✅ Zero external dependencies
+
+---
+
+#### Secure
+
+OWASP 2025 security headers for production hardening.
+
+```go
+router.Use(middleware.Secure())
+
+// With custom config
+router.Use(middleware.SecureWithConfig(middleware.SecureConfig{
+    ContentSecurityPolicy:   "default-src 'self'; script-src 'self' 'unsafe-inline'",
+    HSTSMaxAge:             31536000, // 1 year
+    HSTSExcludeSubdomains:  false,
+    XFrameOptions:          "DENY",
+    ContentTypeNosniff:     "nosniff",
+    ReferrerPolicy:         "strict-origin-when-cross-origin",
+}))
+```
+
+**Features (OWASP 2025)**:
+- ✅ Content-Security-Policy (CSP)
+- ✅ Strict-Transport-Security (HSTS)
+- ✅ X-Frame-Options
+- ✅ X-Content-Type-Options: nosniff
+- ✅ X-XSS-Protection (deprecated, not set by default)
+- ✅ Referrer-Policy
+- ✅ Cross-Origin-Embedder-Policy
+- ✅ Cross-Origin-Opener-Policy
+- ✅ Cross-Origin-Resource-Policy
+- ✅ Permissions-Policy
+
+**Coverage**: 100%
+**Dependencies**: Zero (stdlib only)
+
+---
+
+### Authentication & Rate Limiting
+
+#### JWT
+
+JWT token validation with algorithm confusion prevention.
+
+```go
+import "github.com/golang-jwt/jwt/v5"
+
+router.Use(middleware.JWT(middleware.JWTConfig{
+    SigningKey:    []byte("your-secret-key"),
+    SigningMethod: jwt.SigningMethodHS256,
+    TokenLookup:   "header:Authorization",
+}))
+
+// With custom validation
+router.Use(middleware.JWT(middleware.JWTConfig{
+    SigningKey:    []byte("secret"),
+    SigningMethod: jwt.SigningMethodHS256,
+    Issuer:        "my-app",
+    Audience:      []string{"api"},
+}))
+```
+
+**Features**:
+- ✅ Algorithms: HS256, HS384, HS512, RS256, ES256
+- ✅ Token from Header/Query/Cookie
+- ✅ Issuer/Audience validation
+- ✅ Algorithm confusion prevention (forbids "none")
+- ✅ Custom claims support
+- ✅ Expiration time validation
+
+**Dependency**: `github.com/golang-jwt/jwt/v5`
+
+---
+
+#### RateLimit
+
+Token bucket rate limiting with RFC-compliant headers.
+
+```go
+router.Use(middleware.RateLimit(middleware.RateLimitConfig{
+    Rate:  100,  // 100 requests per second
+    Burst: 200,  // burst of 200
+    KeyFunc: middleware.RateLimitByIP,
+}))
+
+// Custom key function
+router.Use(middleware.RateLimit(middleware.RateLimitConfig{
+    Rate:  10,
+    Burst: 20,
+    KeyFunc: func(c *fursy.Context) string {
+        // Rate limit by user ID
+        userID := c.Get("user_id").(string)
+        return userID
+    },
+}))
+```
+
+**Features**:
+- ✅ Token bucket algorithm (`golang.org/x/time/rate`)
+- ✅ Per-IP or custom key function
+- ✅ RFC headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`)
+- ✅ In-memory store with automatic cleanup
+- ✅ Custom error handler
+- ✅ Configurable retry-after header
+
+**Dependency**: `golang.org/x/time/rate`
+
+---
+
+### Resilience
+
+#### CircuitBreaker
+
+Zero-dependency circuit breaker for fault tolerance.
+
+```go
+router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
+    MaxRequests:         100,
+    ConsecutiveFailures: 5,
+    Timeout:             30 * time.Second,
+    ResetTimeout:        60 * time.Second,
+}))
+
+// With ratio-based threshold
+router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
+    MaxRequests:  1000,
+    FailureRatio: 0.25, // Open circuit when 25% of requests fail
+    Timeout:      30 * time.Second,
+    ResetTimeout: 60 * time.Second,
+}))
+```
+
+**Features**:
+- ✅ Zero external dependencies (pure Go)
+- ✅ Consecutive failures threshold
+- ✅ Ratio-based threshold
+- ✅ Time-window threshold
+- ✅ Half-open state with max requests
+- ✅ States: Closed → Open → Half-Open → Closed
+- ✅ Custom error handler
+- ✅ Thread-safe (concurrent request handling)
+
+**Coverage**: 95.5%
+**Dependencies**: Zero (stdlib only)
+
+---
+
+### Middleware Comparison
+
+| Middleware | FURSY | Gin | Echo | Fiber |
+|------------|-------|-----|------|-------|
+| **Logger** | ✅ `log/slog` | ✅ Custom | ✅ Custom | ✅ Custom |
+| **Recovery** | ✅ RFC 9457 | ✅ Basic | ✅ Basic | ✅ Basic |
+| **CORS** | ✅ Built-in (zero deps) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
+| **BasicAuth** | ✅ Built-in | ✅ Built-in | ✅ Built-in | ✅ Built-in |
+| **JWT** | ✅ Built-in | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
+| **Rate Limit** | ✅ Built-in (RFC headers) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
+| **Security Headers** | ✅ OWASP 2025 | ❌ | 🔧 Plugin | ✅ Basic |
+| **Circuit Breaker** | ✅ Zero deps | ❌ | ❌ | ❌ |
+| **Test Coverage** | **88.9%** | ? | ? | ? |
+| **Dependencies** | **Core: 0, JWT: 1, RateLimit: 1** | Multiple | Multiple | Multiple |
+
+**Legend**:
+- ✅ = Built-in with high quality implementation
+- 🔧 = Plugin/third-party required
+- ❌ = Not available
+
+**FURSY advantage**: Production-ready middleware with minimal dependencies, OWASP 2025 compliance, RFC 9457 error responses, and comprehensive test coverage.
+
+---
+
+### Learn More
+
+- **[Middleware Examples](examples/05-middleware/)** - Complete examples for all 8 middleware
+- **[Middleware Source](middleware/)** - Middleware implementations with tests
+
+---
+
 ## 🎯 Convenience Methods (REST Best Practices)
 
 FURSY provides convenient shortcuts for common HTTP response patterns, following REST best practices:
