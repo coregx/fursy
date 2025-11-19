@@ -1,0 +1,41 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    env:
+      GOEXPERIMENT: jsonv2  # Required for encoding/json/v2
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+        cache: true
+
+    - name: Run benchmarks
+      run: |
+        go test -bench=. -benchmem -run=^$ ./... > benchmark_results.txt
+        cat benchmark_results.txt
+
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      continue-on-error: true  # gh-pages branch created on first run
+      if: github.ref == 'refs/heads/main'
+      with:
+        tool: 'go'
+        output-file-path: benchmark_results.txt
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: false

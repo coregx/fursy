@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Future features and enhancements (Phase 4: Ecosystem)
 
+## [0.3.2] - 2025-01-19
+
+### Fixed
+- **Minimal Dependencies Policy**: Removed SQLite from core dependencies
+  - Deleted redundant `plugins_integration_test.go` from root (integration tests already in `plugins/database/`)
+  - Core now has ONLY 2 external dependencies: `golang-jwt/jwt` (JWT middleware) and `golang.org/x/time` (RateLimit middleware)
+  - Removed ~10 transitive dependencies from core module (dustin/go-humanize, google/uuid, modernc.org/sqlite, etc.)
+  - SQLite remains available in `plugins/database` for users who need it
+
+### Changed
+- **Coverage**: 91.7% (maintained high quality after cleanup)
+- **Tests**: All passing with race detector
+- **Performance**: No regressions (256 ns/op static, 326 ns/op parametric)
+
+## [0.3.1] - 2025-01-19
+
+### Fixed
+- **Build Issues**: Fixed issues in v0.3.0 cached in proxy.golang.org
+  - Removed local path replace directive from go.mod (fixes CI failures)
+  - Deleted broken `examples/09-rest-api-with-db/main.go` (syntax errors)
+  - Applied code formatting with gofmt to all files
+  - Cleaned up go.mod dependencies
+
+### Note
+v0.3.1 is a patch release fixing deployment issues in v0.3.0. Use v0.3.2 for the cleanest version.
+
 ## [0.3.0] - 2025-01-19
 
 ### Added

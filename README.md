@@ -3,11 +3,12 @@
 
 Next-generation HTTP router for Go with blazing performance, type-safe handlers, and minimal dependencies.
 
-[![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](https://github.com/coregx/fursy)
-[![Coverage](https://img.shields.io/badge/Coverage-93.1%25-brightgreen.svg)](https://github.com/coregx/fursy)
-[![Version](https://img.shields.io/badge/Version-v0.3.0-blue.svg)](https://github.com/coregx/fursy/releases)
+[![Go Reference](https://pkg.go.dev/badge/github.com/coregx/fursy.svg)](https://pkg.go.dev/github.com/coregx/fursy)
+[![Go Report Card](https://goreportcard.com/badge/github.com/coregx/fursy)](https://goreportcard.com/report/github.com/coregx/fursy)
+[![Tests](https://github.com/coregx/fursy/actions/workflows/test.yml/badge.svg)](https://github.com/coregx/fursy/actions)
+[![codecov](https://codecov.io/gh/coregx/fursy/branch/main/graph/badge.svg)](https://codecov.io/gh/coregx/fursy)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/coregx/fursy)](https://github.com/coregx/fursy/releases)
 
 ---
 
