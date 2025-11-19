@@ -538,12 +538,12 @@ func TestService_ListUsers(t *testing.T) {
 	user3, _ := NewUser("user3@example.com", "Password123", "User 3")
 
 	tests := []struct {
-		name       string
-		offset     int
-		limit      int
-		setup      func(*mockRepository)
-		wantCount  int
-		wantTotal  int
+		name      string
+		offset    int
+		limit     int
+		setup     func(*mockRepository)
+		wantCount int
+		wantTotal int
 	}{
 		{
 			name:   "all users",

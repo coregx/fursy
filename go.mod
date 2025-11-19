@@ -4,8 +4,6 @@ go 1.25.0
 
 require (
 	github.com/coregx/fursy/plugins/database v0.0.0-00010101000000-000000000000
-	github.com/coregx/fursy/plugins/stream v0.0.0-00010101000000-000000000000
-	github.com/coregx/stream v0.1.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	golang.org/x/time v0.14.0
 	modernc.org/sqlite v1.40.1
@@ -23,8 +21,6 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
-
-replace github.com/coregx/stream => D:/projects/coregx/stream
 
 replace github.com/coregx/fursy/plugins/stream => ./plugins/stream
 

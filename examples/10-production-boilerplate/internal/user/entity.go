@@ -17,8 +17,8 @@ type User struct {
 	Email     Email    // Value Object
 	Password  Password // Value Object
 	Name      string
-	Role      Role     // Value Object
-	Status    Status   // Value Object
+	Role      Role   // Value Object
+	Status    Status // Value Object
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

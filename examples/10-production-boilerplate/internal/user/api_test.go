@@ -15,14 +15,14 @@ import (
 
 // mockService is a mock implementation of Service for API testing.
 type mockService struct {
-	registerFunc      func(ctx context.Context, req RegisterRequest) (*User, error)
-	loginFunc         func(ctx context.Context, req LoginRequest) (string, error)
-	getProfileFunc    func(ctx context.Context, userID string) (*User, error)
-	updateProfileFunc func(ctx context.Context, userID string, req UpdateProfileRequest) (*User, error)
+	registerFunc       func(ctx context.Context, req RegisterRequest) (*User, error)
+	loginFunc          func(ctx context.Context, req LoginRequest) (string, error)
+	getProfileFunc     func(ctx context.Context, userID string) (*User, error)
+	updateProfileFunc  func(ctx context.Context, userID string, req UpdateProfileRequest) (*User, error)
 	changePasswordFunc func(ctx context.Context, userID string, req ChangePasswordRequest) error
-	listUsersFunc     func(ctx context.Context, offset, limit int) ([]*User, int, error)
-	banUserFunc       func(ctx context.Context, userID string) error
-	promoteFunc       func(ctx context.Context, userID string) error
+	listUsersFunc      func(ctx context.Context, offset, limit int) ([]*User, int, error)
+	banUserFunc        func(ctx context.Context, userID string) error
+	promoteFunc        func(ctx context.Context, userID string) error
 }
 
 func (m *mockService) Register(ctx context.Context, req RegisterRequest) (*User, error) {

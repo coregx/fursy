@@ -6,9 +6,9 @@ package main
 
 import (
 	"encoding/json/v2"
-	"net/http"
 	"log"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/coregx/fursy"

@@ -5,9 +5,9 @@
 package main
 
 import (
-	"net/http"
 	"log"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/coregx/fursy"

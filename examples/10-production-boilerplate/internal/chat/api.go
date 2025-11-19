@@ -3,8 +3,8 @@ package chat
 import (
 	"log/slog"
 
-	"github.com/coregx/fursy"
 	"example.com/production-boilerplate/internal/shared/auth"
+	"github.com/coregx/fursy"
 	"github.com/coregx/stream/websocket"
 )
 

@@ -48,7 +48,7 @@ func (api *API) RegisterRoutes(r *fursy.Router, authMiddleware fursy.HandlerFunc
 func (api *API) register(c *fursy.Context) error {
 	var req RegisterRequest
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error(),))
+		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error()))
 	}
 
 	user, err := api.service.Register(c.Request.Context(), req)
@@ -64,7 +64,7 @@ func (api *API) register(c *fursy.Context) error {
 func (api *API) login(c *fursy.Context) error {
 	var req LoginRequest
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error(),))
+		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error()))
 	}
 
 	token, err := api.service.Login(c.Request.Context(), req)
@@ -97,7 +97,7 @@ func (api *API) updateProfile(c *fursy.Context) error {
 
 	var req UpdateProfileRequest
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error(),))
+		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error()))
 	}
 
 	user, err := api.service.UpdateProfile(c.Request.Context(), userID, req)
@@ -115,7 +115,7 @@ func (api *API) changePassword(c *fursy.Context) error {
 
 	var req ChangePasswordRequest
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error(),))
+		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error()))
 	}
 
 	err := api.service.ChangePassword(c.Request.Context(), userID, req)
@@ -131,8 +131,14 @@ func (api *API) changePassword(c *fursy.Context) error {
 // listUsers lists all users (admin only).
 func (api *API) listUsers(c *fursy.Context) error {
 	// Parse pagination from query params
-	offset, _ := strconv.Atoi(c.Query("offset")); if offset == 0 { offset = 0 }
-	limit, _ := strconv.Atoi(c.Query("limit")); if limit == 0 { limit = 20 }
+	offset, _ := strconv.Atoi(c.Query("offset"))
+	if offset == 0 {
+		offset = 0
+	}
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	if limit == 0 {
+		limit = 20
+	}
 
 	users, total, err := api.service.ListUsers(c.Request.Context(), offset, limit)
 	if err != nil {
