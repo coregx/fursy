@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Future features and enhancements (Phase 4: Ecosystem)
 
-## [0.3.3] - 2025-01-19
+## [0.3.3] - 2025-11-24
 
 ### Fixed
 - **Critical Routing Bug**: Fixed panic in routes with `:param` followed by multiple static segments
@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Direct Assignment**: Use `n.children = []*node{child}` instead of `addChild()` to allow empty path placeholder
 - **Zero-allocation Routing**: Placeholder pattern maintains zero-allocation guarantee for route lookup
 
-## [0.3.2] - 2025-01-19
+## [0.3.2] - 2025-11-19
 
 ### Fixed
 - **Minimal Dependencies Policy**: Removed SQLite from core dependencies
@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tests**: All passing with race detector
 - **Performance**: No regressions (256 ns/op static, 326 ns/op parametric)
 
-## [0.3.1] - 2025-01-19
+## [0.3.1] - 2025-11-19
 
 ### Fixed
 - **Build Issues**: Fixed issues in v0.3.0 cached in proxy.golang.org
@@ -70,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Note
 v0.3.1 is a patch release fixing deployment issues in v0.3.0. Use v0.3.2 for the cleanest version.
 
-## [0.3.0] - 2025-01-19
+## [0.3.0] - 2025-11-19
 
 ### Added
 
@@ -219,7 +219,7 @@ v0.3.1 is a patch release fixing deployment issues in v0.3.0. Use v0.3.2 for the
 ### Contributors
 - Enhanced by Claude (fursy-senior-architect agent)
 
-## [0.2.0] - 2025-01-18
+## [0.2.0] - 2025-11-18
 
 ### Added
 
