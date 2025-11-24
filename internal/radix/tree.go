@@ -115,6 +115,29 @@ func (t *Tree) insertNode(path string, handler interface{}, n *node, fullPath st
 		return nil
 	}
 
+	// Special case: '/' after param
+	// This handles the case where param nodes have static children like:
+	// /users/:id/activate, /users/:id/deactivate
+	// Following httprouter's approach: skip prefix check for param children
+	if n.nType == param && path != "" && path[0] == '/' {
+		if len(n.children) > 0 {
+			// Move to the existing child node and continue inserting there
+			n = n.children[0]
+			n.incrementPriority()
+			return t.insertNode(path, handler, n, fullPath)
+		}
+
+		// No children yet - create empty placeholder child (like httprouter does)
+		// This child will hold all static paths after this param
+		child := &node{
+			priority: 1,
+		}
+		// Directly assign children array (bypassing addChild which rejects empty path)
+		n.children = []*node{child}
+		n = child
+		return t.insertNode(path, handler, n, fullPath)
+	}
+
 	// Find longest common prefix
 	i := longestCommonPrefix(path, n.path)
 

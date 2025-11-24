@@ -10,6 +10,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Future features and enhancements (Phase 4: Ecosystem)
 
+## [0.3.3] - 2025-01-19
+
+### Fixed
+- **Critical Routing Bug**: Fixed panic in routes with `:param` followed by multiple static segments
+  - Routes like `/users/:id/activate` + `/users/:id/deactivate` would panic at line 147
+  - Root cause: Common prefix check compared `/deactivate` with `:id` and found no match
+  - **Solution**: Implemented httprouter's approach of creating empty placeholder child nodes after param nodes
+  - Pattern studied from httprouter's `insertChild` (lines 217-270) and `addRoute` (lines 180-184)
+  - Changed files:
+    - `internal/radix/tree.go` (lines 118-138): Added special case handling for param node children
+    - `internal/radix/tree_param_static_test.go` (new file): 6 comprehensive test cases covering all param+static patterns
+
+### Testing
+- All 650+ tests passing with race detector (via WSL2 Gentoo)
+- **New test cases** (all passing):
+  - `TestTree_ParamWithMultipleStaticChildren` - Original bug case (`/users/:id/activate` + `/users/:id/deactivate`)
+  - `TestTree_NestedParams` - Nested params (`/users/:user_id/posts/:post_id/comments`)
+  - `TestTree_AlternatingParamStatic` - Alternating pattern (`/a/:b/c/:d/e`)
+  - `TestTree_ParamWithLongStaticTail` - Long static tails (`/:a/b/c/d/e/f/g`)
+  - `TestTree_ConsecutiveParams` - Consecutive params (`/:a/:b/:c/d`)
+  - `TestTree_StaticVsParam` - Static priority over params
+- **Coverage**: 88.4% internal/radix, 91.7% overall (maintained high quality)
+- **Linter**: 0 issues (golangci-lint clean)
+
+### Performance
+- No regressions - routing performance maintained:
+  - Static routes: 256 ns/op, 1 alloc/op
+  - Parametric routes: 326 ns/op, 1 alloc/op
+
+### Technical Details
+- **httprouter Pattern**: When param node has static children, create empty placeholder child (path="", priority=1) and bypass common prefix check
+- **Direct Assignment**: Use `n.children = []*node{child}` instead of `addChild()` to allow empty path placeholder
+- **Zero-allocation Routing**: Placeholder pattern maintains zero-allocation guarantee for route lookup
+
 ## [0.3.2] - 2025-01-19
 
 ### Fixed
