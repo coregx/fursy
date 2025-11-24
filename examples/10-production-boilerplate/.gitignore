@@ -1,0 +1,33 @@
+# Binaries
+10-production-boilerplate
+server
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Environment files
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

@@ -3,11 +3,12 @@
 
 Next-generation HTTP router for Go with blazing performance, type-safe handlers, and minimal dependencies.
 
-[![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](https://github.com/coregx/fursy)
-[![Coverage](https://img.shields.io/badge/Coverage-91.7%25-brightgreen.svg)](https://github.com/coregx/fursy)
-[![Version](https://img.shields.io/badge/Version-v0.2.0-blue.svg)](https://github.com/coregx/fursy/releases)
+[![Go Reference](https://pkg.go.dev/badge/github.com/coregx/fursy.svg)](https://pkg.go.dev/github.com/coregx/fursy)
+[![Go Report Card](https://goreportcard.com/badge/github.com/coregx/fursy)](https://goreportcard.com/report/github.com/coregx/fursy)
+[![Tests](https://github.com/coregx/fursy/actions/workflows/test.yml/badge.svg)](https://github.com/coregx/fursy/actions)
+[![codecov](https://codecov.io/gh/coregx/fursy/branch/main/graph/badge.svg)](https://codecov.io/gh/coregx/fursy)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/coregx/fursy)](https://github.com/coregx/fursy/releases)
 
 ---
 
@@ -158,6 +159,9 @@ go get github.com/coregx/fursy
 - ✅ **Graceful Shutdown** - Connection draining, Kubernetes-ready
 - ✅ **Context Pooling** - Memory-efficient, prevents leaks
 - ✅ **Convenience Methods** - REST-friendly shortcuts (OK, Created, NoContentSuccess)
+- ✅ **Real-Time Communications** - SSE + WebSocket via stream library
+- ✅ **Database Integration** - dbcontext pattern with transaction support
+- ✅ **Production Boilerplate** - Complete DDD example with real-time features
 
 ---
 
@@ -432,7 +436,7 @@ router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
 | **Rate Limit** | ✅ Built-in (RFC headers) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
 | **Security Headers** | ✅ OWASP 2025 | ❌ | 🔧 Plugin | ✅ Basic |
 | **Circuit Breaker** | ✅ Zero deps | ❌ | ❌ | ❌ |
-| **Test Coverage** | **88.9%** | ? | ? | ? |
+| **Test Coverage** | **93.1%** | ? | ? | ? |
 | **Dependencies** | **Core: 0, JWT: 1, RateLimit: 1** | Multiple | Multiple | Multiple |
 
 **Legend**:
@@ -536,6 +540,123 @@ router.DELETE[Empty, Empty]("/users/:id", func(b *fursy.Box[Empty, Empty]) error
     return b.NoContentSuccess()  // 204
 })
 ```
+
+### Plugin Integration Methods
+
+FURSY provides seamless integration with plugins through convenient Context methods:
+
+#### Database Access
+
+```go
+import (
+    "github.com/coregx/fursy"
+    "github.com/coregx/fursy/plugins/database"
+)
+
+// Setup database
+sqlDB, _ := sql.Open("postgres", dsn)
+db := database.NewDB(sqlDB)
+
+router := fursy.New()
+router.Use(database.Middleware(db))
+
+// Access database in handlers
+router.GET("/users/:id", func(c *fursy.Context) error {
+    db := c.DB().(*database.DB)  // Type assertion
+
+    var user User
+    err := db.QueryRow(c.Request.Context(),
+        "SELECT id, name FROM users WHERE id = $1", c.Param("id")).
+        Scan(&user.ID, &user.Name)
+
+    if err == sql.ErrNoRows {
+        return c.Problem(fursy.NotFound("User not found"))
+    }
+    return c.JSON(200, user)
+})
+```
+
+**Type-safe helper** (recommended):
+
+```go
+router.GET("/users/:id", func(c *fursy.Context) error {
+    db, ok := database.GetDB(c)  // Type-safe retrieval
+    if !ok {
+        return c.Problem(fursy.InternalServerError("Database not configured"))
+    }
+
+    // Use db...
+})
+```
+
+#### Server-Sent Events (SSE)
+
+```go
+import (
+    "github.com/coregx/fursy/plugins/stream"
+    "github.com/coregx/stream/sse"
+)
+
+// Setup SSE hub
+hub := sse.NewHub[Notification]()
+go hub.Run()
+defer hub.Close()
+
+router.Use(stream.SSEHub(hub))
+
+// SSE endpoint
+router.GET("/events", func(c *fursy.Context) error {
+    hub, _ := stream.GetSSEHub[Notification](c)
+
+    return stream.SSEUpgrade(c, func(conn *sse.Conn) error {
+        hub.Register(conn)
+        defer hub.Unregister(conn)
+
+        <-conn.Done()  // Wait for client disconnect
+        return nil
+    })
+})
+```
+
+#### WebSocket
+
+```go
+import (
+    "github.com/coregx/fursy/plugins/stream"
+    "github.com/coregx/stream/websocket"
+)
+
+// Setup WebSocket hub
+hub := websocket.NewHub()
+go hub.Run()
+defer hub.Close()
+
+router.Use(stream.WebSocketHub(hub))
+
+// WebSocket endpoint
+router.GET("/ws", func(c *fursy.Context) error {
+    hub, _ := stream.GetWebSocketHub(c)
+
+    return stream.WebSocketUpgrade(c, func(conn *websocket.Conn) error {
+        hub.Register(conn)
+        defer hub.Unregister(conn)
+
+        for {
+            msgType, data, err := conn.Read()
+            if err != nil {
+                return err
+            }
+            hub.Broadcast(data)  // Echo to all clients
+        }
+    }, nil)
+})
+```
+
+**See also**:
+- **[plugins/database](plugins/database/)** - Database integration with transactions
+- **[plugins/stream](plugins/stream/)** - SSE and WebSocket real-time communication
+- **[examples/07-sse-notifications](examples/07-sse-notifications/)** - SSE example
+- **[examples/08-websocket-chat](examples/08-websocket-chat/)** - WebSocket example
 
 ---
 
@@ -1028,30 +1149,31 @@ Your fursy application will automatically send traces to Jaeger. No configuratio
 
 ## 📈 Status
 
-**Current Version**: v0.1.0 (Production Ready)
+**Current Version**: v0.3.0 (Production Ready)
 
-**Status**: Production Ready - Complete routing, middleware, auth, rate limiting, circuit breaker
+**Status**: Production Ready - Complete ecosystem with real-time, database, and production examples
 
-**Coverage**: 91.7% test coverage
+**Coverage**: 93.1% test coverage (core), 650+ tests total
 
 **Performance**: 256 ns/op (static), 326 ns/op (parametric), 1 alloc/op
 
 **Roadmap**:
 
 ```
-✅ v0.1.0               📋 v0.x.x               🎯 v1.0.0 LTS
-(Nov 2025)           (2025-2026)              (TBD - After Full
-                                              API Stabilization)
-    │                      │                          │
-    ▼                      ▼                          ▼
-Foundation           Feature Releases          Stable API
-API Excellence       (Database, Cache,         Production Usage
-Production           Community Tools)          Long-Term Support
-(COMPLETE!)          (On-Demand)              (NOT Rushing!)
+✅ v0.1.0          ✅ v0.2.0          ✅ v0.3.0             🎯 v1.0.0 LTS
+(Foundation)     (Docs+Examples)  (Real-time+DB)         (TBD - After Full
+                                                          API Stabilization)
+    │                  │                 │                       │
+    ▼                  ▼                 ▼                       ▼
+Core Router        Documentation    Real-Time+DB            Stable API
+Middleware         11 Examples      Production Ready        Long-Term Support
+Production         Validation       2 Plugins               (NOT Rushing!)
+Features           OpenAPI          DDD Boilerplate
 ```
 
-**Current Status**: v0.1.0 Production Ready ✅
-**Next**: v0.x.x feature releases as needed (Database middleware, Cache, Community tools)
+**Current Status**: v0.3.0 Production Ready ✅
+**Ecosystem**: stream v0.1.0 (SSE + WebSocket), 2 production plugins, 10 examples
+**Next**: v0.x.x feature releases as needed (Cache, more plugins, community tools)
 **v1.0.0 LTS**: After 6-12 months of production usage and full API stabilization
 
 ---
@@ -1104,6 +1226,10 @@ FURSY stands on the shoulders of giants:
 **Philosophy**:
 - [Relica](https://github.com/coregx/relica) - Zero deps, type safety, quality
 
+### Special Thanks
+
+**Professor Ancha Baranova** - This project would not have been possible without her invaluable help and support. Her assistance was crucial in making all coregx projects a reality.
+
 ---
 
 ## 📞 Contact
@@ -1125,8 +1251,9 @@ FURSY stands on the shoulders of giants:
 
 *Built with ❤️ by the coregx team*
 
-**Version**: v0.1.0 - Production Ready
-**Next**: v0.2.0 (new features), v0.3.0 (more features) → v1.0.0 LTS (Q3 2026, after full API stabilization)
+**Version**: v0.3.0 - Production Ready
+**Ecosystem**: stream v0.1.0 + 2 plugins + 10 examples + DDD boilerplate
+**Next**: v1.0.0 LTS (after full API stabilization)
 
 </div>
 
