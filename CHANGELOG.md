@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CircuitBreaker Tests**: Tests for `CircuitBreaker()` default constructor, `CircuitBreakerWithName()`, `GetState()`, `GetCounts()`, `Reset()`, `FormatState()`
 - **Middleware Tests**: Tests for `Logger()` and `Recovery()` default constructors
 
+### Fixed
+- **README.md**: Fixed 5 critical API mismatches between documentation and actual code
+  - `JWT()` signature: was showing config struct, corrected to `JWT(signingKey)` / `JWTWithConfig(config)`
+  - `RateLimit()` signature: was showing config struct, corrected to `RateLimit(rate, burst)` / `RateLimitWithConfig(config)`
+  - `CircuitBreaker()` signature: removed non-existent fields (`ResetTimeout`, `FailureRatio`), added helper functions
+  - `router.Run()`: replaced with `http.ListenAndServe()` (Run method does not exist)
+  - Package godoc: fixed `*fursy.Box` without type params → `*fursy.Context`
+
 ### Testing
 - All tests passing, 0 linter issues (golangci-lint clean)
 - No performance regressions
@@ -535,4 +543,10 @@ See [ROADMAP.md](ROADMAP.md) for detailed plans and timelines.
 
 ---
 
+[0.3.4]: https://github.com/coregx/fursy/releases/tag/v0.3.4
+[0.3.3]: https://github.com/coregx/fursy/releases/tag/v0.3.3
+[0.3.2]: https://github.com/coregx/fursy/releases/tag/v0.3.2
+[0.3.1]: https://github.com/coregx/fursy/releases/tag/v0.3.1
+[0.3.0]: https://github.com/coregx/fursy/releases/tag/v0.3.0
+[0.2.0]: https://github.com/coregx/fursy/releases/tag/v0.2.0
 [0.1.0]: https://github.com/coregx/fursy/releases/tag/v0.1.0
