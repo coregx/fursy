@@ -7,7 +7,7 @@
 //
 //	router := fursy.New()
 //
-//	router.GET("/users/:id", func(c *fursy.Box) error {
+//	router.GET("/users/:id", func(c *fursy.Context) error {
 //		id := c.Param("id")
 //		return c.String(200, "User ID: "+id)
 //	})
@@ -34,7 +34,7 @@
 //
 // # URL Parameters
 //
-// Extract parameters using Box methods:
+// Extract parameters using Context methods:
 //
 //	id := c.Param("id")
 //	page := c.Query("page")
@@ -69,7 +69,7 @@ import (
 // Example:
 //
 //	router := fursy.New()
-//	router.GET("/users/:id", func(c *fursy.Box) error {
+//	router.GET("/users/:id", func(c *fursy.Context) error {
 //		id := c.Param("id")
 //		return c.String(200, "User ID: "+id)
 //	})
@@ -315,7 +315,7 @@ func (r *Router) Group(prefix string, middleware ...HandlerFunc) *RouteGroup {
 //
 // Example:
 //
-//	router.GET("/users", func(c *fursy.Box) error {
+//	router.GET("/users", func(c *fursy.Context) error {
 //		return c.JSON(200, users)
 //	})
 func (r *Router) GET(path string, handler HandlerFunc) {
@@ -326,7 +326,7 @@ func (r *Router) GET(path string, handler HandlerFunc) {
 //
 // Example:
 //
-//	router.POST("/users", func(c *fursy.Box) error {
+//	router.POST("/users", func(c *fursy.Context) error {
 //		return c.JSON(201, newUser)
 //	})
 func (r *Router) POST(path string, handler HandlerFunc) {
@@ -337,7 +337,7 @@ func (r *Router) POST(path string, handler HandlerFunc) {
 //
 // Example:
 //
-//	router.PUT("/users/:id", func(c *fursy.Box) error {
+//	router.PUT("/users/:id", func(c *fursy.Context) error {
 //		id := c.Param("id")
 //		return c.NoContent(204)
 //	})
@@ -349,7 +349,7 @@ func (r *Router) PUT(path string, handler HandlerFunc) {
 //
 // Example:
 //
-//	router.DELETE("/users/:id", func(c *fursy.Box) error {
+//	router.DELETE("/users/:id", func(c *fursy.Context) error {
 //		id := c.Param("id")
 //		return c.NoContent(204)
 //	})
@@ -361,7 +361,7 @@ func (r *Router) DELETE(path string, handler HandlerFunc) {
 //
 // Example:
 //
-//	router.PATCH("/users/:id", func(c *fursy.Box) error {
+//	router.PATCH("/users/:id", func(c *fursy.Context) error {
 //		id := c.Param("id")
 //		return c.JSON(200, updatedUser)
 //	})
@@ -373,7 +373,7 @@ func (r *Router) PATCH(path string, handler HandlerFunc) {
 //
 // Example:
 //
-//	router.HEAD("/users/:id", func(c *fursy.Box) error {
+//	router.HEAD("/users/:id", func(c *fursy.Context) error {
 //		return c.NoContent(200)
 //	})
 func (r *Router) HEAD(path string, handler HandlerFunc) {
@@ -384,7 +384,7 @@ func (r *Router) HEAD(path string, handler HandlerFunc) {
 //
 // Example:
 //
-//	router.OPTIONS("/users", func(c *fursy.Box) error {
+//	router.OPTIONS("/users", func(c *fursy.Context) error {
 //		c.SetHeader("Allow", "GET, POST, PUT, DELETE")
 //		return c.NoContent(200)
 //	})
@@ -404,7 +404,7 @@ func (r *Router) OPTIONS(path string, handler HandlerFunc) {
 //
 // Example:
 //
-//	router.Handle("GET", "/users/:id", func(c *fursy.Box) error {
+//	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 //		id := c.Param("id")
 //		return c.String(200, "User ID: "+id)
 //	})

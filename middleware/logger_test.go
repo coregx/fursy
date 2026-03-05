@@ -465,6 +465,30 @@ func TestLogResponseWriter(t *testing.T) {
 	})
 }
 
+// TestLogger_DefaultConstructor tests that Logger() wrapper uses default configuration.
+func TestLogger_DefaultConstructor(t *testing.T) {
+	// Logger() is a thin wrapper over LoggerWithConfig(LoggerConfig{}).
+	// We verify it returns a working middleware by using it with a real router.
+	r := fursy.New()
+	r.Use(Logger())
+
+	r.GET("/health", func(c *fursy.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	if w.Body.String() != "OK" {
+		t.Errorf("expected body 'OK', got %q", w.Body.String())
+	}
+}
+
 // TestLogger_IntegrationWithGroups tests logger with route groups.
 func TestLogger_IntegrationWithGroups(t *testing.T) {
 	var buf bytes.Buffer

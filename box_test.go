@@ -455,3 +455,47 @@ func TestBox_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 		t.Errorf("DELETE: expected status 204, got %d", w.Code)
 	}
 }
+
+// TestBox_Unauthorized tests the Unauthorized convenience method.
+func TestBox_Unauthorized(t *testing.T) {
+	r := New()
+
+	GET[Empty, TestResponse](r, "/protected", func(c *Box[Empty, TestResponse]) error {
+		return c.Unauthorized(TestResponse{Message: "Invalid credentials"})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", w.Code)
+	}
+
+	expectedBody := `{"id":0,"message":"Invalid credentials"}` + "\n"
+	if w.Body.String() != expectedBody {
+		t.Errorf("expected body %q, got %q", expectedBody, w.Body.String())
+	}
+}
+
+// TestBox_Forbidden tests the Forbidden convenience method.
+func TestBox_Forbidden(t *testing.T) {
+	r := New()
+
+	GET[Empty, TestResponse](r, "/admin", func(c *Box[Empty, TestResponse]) error {
+		return c.Forbidden(TestResponse{Message: "Insufficient permissions"})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/admin", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected status 403, got %d", w.Code)
+	}
+
+	expectedBody := `{"id":0,"message":"Insufficient permissions"}` + "\n"
+	if w.Body.String() != expectedBody {
+		t.Errorf("expected body %q, got %q", expectedBody, w.Body.String())
+	}
+}

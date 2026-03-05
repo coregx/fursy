@@ -231,7 +231,7 @@ func ValidationProblem(errs ValidationErrors) Problem {
 
 	detail := fmt.Sprintf("%d field(s) failed validation", len(errs))
 	if len(errs) == 1 {
-		detail = errs[0].Message
+		detail = errs[0].Message //nolint:gosec // G602 false positive: len check above guarantees index 0 exists.
 	}
 
 	return Problem{

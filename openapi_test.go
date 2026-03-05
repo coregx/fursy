@@ -598,6 +598,86 @@ func TestRouter_ServeOpenAPI(t *testing.T) {
 	}
 }
 
+func TestOpenAPI_WriteJSON(t *testing.T) {
+	router := New()
+	router.WithInfo(Info{
+		Title:   "Write JSON Test",
+		Version: "1.0.0",
+	})
+	router.GET("/ping", func(_ *Context) error {
+		return nil
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	if err := doc.WriteJSON(w); err != nil {
+		t.Fatalf("WriteJSON failed: %v", err)
+	}
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	contentType := w.Header().Get("Content-Type")
+	if contentType != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type 'application/json; charset=utf-8', got %q", contentType)
+	}
+
+	if w.Body.Len() == 0 {
+		t.Error("expected non-empty body")
+	}
+
+	// Verify valid JSON with expected openapi version.
+	var result map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("body is not valid JSON: %v", err)
+	}
+
+	if result["openapi"] != "3.1.0" {
+		t.Errorf("expected openapi '3.1.0', got %v", result["openapi"])
+	}
+
+	info, ok := result["info"].(map[string]any)
+	if !ok {
+		t.Fatal("expected info object in JSON")
+	}
+
+	if info["title"] != "Write JSON Test" {
+		t.Errorf("expected title 'Write JSON Test', got %v", info["title"])
+	}
+}
+
+func TestOpenAPI_WriteYAML(t *testing.T) {
+	router := New()
+	router.GET("/test", func(_ *Context) error {
+		return nil
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{
+		Title:   "YAML Test",
+		Version: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	err = doc.WriteYAML(w)
+
+	// WriteYAML is not yet implemented and must return an error.
+	if err == nil {
+		t.Fatal("expected error from WriteYAML, got nil")
+	}
+
+	if err.Error() != "YAML output not yet implemented (requires external dependency)" {
+		t.Errorf("unexpected error message: %q", err.Error())
+	}
+}
+
 func TestRouter_ServeOpenAPI_DefaultInfo(t *testing.T) {
 	router := New()
 

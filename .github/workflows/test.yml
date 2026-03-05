@@ -6,25 +6,19 @@ name: Tests
 # - Minimal dependencies (core routing: stdlib only, middleware: jwt + x/time)
 # - GOEXPERIMENT=jsonv2 required for encoding/json/v2 support
 #
-# Branch Strategy (Git Flow):
-# - feature/** branches: Development work
-# - release/** branches: Pre-release testing (test here BEFORE merging to main)
-# - develop branch: Integration branch
+# Branch Strategy (GitHub Flow):
+# - feature/*, release/*, hotfix/* branches: Development work
 # - main branch: Production-ready code only (protected)
 # - Pull requests: Must pass all tests before merge
+# - Push to main triggers tests as final validation after merge
 
 on:
   push:
     branches:
       - main
-      - develop
-      - 'feature/**'
-      - 'release/**'
-      - 'hotfix/**'
   pull_request:
     branches:
       - main
-      - develop
 
 jobs:
   # Unit tests - Cross-platform

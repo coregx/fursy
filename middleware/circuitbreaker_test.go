@@ -582,6 +582,224 @@ func TestCircuitBreaker_StateString(t *testing.T) {
 	}
 }
 
+// TestCircuitBreaker_DefaultConstructor tests that CircuitBreaker() uses sensible defaults.
+func TestCircuitBreaker_DefaultConstructor(t *testing.T) {
+	router := fursy.New()
+	router.Use(CircuitBreaker())
+
+	var failCount int32
+
+	router.GET("/test", func(c *fursy.Context) error {
+		count := atomic.AddInt32(&failCount, 1)
+		if count <= 5 {
+			return errors.New("simulated failure")
+		}
+		return c.String(http.StatusOK, "OK")
+	})
+
+	// Default threshold is 5 consecutive failures.
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+	}
+
+	// 6th request should be blocked (circuit open after 5 consecutive failures).
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected circuit open (503) with default constructor, got %d", rec.Code)
+	}
+}
+
+// TestCircuitBreakerWithName_SetsName tests CircuitBreakerWithName sets the name correctly.
+func TestCircuitBreakerWithName_SetsName(t *testing.T) {
+	router := fursy.New()
+
+	// CircuitBreakerWithName must produce working middleware (named "payments").
+	router.Use(CircuitBreakerWithName("payments", CircuitBreakerConfig{
+		ConsecutiveFailures: 2,
+		Timeout:             1 * time.Second,
+	}))
+
+	router.GET("/pay", func(_ *fursy.Context) error {
+		return errors.New("payment gateway down")
+	})
+
+	// 2 failures → open.
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/pay", http.NoBody)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+	}
+
+	// 3rd request should be blocked.
+	req := httptest.NewRequest(http.MethodGet, "/pay", http.NoBody)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("CircuitBreakerWithName: expected 503, got %d", rec.Code)
+	}
+}
+
+// TestCircuitBreaker_GetState tests GetState returns the current state.
+func TestCircuitBreaker_GetState(t *testing.T) {
+	cb := &circuitBreaker{
+		state:  StateClosed,
+		counts: Counts{},
+	}
+
+	t.Run("initial state is closed", func(t *testing.T) {
+		if got := cb.GetState(); got != StateClosed {
+			t.Errorf("expected StateClosed, got %s", got)
+		}
+	})
+
+	t.Run("open state", func(t *testing.T) {
+		cb.mu.Lock()
+		cb.state = StateOpen
+		cb.mu.Unlock()
+
+		if got := cb.GetState(); got != StateOpen {
+			t.Errorf("expected StateOpen, got %s", got)
+		}
+	})
+
+	t.Run("half-open state", func(t *testing.T) {
+		cb.mu.Lock()
+		cb.state = StateHalfOpen
+		cb.mu.Unlock()
+
+		if got := cb.GetState(); got != StateHalfOpen {
+			t.Errorf("expected StateHalfOpen, got %s", got)
+		}
+	})
+}
+
+// TestCircuitBreaker_GetCounts tests GetCounts returns a copy of current counts.
+func TestCircuitBreaker_GetCounts(t *testing.T) {
+	cb := &circuitBreaker{
+		state: StateClosed,
+		counts: Counts{
+			Requests:             10,
+			TotalSuccesses:       7,
+			TotalFailures:        3,
+			ConsecutiveSuccesses: 2,
+			ConsecutiveFailures:  1,
+		},
+	}
+
+	counts := cb.GetCounts()
+
+	if counts.Requests != 10 {
+		t.Errorf("expected Requests 10, got %d", counts.Requests)
+	}
+
+	if counts.TotalSuccesses != 7 {
+		t.Errorf("expected TotalSuccesses 7, got %d", counts.TotalSuccesses)
+	}
+
+	if counts.TotalFailures != 3 {
+		t.Errorf("expected TotalFailures 3, got %d", counts.TotalFailures)
+	}
+
+	if counts.ConsecutiveSuccesses != 2 {
+		t.Errorf("expected ConsecutiveSuccesses 2, got %d", counts.ConsecutiveSuccesses)
+	}
+
+	if counts.ConsecutiveFailures != 1 {
+		t.Errorf("expected ConsecutiveFailures 1, got %d", counts.ConsecutiveFailures)
+	}
+
+	// GetCounts must return a copy — modifying it must not affect the internal state.
+	counts.Requests = 999
+	if cb.GetCounts().Requests == 999 {
+		t.Error("GetCounts should return a copy, not a reference")
+	}
+}
+
+// TestCircuitBreaker_Reset tests Reset returns the circuit breaker to closed state.
+func TestCircuitBreaker_Reset(t *testing.T) {
+	cb := &circuitBreaker{
+		state: StateOpen,
+		counts: Counts{
+			Requests:            5,
+			TotalFailures:       5,
+			ConsecutiveFailures: 5,
+		},
+		expiry:   time.Now().Add(10 * time.Minute),
+		requests: []requestRecord{{timestamp: time.Now(), success: false}},
+	}
+
+	cb.Reset()
+
+	if cb.GetState() != StateClosed {
+		t.Errorf("after Reset, expected StateClosed, got %s", cb.GetState())
+	}
+
+	counts := cb.GetCounts()
+
+	if counts.Requests != 0 {
+		t.Errorf("after Reset, expected Requests 0, got %d", counts.Requests)
+	}
+
+	if counts.TotalFailures != 0 {
+		t.Errorf("after Reset, expected TotalFailures 0, got %d", counts.TotalFailures)
+	}
+
+	if counts.ConsecutiveFailures != 0 {
+		t.Errorf("after Reset, expected ConsecutiveFailures 0, got %d", counts.ConsecutiveFailures)
+	}
+
+	cb.mu.RLock()
+	isZeroExpiry := cb.expiry.IsZero()
+	isNilRequests := cb.requests == nil
+	cb.mu.RUnlock()
+
+	if !isZeroExpiry {
+		t.Error("after Reset, expiry should be zero time")
+	}
+
+	if !isNilRequests {
+		t.Error("after Reset, requests slice should be nil")
+	}
+}
+
+// TestCircuitBreaker_FormatState tests FormatState formats the state correctly.
+func TestCircuitBreaker_FormatState(t *testing.T) {
+	cb := &circuitBreaker{
+		state: StateClosed,
+		counts: Counts{
+			Requests:            10,
+			TotalSuccesses:      8,
+			TotalFailures:       2,
+			ConsecutiveFailures: 0,
+		},
+	}
+
+	result := FormatState(cb)
+
+	expected := "State: closed, Requests: 10, Successes: 8, Failures: 2, Consecutive Failures: 0"
+	if result != expected {
+		t.Errorf("FormatState = %q, want %q", result, expected)
+	}
+
+	// Verify it reflects state changes.
+	cb.mu.Lock()
+	cb.state = StateOpen
+	cb.counts.ConsecutiveFailures = 5
+	cb.mu.Unlock()
+
+	result = FormatState(cb)
+
+	if result[:12] != "State: open," {
+		t.Errorf("FormatState after state change should start with 'State: open,', got %q", result)
+	}
+}
+
 // contains checks if a string contains a substring.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsSubstring(s, substr))

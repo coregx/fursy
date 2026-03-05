@@ -322,20 +322,22 @@ router.Use(middleware.SecureWithConfig(middleware.SecureConfig{
 JWT token validation with algorithm confusion prevention.
 
 ```go
-import "github.com/golang-jwt/jwt/v5"
+// Simple usage with signing key
+router.Use(middleware.JWT([]byte("your-secret-key")))
 
-router.Use(middleware.JWT(middleware.JWTConfig{
+// With full configuration
+router.Use(middleware.JWTWithConfig(middleware.JWTConfig{
     SigningKey:    []byte("your-secret-key"),
-    SigningMethod: jwt.SigningMethodHS256,
-    TokenLookup:   "header:Authorization",
+    SigningMethod: "HS256",
+    TokenLookup:  "header:Authorization",
 }))
 
-// With custom validation
-router.Use(middleware.JWT(middleware.JWTConfig{
-    SigningKey:    []byte("secret"),
-    SigningMethod: jwt.SigningMethodHS256,
-    Issuer:        "my-app",
-    Audience:      []string{"api"},
+// With issuer and audience validation
+router.Use(middleware.JWTWithConfig(middleware.JWTConfig{
+    SigningKey:       []byte("secret"),
+    SigningMethod:    "HS256",
+    ValidateIssuer:   "my-app",
+    ValidateAudience: "api",
 }))
 ```
 
@@ -356,20 +358,16 @@ router.Use(middleware.JWT(middleware.JWTConfig{
 Token bucket rate limiting with RFC-compliant headers.
 
 ```go
-router.Use(middleware.RateLimit(middleware.RateLimitConfig{
-    Rate:  100,  // 100 requests per second
-    Burst: 200,  // burst of 200
-    KeyFunc: middleware.RateLimitByIP,
-}))
+// Simple usage (100 req/s, burst of 200)
+router.Use(middleware.RateLimit(100, 200))
 
-// Custom key function
-router.Use(middleware.RateLimit(middleware.RateLimitConfig{
+// With full configuration and custom key function
+router.Use(middleware.RateLimitWithConfig(middleware.RateLimitConfig{
     Rate:  10,
     Burst: 20,
     KeyFunc: func(c *fursy.Context) string {
         // Rate limit by user ID
-        userID := c.Get("user_id").(string)
-        return userID
+        return c.GetString("user_id")
     },
 }))
 ```
@@ -393,19 +391,20 @@ router.Use(middleware.RateLimit(middleware.RateLimitConfig{
 Zero-dependency circuit breaker for fault tolerance.
 
 ```go
-router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
-    MaxRequests:         100,
+// Simple usage with defaults (5 consecutive failures, 60s timeout)
+router.Use(middleware.CircuitBreaker())
+
+// With consecutive failures threshold
+router.Use(middleware.CircuitBreakerConsecutive(5, 30*time.Second))
+
+// With ratio-based threshold (3 failures out of 10 requests)
+router.Use(middleware.CircuitBreakerRatio(3, 10, 30*time.Second))
+
+// With full configuration
+router.Use(middleware.CircuitBreakerWithConfig(middleware.CircuitBreakerConfig{
     ConsecutiveFailures: 5,
     Timeout:             30 * time.Second,
-    ResetTimeout:        60 * time.Second,
-}))
-
-// With ratio-based threshold
-router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
-    MaxRequests:  1000,
-    FailureRatio: 0.25, // Open circuit when 25% of requests fail
-    Timeout:      30 * time.Second,
-    ResetTimeout: 60 * time.Second,
+    MaxRequests:         2, // Allow 2 requests in half-open state
 }))
 ```
 
@@ -419,7 +418,7 @@ router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
 - ✅ Custom error handler
 - ✅ Thread-safe (concurrent request handling)
 
-**Coverage**: 95.5%
+**Coverage**: 95.6%
 **Dependencies**: Zero (stdlib only)
 
 ---
@@ -436,7 +435,7 @@ router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
 | **Rate Limit** | ✅ Built-in (RFC headers) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
 | **Security Headers** | ✅ OWASP 2025 | ❌ | 🔧 Plugin | ✅ Basic |
 | **Circuit Breaker** | ✅ Zero deps | ❌ | ❌ | ❌ |
-| **Test Coverage** | **93.1%** | ? | ? | ? |
+| **Test Coverage** | **93.8%** | ? | ? | ? |
 | **Dependencies** | **Core: 0, JWT: 1, RateLimit: 1** | Multiple | Multiple | Multiple |
 
 **Legend**:
@@ -748,7 +747,7 @@ func main() {
             return c.Created("/users/"+user.ID, user)
         })
 
-    router.Run(":8080")
+    log.Fatal(http.ListenAndServe(":8080", router))
 }
 ```
 
@@ -1149,11 +1148,11 @@ Your fursy application will automatically send traces to Jaeger. No configuratio
 
 ## 📈 Status
 
-**Current Version**: v0.3.0 (Production Ready)
+**Current Version**: v0.3.3 (Production Ready)
 
 **Status**: Production Ready - Complete ecosystem with real-time, database, and production examples
 
-**Coverage**: 93.1% test coverage (core), 650+ tests total
+**Coverage**: 93.8% test coverage (total), 94.3% core, 97.7% binding, 95.6% middleware
 
 **Performance**: 256 ns/op (static), 326 ns/op (parametric), 1 alloc/op
 
@@ -1171,7 +1170,7 @@ Production         Validation       2 Plugins               (NOT Rushing!)
 Features           OpenAPI          DDD Boilerplate
 ```
 
-**Current Status**: v0.3.0 Production Ready ✅
+**Current Status**: v0.3.3 Production Ready ✅
 **Ecosystem**: stream v0.1.0 (SSE + WebSocket), 2 production plugins, 10 examples
 **Next**: v0.x.x feature releases as needed (Cache, more plugins, community tools)
 **v1.0.0 LTS**: After 6-12 months of production usage and full API stabilization
@@ -1251,7 +1250,7 @@ FURSY stands on the shoulders of giants:
 
 *Built with ❤️ by the coregx team*
 
-**Version**: v0.3.0 - Production Ready
+**Version**: v0.3.3 - Production Ready
 **Ecosystem**: stream v0.1.0 + 2 plugins + 10 examples + DDD boilerplate
 **Next**: v1.0.0 LTS (after full API stabilization)
 
