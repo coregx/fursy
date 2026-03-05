@@ -283,22 +283,22 @@ func TestMultipartBinder_InvalidContentType(t *testing.T) {
 
 // BindAllTypesStruct is used to test setField for all supported types.
 type BindAllTypesStruct struct {
-	Str      string  `form:"str"`
-	Int      int     `form:"int"`
-	Int8     int8    `form:"int8"`
-	Int16    int16   `form:"int16"`
-	Int32    int32   `form:"int32"`
-	Int64    int64   `form:"int64"`
-	Uint     uint    `form:"uint"`
-	Uint8    uint8   `form:"uint8"`
-	Uint16   uint16  `form:"uint16"`
-	Uint32   uint32  `form:"uint32"`
-	Uint64   uint64  `form:"uint64"`
-	Float32  float32 `form:"float32"`
-	Float64  float64 `form:"float64"`
-	Bool     bool    `form:"bool"`
-	Ignored  string  `form:"-"`
-	NoTag    string
+	Str     string  `form:"str"`
+	Int     int     `form:"int"`
+	Int8    int8    `form:"int8"`
+	Int16   int16   `form:"int16"`
+	Int32   int32   `form:"int32"`
+	Int64   int64   `form:"int64"`
+	Uint    uint    `form:"uint"`
+	Uint8   uint8   `form:"uint8"`
+	Uint16  uint16  `form:"uint16"`
+	Uint32  uint32  `form:"uint32"`
+	Uint64  uint64  `form:"uint64"`
+	Float32 float32 `form:"float32"`
+	Float64 float64 `form:"float64"`
+	Bool    bool    `form:"bool"`
+	Ignored string  `form:"-"`
+	NoTag   string
 }
 
 // TestSetField_AllTypes tests setField with every supported field type.
