@@ -375,6 +375,44 @@ func TestRecovery_MiddlewareChain(t *testing.T) {
 	}
 }
 
+// TestRecovery_DefaultConstructor tests that Recovery() wrapper uses default configuration.
+func TestRecovery_DefaultConstructor(t *testing.T) {
+	// Recovery() is a thin wrapper over RecoveryWithConfig(RecoveryConfig{}).
+	// We verify it returns working middleware that recovers from panics.
+	r := fursy.New()
+	r.Use(Recovery())
+
+	r.GET("/boom", func(_ *fursy.Context) error {
+		panic("default recovery test")
+	})
+
+	r.GET("/ok", func(c *fursy.Context) error {
+		return c.String(http.StatusOK, "fine")
+	})
+
+	// Panic request must be recovered and return 500.
+	req := httptest.NewRequest(http.MethodGet, "/boom", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", w.Code)
+	}
+
+	if !strings.Contains(w.Body.String(), "Internal Server Error") {
+		t.Errorf("expected 'Internal Server Error' in body, got %q", w.Body.String())
+	}
+
+	// Normal request must pass through unaffected.
+	req2 := httptest.NewRequest(http.MethodGet, "/ok", http.NoBody)
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w2.Code)
+	}
+}
+
 // TestRecovery_CustomType tests panic with custom error type.
 func TestRecovery_CustomType(t *testing.T) {
 	var buf bytes.Buffer

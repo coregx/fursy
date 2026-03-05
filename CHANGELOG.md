@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Future features and enhancements (Phase 4: Ecosystem)
 
+## [0.3.4] - 2026-03-05
+
+### Changed
+- **Test Coverage**: Comprehensive test coverage improvements for awesome-go submission
+  - Total coverage: 90.1% → **93.8%** (+3.7%)
+  - Core (`fursy`): 93.1% → **94.3%** (+1.2%)
+  - Binding (`internal/binding`): 64.4% → **97.7%** (+33.3%)
+  - Middleware: 91.7% → **95.6%** (+3.9%)
+
+### Added
+- **Binding Tests**: Full coverage for `setField` (all Go types: int8-64, uint8-64, float32/64, bool, string), `mapForm` edge cases (non-pointer, non-struct, unexported fields, missing values), XML/multipart binder error paths
+- **Box Tests**: Tests for `Unauthorized()` and `Forbidden()` response methods
+- **Generic Router Tests**: Tests for `HEAD[Req,Res]()` and `OPTIONS[Req,Res]()` (new file `router_generic_test.go`)
+- **OpenAPI Tests**: Tests for `WriteJSON()` (Content-Type, body validation) and `WriteYAML()` (not-implemented error)
+- **CircuitBreaker Tests**: Tests for `CircuitBreaker()` default constructor, `CircuitBreakerWithName()`, `GetState()`, `GetCounts()`, `Reset()`, `FormatState()`
+- **Middleware Tests**: Tests for `Logger()` and `Recovery()` default constructors
+
+### Testing
+- All tests passing, 0 linter issues (golangci-lint clean)
+- No performance regressions
+
 ## [0.3.3] - 2025-11-24
 
 ### Fixed

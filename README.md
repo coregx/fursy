@@ -419,7 +419,7 @@ router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
 - ✅ Custom error handler
 - ✅ Thread-safe (concurrent request handling)
 
-**Coverage**: 95.5%
+**Coverage**: 95.6%
 **Dependencies**: Zero (stdlib only)
 
 ---
@@ -436,7 +436,7 @@ router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
 | **Rate Limit** | ✅ Built-in (RFC headers) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
 | **Security Headers** | ✅ OWASP 2025 | ❌ | 🔧 Plugin | ✅ Basic |
 | **Circuit Breaker** | ✅ Zero deps | ❌ | ❌ | ❌ |
-| **Test Coverage** | **93.1%** | ? | ? | ? |
+| **Test Coverage** | **93.8%** | ? | ? | ? |
 | **Dependencies** | **Core: 0, JWT: 1, RateLimit: 1** | Multiple | Multiple | Multiple |
 
 **Legend**:
@@ -1149,11 +1149,11 @@ Your fursy application will automatically send traces to Jaeger. No configuratio
 
 ## 📈 Status
 
-**Current Version**: v0.3.0 (Production Ready)
+**Current Version**: v0.3.3 (Production Ready)
 
 **Status**: Production Ready - Complete ecosystem with real-time, database, and production examples
 
-**Coverage**: 93.1% test coverage (core), 650+ tests total
+**Coverage**: 93.8% test coverage (total), 94.3% core, 97.7% binding, 95.6% middleware
 
 **Performance**: 256 ns/op (static), 326 ns/op (parametric), 1 alloc/op
 
@@ -1171,7 +1171,7 @@ Production         Validation       2 Plugins               (NOT Rushing!)
 Features           OpenAPI          DDD Boilerplate
 ```
 
-**Current Status**: v0.3.0 Production Ready ✅
+**Current Status**: v0.3.3 Production Ready ✅
 **Ecosystem**: stream v0.1.0 (SSE + WebSocket), 2 production plugins, 10 examples
 **Next**: v0.x.x feature releases as needed (Cache, more plugins, community tools)
 **v1.0.0 LTS**: After 6-12 months of production usage and full API stabilization
@@ -1251,7 +1251,7 @@ FURSY stands on the shoulders of giants:
 
 *Built with ❤️ by the coregx team*
 
-**Version**: v0.3.0 - Production Ready
+**Version**: v0.3.3 - Production Ready
 **Ecosystem**: stream v0.1.0 + 2 plugins + 10 examples + DDD boilerplate
 **Next**: v1.0.0 LTS (after full API stabilization)
 
