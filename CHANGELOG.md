@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Future features and enhancements (Phase 4: Ecosystem)
 
+## [0.4.0] - 2026-07-16
+
+### Added
+- **Trailing Slash Handling** — configurable via `WithTrailingSlash()` ([#6](https://github.com/coregx/fursy/issues/6))
+  - `IgnoreTrailingSlash` (default): `/users` and `/users/` are distinct routes
+  - `StripTrailingSlash`: silently serves the handler without redirect
+  - `RedirectTrailingSlash`: 301 (GET) or 308 (other methods) redirect to canonical URL
+  - Bidirectional: handles both adding and removing trailing slashes
+  - Query strings preserved across redirects
+  - 405 Method Not Allowed correctly considers alternate paths
+  - 100% test coverage on all new functions (16 test functions, 43 test cases, 2 benchmarks)
+
+### Changed
+- **ServeHTTP refactored**: extracted `handleNotFound()`, `tryTrailingSlashLookup()`, `existsInTree()` for reduced cognitive complexity and better maintainability
+- **Test Coverage**: 93.8% → **94.6%** (+0.8%)
+
+### Performance
+- Exact match with trailing slash enabled: **142 ns/op, 1 alloc/op** (near-zero overhead vs baseline 131 ns)
+- Strip trailing slash (fallback path): **240 ns/op, 2 allocs/op** (well under 500ns target)
+
 ## [0.3.4] - 2026-03-05
 
 ### Changed
@@ -543,6 +563,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed plans and timelines.
 
 ---
 
+[0.4.0]: https://github.com/coregx/fursy/releases/tag/v0.4.0
 [0.3.4]: https://github.com/coregx/fursy/releases/tag/v0.3.4
 [0.3.3]: https://github.com/coregx/fursy/releases/tag/v0.3.3
 [0.3.2]: https://github.com/coregx/fursy/releases/tag/v0.3.2

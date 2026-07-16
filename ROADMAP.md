@@ -3,7 +3,7 @@
 > **Strategic Advantage**: Modern Go 1.25+ features + proven routing patterns!
 > **Approach**: Combine best practices from httprouter, Gin, Echo with type-safe generics
 
-**Last Updated**: 2026-03-05 | **Current Version**: v0.3.4 (Production Ready + 93.8% Coverage) | **Phase**: Phase 4 In Progress (Ecosystem + Awesome-Go Submission) | **Target**: v1.0.0 LTS (TBD, after full API stabilization)
+**Last Updated**: 2026-07-16 | **Current Version**: v0.4.0 (Production Ready + 94.6% Coverage) | **Phase**: Phase 4 In Progress (Ecosystem + Awesome-Go Submission) | **Target**: v1.0.0 LTS (TBD, after full API stabilization)
 
 ---
 
@@ -127,11 +127,11 @@ v1.0.0 LTS → Long-term support (Q3 2026)
 
 ---
 
-## 📊 Current Status (v0.3.4 - Production Ready + Awesome-Go Ready)
+## 📊 Current Status (v0.4.0 - Production Ready + Awesome-Go Ready)
 
 **Phase**: 🚀 Phase 4 In Progress (Ecosystem Building + Awesome-Go Submission)
 **Performance**: Production-ready! (256-326 ns/op, 1 alloc/op)
-**Coverage**: 93.8% total (94.3% core, 97.7% binding, 95.6% middleware)
+**Coverage**: 94.6% total (94.6% core, 97.7% binding, 95.6% middleware)
 
 **What Works**:
 - ✅ **Radix tree routing** (zero-allocation lookup, <500ns parametric routes)
@@ -145,6 +145,7 @@ v1.0.0 LTS → Long-term support (Q3 2026)
 - ✅ **Circuit Breaker** (failure threshold, auto-recovery, zero deps)
 - ✅ **Graceful Shutdown** (connection draining, Kubernetes signals)
 - ✅ **Context Pooling** (sync.Pool, 1 alloc/op, memory-efficient)
+- ✅ **Trailing Slash Handling** (strip/redirect, bidirectional, 301/308)
 
 **Performance**:
 - ✅ Static routes: 256 ns/op, 1 alloc/op
@@ -153,7 +154,7 @@ v1.0.0 LTS → Long-term support (Q3 2026)
 - ✅ Memory efficient: context pooling prevents leaks
 
 **Validation**:
-- ✅ 93.8% test coverage (exceeded all phase targets)
+- ✅ 94.6% test coverage (exceeded all phase targets)
 - ✅ 0 linter issues (34+ linters via golangci-lint)
 - ✅ Race detector clean
 - ✅ Cross-platform (Linux, macOS, Windows)
