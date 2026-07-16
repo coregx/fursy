@@ -9,6 +9,18 @@ import (
 	"fmt"
 )
 
+// RFC 9457 Problem Details constants.
+const (
+	defaultProblemType = "about:blank"
+
+	// Standard Problem JSON field names.
+	fieldType     = "type"
+	fieldTitle    = "title"
+	fieldStatus   = "status"
+	fieldDetail   = "detail"
+	fieldInstance = "instance"
+)
+
 // Problem represents an RFC 9457 Problem Details object.
 //
 // RFC 9457 defines a "problem detail" as a way to carry machine-readable
@@ -87,23 +99,23 @@ func (p Problem) Error() string {
 func (p Problem) MarshalJSON() ([]byte, error) {
 	// Create a map with all standard fields.
 	m := map[string]any{
-		"type":   p.Type,
-		"title":  p.Title,
-		"status": p.Status,
+		fieldType:   p.Type,
+		fieldTitle:  p.Title,
+		fieldStatus: p.Status,
 	}
 
 	// Add optional fields if present.
 	if p.Detail != "" {
-		m["detail"] = p.Detail
+		m[fieldDetail] = p.Detail
 	}
 	if p.Instance != "" {
-		m["instance"] = p.Instance
+		m[fieldInstance] = p.Instance
 	}
 
 	// Flatten extensions into the map.
 	for k, v := range p.Extensions {
 		// Prevent overwriting standard fields.
-		if k != "type" && k != "title" && k != "status" && k != "detail" && k != "instance" {
+		if k != fieldType && k != fieldTitle && k != fieldStatus && k != fieldDetail && k != fieldInstance {
 			m[k] = v
 		}
 	}
@@ -115,7 +127,7 @@ func (p Problem) MarshalJSON() ([]byte, error) {
 // The type defaults to "about:blank" as per RFC 9457.
 func NewProblem(status int, title, detail string) Problem {
 	return Problem{
-		Type:   "about:blank",
+		Type:   defaultProblemType,
 		Title:  title,
 		Status: status,
 		Detail: detail,
@@ -226,7 +238,7 @@ func ServiceUnavailable(detail string) Problem {
 //	}
 func ValidationProblem(errs ValidationErrors) Problem {
 	if errs.IsEmpty() {
-		return UnprocessableEntity("validation failed")
+		return UnprocessableEntity(errValidationFailed)
 	}
 
 	detail := fmt.Sprintf("%d field(s) failed validation", len(errs))
@@ -235,7 +247,7 @@ func ValidationProblem(errs ValidationErrors) Problem {
 	}
 
 	return Problem{
-		Type:   "about:blank",
+		Type:   defaultProblemType,
 		Title:  "Validation Failed",
 		Status: 422,
 		Detail: detail,

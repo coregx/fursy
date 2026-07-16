@@ -515,3 +515,38 @@ func TestLogger_IntegrationWithGroups(t *testing.T) {
 		t.Errorf("log should contain full path with group prefix, got: %s", output)
 	}
 }
+
+// TestLogResponseWriter_Flush tests that the logger wrapper implements http.Flusher.
+func TestLogResponseWriter_Flush(t *testing.T) {
+	w := httptest.NewRecorder()
+	lrw := &logResponseWriter{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+	}
+
+	// Verify Flusher interface.
+	flusher, ok := interface{}(lrw).(http.Flusher)
+	if !ok {
+		t.Fatal("logResponseWriter should implement http.Flusher")
+	}
+
+	flusher.Flush()
+
+	if !w.Flushed {
+		t.Error("Flush should delegate to underlying ResponseWriter")
+	}
+}
+
+// TestLogResponseWriter_Unwrap tests the Unwrap method.
+func TestLogResponseWriter_Unwrap(t *testing.T) {
+	w := httptest.NewRecorder()
+	lrw := &logResponseWriter{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+	}
+
+	unwrapped := lrw.Unwrap()
+	if unwrapped != w {
+		t.Error("Unwrap should return the original ResponseWriter")
+	}
+}

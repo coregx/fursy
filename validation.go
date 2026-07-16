@@ -9,6 +9,9 @@ import (
 	"strings"
 )
 
+// errValidationFailed is the default message when validation fails with no specific errors.
+const errValidationFailed = "validation failed"
+
 // Validator is the interface for request validation.
 //
 // Implementations can use any validation library (validator/v10, ozzo-validation, custom, etc.)
@@ -61,7 +64,7 @@ type ValidationErrors []ValidationError
 // Returns a concatenated string of all validation errors.
 func (ve ValidationErrors) Error() string {
 	if len(ve) == 0 {
-		return "validation failed"
+		return errValidationFailed
 	}
 
 	if len(ve) == 1 {

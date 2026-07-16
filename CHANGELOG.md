@@ -22,8 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 405 Method Not Allowed correctly considers alternate paths
   - 100% test coverage on all new functions (16 test functions, 43 test cases, 2 benchmarks)
 
+### Fixed
+- **ResponseWriter missing http.Flusher** — all ResponseWriter wrappers now implement `http.Flusher` and `Unwrap()` ([#7](https://github.com/coregx/fursy/issues/7))
+  - Logger, CircuitBreaker, OpenTelemetry tracing, and OpenTelemetry metrics wrappers
+  - SSE streaming (`text/event-stream`) now works correctly with middleware enabled
+  - `Flush()` delegates to underlying ResponseWriter; `Unwrap()` returns the original (Go 1.20+ convention)
+
 ### Changed
 - **ServeHTTP refactored**: extracted `handleNotFound()`, `tryTrailingSlashLookup()`, `existsInTree()` for reduced cognitive complexity and better maintainability
+- **Lint cleanup**: resolved all 48 pre-existing golangci-lint issues (goconst, govet inline)
 - **Test Coverage**: 93.8% → **94.6%** (+0.8%)
 
 ### Performance

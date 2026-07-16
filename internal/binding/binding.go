@@ -20,6 +20,15 @@ import (
 	"strings"
 )
 
+// MIME type constants for supported content types.
+const (
+	mimeJSON           = "application/json"
+	mimeXML            = "application/xml"
+	mimeTextXML        = "text/xml"
+	mimeFormURLEncoded = "application/x-www-form-urlencoded"
+	mimeFormData       = "multipart/form-data"
+)
+
 // Common binding errors.
 var (
 	// ErrUnsupportedMediaType is returned when Content-Type is not supported.
@@ -109,7 +118,7 @@ func (multipartBinder) Bind(req *http.Request, obj any) error {
 // mapForm maps form values to struct fields.
 func mapForm(ptr any, form map[string][]string) error {
 	val := reflect.ValueOf(ptr)
-	if val.Kind() != reflect.Ptr {
+	if val.Kind() != reflect.Pointer {
 		return errors.New("binding element must be a pointer")
 	}
 
@@ -215,13 +224,13 @@ func GetBinder(contentType string) (Binder, error) {
 	contentType = strings.TrimSpace(contentType)
 
 	switch contentType {
-	case "", "application/json":
+	case "", mimeJSON:
 		return jsonBinding, nil
-	case "application/xml", "text/xml":
+	case mimeXML, mimeTextXML:
 		return xmlBinding, nil
-	case "application/x-www-form-urlencoded":
+	case mimeFormURLEncoded:
 		return formBinding, nil
-	case "multipart/form-data":
+	case mimeFormData:
 		return multipartBinding, nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedMediaType, contentType)

@@ -66,8 +66,8 @@ func TestSecure_CustomConfig(t *testing.T) {
 	router := fursy.New()
 	router.Use(SecureWithConfig(SecureConfig{
 		ContentTypeNosniff: "nosniff",
-		XFrameOptions:      "DENY",
-		ReferrerPolicy:     "no-referrer",
+		XFrameOptions:      secureXFrameDeny,
+		ReferrerPolicy:     secureNoReferrer,
 	}))
 
 	router.GET("/test", func(c *fursy.Context) error {
@@ -84,11 +84,11 @@ func TestSecure_CustomConfig(t *testing.T) {
 
 	headers := rec.Header()
 
-	if v := headers.Get("X-Frame-Options"); v != "DENY" {
+	if v := headers.Get("X-Frame-Options"); v != secureXFrameDeny {
 		t.Errorf("Expected X-Frame-Options: DENY, got %q", v)
 	}
 
-	if v := headers.Get("Referrer-Policy"); v != "no-referrer" {
+	if v := headers.Get("Referrer-Policy"); v != secureNoReferrer {
 		t.Errorf("Expected Referrer-Policy: no-referrer, got %q", v)
 	}
 }
@@ -163,9 +163,9 @@ func TestSecure_CSP(t *testing.T) {
 	}{
 		{
 			name:           "Basic CSP",
-			csp:            "default-src 'self'",
+			csp:            secureCSPSelf,
 			expectedHeader: "Content-Security-Policy",
-			expectedValue:  "default-src 'self'",
+			expectedValue:  secureCSPSelf,
 		},
 		{
 			name:           "CSP with scripts",
@@ -175,10 +175,10 @@ func TestSecure_CSP(t *testing.T) {
 		},
 		{
 			name:           "CSP Report Only",
-			csp:            "default-src 'self'",
+			csp:            secureCSPSelf,
 			reportOnly:     true,
 			expectedHeader: "Content-Security-Policy-Report-Only",
-			expectedValue:  "default-src 'self'",
+			expectedValue:  secureCSPSelf,
 		},
 	}
 
@@ -220,9 +220,9 @@ func TestSecure_CSP(t *testing.T) {
 func TestSecure_CrossOriginHeaders(t *testing.T) {
 	router := fursy.New()
 	router.Use(SecureWithConfig(SecureConfig{
-		CrossOriginEmbedderPolicy: "require-corp",
-		CrossOriginOpenerPolicy:   "same-origin",
-		CrossOriginResourcePolicy: "same-origin",
+		CrossOriginEmbedderPolicy: secureRequireCorp,
+		CrossOriginOpenerPolicy:   secureOriginSameOrigin,
+		CrossOriginResourcePolicy: secureOriginSameOrigin,
 	}))
 
 	router.GET("/test", func(c *fursy.Context) error {
@@ -235,15 +235,15 @@ func TestSecure_CrossOriginHeaders(t *testing.T) {
 
 	headers := rec.Header()
 
-	if v := headers.Get("Cross-Origin-Embedder-Policy"); v != "require-corp" {
+	if v := headers.Get("Cross-Origin-Embedder-Policy"); v != secureRequireCorp {
 		t.Errorf("Expected COEP: require-corp, got %q", v)
 	}
 
-	if v := headers.Get("Cross-Origin-Opener-Policy"); v != "same-origin" {
+	if v := headers.Get("Cross-Origin-Opener-Policy"); v != secureOriginSameOrigin {
 		t.Errorf("Expected COOP: same-origin, got %q", v)
 	}
 
-	if v := headers.Get("Cross-Origin-Resource-Policy"); v != "same-origin" {
+	if v := headers.Get("Cross-Origin-Resource-Policy"); v != secureOriginSameOrigin {
 		t.Errorf("Expected CORP: same-origin, got %q", v)
 	}
 }
@@ -361,11 +361,11 @@ func TestSecureStrict(t *testing.T) {
 		t.Errorf("Expected ContentTypeNosniff: nosniff, got %q", config.ContentTypeNosniff)
 	}
 
-	if config.XFrameOptions != "DENY" {
+	if config.XFrameOptions != secureXFrameDeny {
 		t.Errorf("Expected XFrameOptions: DENY, got %q", config.XFrameOptions)
 	}
 
-	if config.ReferrerPolicy != "no-referrer" {
+	if config.ReferrerPolicy != secureNoReferrer {
 		t.Errorf("Expected ReferrerPolicy: no-referrer, got %q", config.ReferrerPolicy)
 	}
 
@@ -377,19 +377,19 @@ func TestSecureStrict(t *testing.T) {
 		t.Error("Expected HSTSPreloadEnabled: true")
 	}
 
-	if config.ContentSecurityPolicy != "default-src 'self'" {
+	if config.ContentSecurityPolicy != secureCSPSelf {
 		t.Errorf("Expected CSP: default-src 'self', got %q", config.ContentSecurityPolicy)
 	}
 
-	if config.CrossOriginEmbedderPolicy != "require-corp" {
+	if config.CrossOriginEmbedderPolicy != secureRequireCorp {
 		t.Errorf("Expected COEP: require-corp, got %q", config.CrossOriginEmbedderPolicy)
 	}
 
-	if config.CrossOriginOpenerPolicy != "same-origin" {
+	if config.CrossOriginOpenerPolicy != secureOriginSameOrigin {
 		t.Errorf("Expected COOP: same-origin, got %q", config.CrossOriginOpenerPolicy)
 	}
 
-	if config.CrossOriginResourcePolicy != "same-origin" {
+	if config.CrossOriginResourcePolicy != secureOriginSameOrigin {
 		t.Errorf("Expected CORP: same-origin, got %q", config.CrossOriginResourcePolicy)
 	}
 }
@@ -556,14 +556,14 @@ func TestSecure_AllHeadersSet(t *testing.T) {
 	router := fursy.New()
 	router.Use(SecureWithConfig(SecureConfig{
 		ContentTypeNosniff:        "nosniff",
-		XFrameOptions:             "DENY",
-		ReferrerPolicy:            "no-referrer",
+		XFrameOptions:             secureXFrameDeny,
+		ReferrerPolicy:            secureNoReferrer,
 		HSTSMaxAge:                31536000,
 		HSTSPreloadEnabled:        true,
-		ContentSecurityPolicy:     "default-src 'self'",
-		CrossOriginEmbedderPolicy: "require-corp",
-		CrossOriginOpenerPolicy:   "same-origin",
-		CrossOriginResourcePolicy: "same-origin",
+		ContentSecurityPolicy:     secureCSPSelf,
+		CrossOriginEmbedderPolicy: secureRequireCorp,
+		CrossOriginOpenerPolicy:   secureOriginSameOrigin,
+		CrossOriginResourcePolicy: secureOriginSameOrigin,
 		PermissionsPolicy:         "geolocation=()",
 		XSSProtection:             "0", // Explicitly disable (recommended per OWASP)
 	}))
@@ -581,13 +581,13 @@ func TestSecure_AllHeadersSet(t *testing.T) {
 	// Verify all headers are set.
 	expectedHeaders := map[string]string{
 		"X-Content-Type-Options":       "nosniff",
-		"X-Frame-Options":              "DENY",
-		"Referrer-Policy":              "no-referrer",
+		"X-Frame-Options":              secureXFrameDeny,
+		"Referrer-Policy":              secureNoReferrer,
 		"Strict-Transport-Security":    "max-age=31536000; includeSubDomains; preload",
-		"Content-Security-Policy":      "default-src 'self'",
-		"Cross-Origin-Embedder-Policy": "require-corp",
-		"Cross-Origin-Opener-Policy":   "same-origin",
-		"Cross-Origin-Resource-Policy": "same-origin",
+		"Content-Security-Policy":      secureCSPSelf,
+		"Cross-Origin-Embedder-Policy": secureRequireCorp,
+		"Cross-Origin-Opener-Policy":   secureOriginSameOrigin,
+		"Cross-Origin-Resource-Policy": secureOriginSameOrigin,
 		"Permissions-Policy":           "geolocation=()",
 		"X-XSS-Protection":             "0",
 	}
@@ -621,7 +621,7 @@ func TestSecure_Integration(t *testing.T) {
 	headers := rec.Header()
 
 	// Verify strict security headers are all set.
-	if v := headers.Get("X-Frame-Options"); v != "DENY" {
+	if v := headers.Get("X-Frame-Options"); v != secureXFrameDeny {
 		t.Errorf("Expected X-Frame-Options: DENY, got %q", v)
 	}
 
@@ -629,11 +629,11 @@ func TestSecure_Integration(t *testing.T) {
 		t.Errorf("Expected HSTS with 2 years, got %q", v)
 	}
 
-	if v := headers.Get("Content-Security-Policy"); v != "default-src 'self'" {
+	if v := headers.Get("Content-Security-Policy"); v != secureCSPSelf {
 		t.Errorf("Expected strict CSP, got %q", v)
 	}
 
-	if v := headers.Get("Cross-Origin-Embedder-Policy"); v != "require-corp" {
+	if v := headers.Get("Cross-Origin-Embedder-Policy"); v != secureRequireCorp {
 		t.Errorf("Expected COEP: require-corp, got %q", v)
 	}
 }

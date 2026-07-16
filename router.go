@@ -61,6 +61,8 @@ import (
 	"github.com/coregx/fursy/internal/radix"
 )
 
+const defaultAPIVersion = "1.0.0"
+
 // TrailingSlashBehavior controls how the router handles trailing slashes.
 type TrailingSlashBehavior int
 
@@ -319,7 +321,7 @@ func (r *Router) ServeOpenAPI(path string) {
 		// Use router info if configured, otherwise use minimal defaults.
 		info := Info{
 			Title:   "API Documentation",
-			Version: "1.0.0",
+			Version: defaultAPIVersion,
 		}
 		if r.info != nil {
 			info = *r.info

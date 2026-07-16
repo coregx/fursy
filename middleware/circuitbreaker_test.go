@@ -813,3 +813,35 @@ func containsSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+// TestCbResponseWriter_Flush tests that the circuit breaker wrapper implements http.Flusher.
+func TestCbResponseWriter_Flush(t *testing.T) {
+	w := httptest.NewRecorder()
+	cbrw := &cbResponseWriter{
+		ResponseWriter: w,
+	}
+
+	flusher, ok := interface{}(cbrw).(http.Flusher)
+	if !ok {
+		t.Fatal("cbResponseWriter should implement http.Flusher")
+	}
+
+	flusher.Flush()
+
+	if !w.Flushed {
+		t.Error("Flush should delegate to underlying ResponseWriter")
+	}
+}
+
+// TestCbResponseWriter_Unwrap tests the Unwrap method.
+func TestCbResponseWriter_Unwrap(t *testing.T) {
+	w := httptest.NewRecorder()
+	cbrw := &cbResponseWriter{
+		ResponseWriter: w,
+	}
+
+	unwrapped := cbrw.Unwrap()
+	if unwrapped != w {
+		t.Error("Unwrap should return the original ResponseWriter")
+	}
+}
