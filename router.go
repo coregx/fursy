@@ -53,11 +53,33 @@ import (
 	"errors"
 	"net/http"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/coregx/fursy/internal/radix"
+)
+
+// TrailingSlashBehavior controls how the router handles trailing slashes.
+type TrailingSlashBehavior int
+
+const (
+	// IgnoreTrailingSlash treats paths with and without trailing slashes
+	// as different routes. /users and /users/ are distinct.
+	// This is the default behavior.
+	IgnoreTrailingSlash TrailingSlashBehavior = iota
+
+	// StripTrailingSlash silently removes trailing slashes and serves
+	// the handler for the canonical path without a redirect.
+	// A request to /users/ is served by the /users handler.
+	StripTrailingSlash
+
+	// RedirectTrailingSlash redirects requests with trailing slashes
+	// to the canonical URL without one using 301 (GET) or 308 (other methods).
+	// It also redirects requests without trailing slashes to the version
+	// with one if that is the registered route (bidirectional).
+	RedirectTrailingSlash
 )
 
 // Router is the main HTTP router for FURSY.
@@ -94,6 +116,10 @@ type Router struct {
 	// If set, Box.Bind() will automatically validate request bodies.
 	// Set using Router.SetValidator().
 	validator Validator
+
+	// trailingSlash controls how trailing slashes in request paths are handled.
+	// See TrailingSlashBehavior for options.
+	trailingSlash TrailingSlashBehavior
 
 	// handleMethodNotAllowed enables automatic 405 responses when a route
 	// exists for a path but not for the requested HTTP method.
@@ -234,6 +260,32 @@ func (r *Router) WithInfo(info Info) *Router {
 //	})
 func (r *Router) WithServer(server Server) *Router {
 	r.servers = append(r.servers, server)
+	return r
+}
+
+// WithTrailingSlash sets the trailing slash handling behavior.
+//
+// By default, /users and /users/ are treated as different routes (IgnoreTrailingSlash).
+// Use StripTrailingSlash to silently serve the handler without a redirect,
+// or RedirectTrailingSlash to issue a 301 (GET) or 308 (other methods) redirect
+// to the canonical URL.
+//
+// RedirectTrailingSlash is bidirectional: if /users/ is registered and /users is
+// requested, it redirects to /users/ (and vice versa).
+//
+// Example:
+//
+//	router := fursy.New()
+//	router.WithTrailingSlash(fursy.StripTrailingSlash)
+//
+//	router.GET("/api/companies", handler)
+//	// Now GET /api/companies/ also works (silently stripped)
+//
+//	// Or use redirects:
+//	router.WithTrailingSlash(fursy.RedirectTrailingSlash)
+//	// GET /api/companies/ → 301 redirect to /api/companies
+func (r *Router) WithTrailingSlash(behavior TrailingSlashBehavior) *Router {
+	r.trailingSlash = behavior
 	return r
 }
 
@@ -554,67 +606,147 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Get tree for this HTTP method.
 	tree := r.trees[req.Method]
 	if tree == nil {
-		if r.handleMethodNotAllowed {
-			// Check if path exists in other methods.
-			if r.pathExistsInOtherMethods(path, req.Method) {
-				c.init(w, req, r, nil)
-				_ = c.String(http.StatusMethodNotAllowed, "Method Not Allowed")
-				return
-			}
-		}
-		c.init(w, req, r, nil)
-		_ = c.String(http.StatusNotFound, "Not Found")
+		r.handleNotFound(c, w, req, path)
 		return
 	}
 
 	// Lookup route in radix tree.
 	handler, params, found := tree.Lookup(path)
+
+	// If not found, try the trailing slash alternate path.
+	if !found && r.trailingSlash != IgnoreTrailingSlash {
+		altHandler, altParams, altFound, redirected := r.tryTrailingSlashLookup(tree, w, req, path)
+		if redirected {
+			return
+		}
+		if altFound {
+			handler, params, found = altHandler, altParams, altFound
+		}
+	}
+
 	if !found {
-		c.init(w, req, r, nil)
-		_ = c.String(http.StatusNotFound, "Not Found")
+		r.handleNotFound(c, w, req, path)
 		return
 	}
 
 	// Convert internal params to public Param slice.
-	// Reuse pre-allocated params buffer from context (zero allocation).
-	c.params = c.params[:0] // Reset length, keep capacity.
+	c.params = c.params[:0]
 	for _, p := range params {
 		c.params = append(c.params, Param{Key: p.Key, Value: p.Value})
 	}
 
-	// Initialize context.
 	c.init(w, req, r, c.params)
 
 	// Build handler chain: middleware + route handler.
-	// Reuse pre-allocated handlers buffer from context (zero allocation).
 	routeHandler := handler.(HandlerFunc)
-	c.handlers = c.handlers[:0] // Reset length, keep capacity.
+	c.handlers = c.handlers[:0]
 	c.handlers = append(c.handlers, r.middleware...)
 	c.handlers = append(c.handlers, routeHandler)
 	c.index = -1
 	c.aborted = false
 
-	// Execute middleware chain.
 	if err := c.Next(); err != nil {
-		// If handler returned an error and hasn't written a response,
-		// send a 500 Internal Server Error.
-		// In the future, this will call custom ErrorHandler.
 		_ = c.String(http.StatusInternalServerError, "Internal Server Error")
 	}
 }
 
+// handleNotFound sends a 404 or 405 response depending on configuration.
+func (r *Router) handleNotFound(c *Context, w http.ResponseWriter, req *http.Request, path string) {
+	if r.handleMethodNotAllowed && r.pathExistsInOtherMethods(path, req.Method) {
+		c.init(w, req, r, nil)
+		_ = c.String(http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+	c.init(w, req, r, nil)
+	_ = c.String(http.StatusNotFound, "Not Found")
+}
+
+// tryTrailingSlashLookup attempts to find a handler by toggling the trailing slash.
+// Returns (handler, params, found, redirected). If redirected is true, a redirect
+// response was already sent and the caller should return immediately.
+func (r *Router) tryTrailingSlashLookup(
+	tree *radix.Tree,
+	w http.ResponseWriter,
+	req *http.Request,
+	path string,
+) (interface{}, []radix.Param, bool, bool) {
+	altPath := trailingSlashAlternate(path)
+	if altPath == "" {
+		return nil, nil, false, false
+	}
+
+	handler, params, found := tree.Lookup(altPath)
+	if !found {
+		return nil, nil, false, false
+	}
+
+	if r.trailingSlash == RedirectTrailingSlash {
+		r.redirectTrailingSlash(w, req, altPath)
+		return nil, nil, false, true
+	}
+
+	return handler, params, true, false
+}
+
 // pathExistsInOtherMethods checks if a path exists in other HTTP methods.
-// Used for 405 Method Not Allowed responses.
+// When trailing slash handling is enabled, also checks the alternate path.
 func (r *Router) pathExistsInOtherMethods(path, method string) bool {
+	altPath := ""
+	if r.trailingSlash != IgnoreTrailingSlash {
+		altPath = trailingSlashAlternate(path)
+	}
+
 	for m, tree := range r.trees {
-		if m != method {
-			_, _, found := tree.Lookup(path)
-			if found {
-				return true
-			}
+		if m == method {
+			continue
+		}
+		if r.existsInTree(tree, path, altPath) {
+			return true
 		}
 	}
 	return false
+}
+
+func (r *Router) existsInTree(tree *radix.Tree, path, altPath string) bool {
+	_, _, found := tree.Lookup(path)
+	if found {
+		return true
+	}
+	if altPath != "" {
+		_, _, found = tree.Lookup(altPath)
+		return found
+	}
+	return false
+}
+
+// trailingSlashAlternate returns the path with the trailing slash toggled.
+// /users/ becomes /users, /users becomes /users/.
+// Returns empty string for the root path "/" (no alternate).
+func trailingSlashAlternate(path string) string {
+	if path == "/" || path == "" {
+		return ""
+	}
+	if strings.HasSuffix(path, "/") {
+		return path[:len(path)-1]
+	}
+	return path + "/"
+}
+
+// redirectTrailingSlash sends a redirect to the canonical path.
+// GET requests use 301 Moved Permanently.
+// All other methods use 308 Permanent Redirect to preserve the HTTP method.
+func (r *Router) redirectTrailingSlash(w http.ResponseWriter, req *http.Request, target string) {
+	code := http.StatusMovedPermanently
+	if req.Method != http.MethodGet {
+		code = http.StatusPermanentRedirect
+	}
+
+	// Preserve query string in the redirect.
+	if req.URL.RawQuery != "" {
+		target = target + "?" + req.URL.RawQuery
+	}
+
+	http.Redirect(w, req, target, code) //nolint:gosec // target is derived from request path by toggling slash, not user input
 }
 
 // OnShutdown registers a function to be called during graceful shutdown.
