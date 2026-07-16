@@ -71,7 +71,7 @@ func generateValidToken(key interface{}, method string) string {
 
 func TestJWT_BasicAuth_HS256(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateValidToken(secret, "HS256")
+	token := generateValidToken(secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWT(secret))
@@ -137,7 +137,7 @@ func TestJWT_MalformedToken(t *testing.T) {
 
 func TestJWT_ExpiredToken(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateExpiredToken(secret, "HS256")
+	token := generateExpiredToken(secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWT(secret))
@@ -159,7 +159,7 @@ func TestJWT_ExpiredToken(t *testing.T) {
 
 func TestJWT_NotYetValidToken(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateNotYetValidToken(secret, "HS256")
+	token := generateNotYetValidToken(secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWT(secret))
@@ -181,7 +181,7 @@ func TestJWT_NotYetValidToken(t *testing.T) {
 
 func TestJWT_WrongSigningKey(t *testing.T) {
 	// Generate token with one key.
-	token := generateValidToken([]byte("key1"), "HS256")
+	token := generateValidToken([]byte("key1"), jwtAlgoHS256)
 
 	// Validate with different key.
 	router := fursy.New()
@@ -212,14 +212,14 @@ func TestJWT_NoneAlgorithm_Forbidden(t *testing.T) {
 
 	_ = JWTWithConfig(JWTConfig{
 		SigningKey:    []byte("secret"),
-		SigningMethod: "none",
+		SigningMethod: jwtAlgoNone,
 	})
 }
 
 func TestJWT_AlgorithmConfusion_Prevention(t *testing.T) {
 	// Generate token with HS256.
 	secret := []byte(testSecret)
-	tokenHS256 := generateValidToken(secret, "HS256")
+	tokenHS256 := generateValidToken(secret, jwtAlgoHS256)
 
 	// Try to validate with RS256 expectation.
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -230,7 +230,7 @@ func TestJWT_AlgorithmConfusion_Prevention(t *testing.T) {
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
 		SigningKey:    &privateKey.PublicKey,
-		SigningMethod: "RS256",
+		SigningMethod: jwtAlgoRS256,
 	}))
 
 	router.GET("/protected", func(c *fursy.Context) error {
@@ -261,12 +261,12 @@ func TestJWT_RS256(t *testing.T) {
 		"iat": time.Now().Unix(),
 	}
 
-	token := generateTestToken(claims, privateKey, "RS256")
+	token := generateTestToken(claims, privateKey, jwtAlgoRS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
 		SigningKey:    &privateKey.PublicKey,
-		SigningMethod: "RS256",
+		SigningMethod: jwtAlgoRS256,
 	}))
 
 	router.GET("/protected", func(c *fursy.Context) error {
@@ -299,12 +299,12 @@ func TestJWT_ES256(t *testing.T) {
 		"iat": time.Now().Unix(),
 	}
 
-	token := generateTestToken(claims, privateKey, "ES256")
+	token := generateTestToken(claims, privateKey, jwtAlgoES256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
 		SigningKey:    &privateKey.PublicKey,
-		SigningMethod: "ES256",
+		SigningMethod: jwtAlgoES256,
 	}))
 
 	router.GET("/protected", func(c *fursy.Context) error {
@@ -327,12 +327,12 @@ func TestJWT_ValidateIssuer(t *testing.T) {
 
 	// Generate token with issuer.
 	claims := jwt.MapClaims{
-		"sub": testSubject,
-		"iss": testIssuer,
-		"exp": time.Now().Add(15 * time.Minute).Unix(),
-		"iat": time.Now().Unix(),
+		"sub":       testSubject,
+		jwtClaimIss: testIssuer,
+		"exp":       time.Now().Add(15 * time.Minute).Unix(),
+		"iat":       time.Now().Unix(),
 	}
-	token := generateTestToken(claims, secret, "HS256")
+	token := generateTestToken(claims, secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -360,12 +360,12 @@ func TestJWT_ValidateIssuer_Invalid(t *testing.T) {
 
 	// Generate token with wrong issuer.
 	claims := jwt.MapClaims{
-		"sub": testSubject,
-		"iss": "wrong-issuer",
-		"exp": time.Now().Add(15 * time.Minute).Unix(),
-		"iat": time.Now().Unix(),
+		"sub":       testSubject,
+		jwtClaimIss: "wrong-issuer",
+		"exp":       time.Now().Add(15 * time.Minute).Unix(),
+		"iat":       time.Now().Unix(),
 	}
-	token := generateTestToken(claims, secret, "HS256")
+	token := generateTestToken(claims, secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -393,12 +393,12 @@ func TestJWT_ValidateAudience(t *testing.T) {
 
 	// Generate token with audience.
 	claims := jwt.MapClaims{
-		"sub": testSubject,
-		"aud": testAudience,
-		"exp": time.Now().Add(15 * time.Minute).Unix(),
-		"iat": time.Now().Unix(),
+		"sub":       testSubject,
+		jwtClaimAud: testAudience,
+		"exp":       time.Now().Add(15 * time.Minute).Unix(),
+		"iat":       time.Now().Unix(),
 	}
-	token := generateTestToken(claims, secret, "HS256")
+	token := generateTestToken(claims, secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -426,12 +426,12 @@ func TestJWT_ValidateAudience_Array(t *testing.T) {
 
 	// Generate token with multiple audiences.
 	claims := jwt.MapClaims{
-		"sub": testSubject,
-		"aud": []string{"aud1", testAudience, "aud3"},
-		"exp": time.Now().Add(15 * time.Minute).Unix(),
-		"iat": time.Now().Unix(),
+		"sub":       testSubject,
+		jwtClaimAud: []string{"aud1", testAudience, "aud3"},
+		"exp":       time.Now().Add(15 * time.Minute).Unix(),
+		"iat":       time.Now().Unix(),
 	}
-	token := generateTestToken(claims, secret, "HS256")
+	token := generateTestToken(claims, secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -493,7 +493,7 @@ func TestJWT_Skipper(t *testing.T) {
 
 func TestJWT_TokenFromQuery(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateValidToken(secret, "HS256")
+	token := generateValidToken(secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -517,7 +517,7 @@ func TestJWT_TokenFromQuery(t *testing.T) {
 
 func TestJWT_TokenFromCookie(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateValidToken(secret, "HS256")
+	token := generateValidToken(secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -560,7 +560,7 @@ func TestJWT_CustomClaims(t *testing.T) {
 		Role:   "admin",
 	}
 
-	token := generateTestToken(claims, secret, "HS256")
+	token := generateTestToken(claims, secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -622,7 +622,7 @@ func TestJWT_CustomErrorHandler(t *testing.T) {
 
 func TestJWT_SuccessHandler(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateValidToken(secret, "HS256")
+	token := generateValidToken(secret, jwtAlgoHS256)
 
 	successHandlerCalled := false
 
@@ -664,7 +664,7 @@ func TestJWT_SuccessHandler(t *testing.T) {
 
 func TestJWT_SuccessHandler_ReturnsError(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateValidToken(secret, "HS256")
+	token := generateValidToken(secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -692,14 +692,14 @@ func TestJWT_SuccessHandler_ReturnsError(t *testing.T) {
 
 func TestJWT_AllowedAlgorithms(t *testing.T) {
 	secret := []byte(testSecret)
-	tokenHS256 := generateValidToken(secret, "HS256")
+	tokenHS256 := generateValidToken(secret, jwtAlgoHS256)
 
 	// Allow both HS256 and HS384.
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
 		SigningKey:        secret,
-		SigningMethod:     "HS256",
-		AllowedAlgorithms: []string{"HS256", "HS384"},
+		SigningMethod:     jwtAlgoHS256,
+		AllowedAlgorithms: []string{jwtAlgoHS256, jwtAlgoHS384},
 	}))
 
 	router.GET("/protected", func(c *fursy.Context) error {
@@ -727,8 +727,8 @@ func TestJWT_AllowedAlgorithms_Forbidden_None(t *testing.T) {
 
 	_ = JWTWithConfig(JWTConfig{
 		SigningKey:        []byte("secret"),
-		SigningMethod:     "HS256",
-		AllowedAlgorithms: []string{"HS256", "none"},
+		SigningMethod:     jwtAlgoHS256,
+		AllowedAlgorithms: []string{jwtAlgoHS256, jwtAlgoNone},
 	})
 }
 
@@ -741,7 +741,7 @@ func TestJWTHelper_GenerateToken(t *testing.T) {
 		"iat": time.Now().Unix(),
 	}
 
-	token, err := JWTHelper{}.GenerateToken(claims, secret, "HS256")
+	token, err := JWTHelper{}.GenerateToken(claims, secret, jwtAlgoHS256)
 	if err != nil {
 		t.Fatalf("failed to generate token: %v", err)
 	}
@@ -769,7 +769,7 @@ func TestJWTHelper_GenerateToken_ForbidsNone(t *testing.T) {
 		"sub": testSubject,
 	}
 
-	_, err := JWTHelper{}.GenerateToken(claims, []byte("secret"), "none")
+	_, err := JWTHelper{}.GenerateToken(claims, []byte("secret"), jwtAlgoNone)
 	if !errors.Is(err, ErrJWTNoneAlgo) {
 		t.Errorf("expected ErrJWTNoneAlgo, got %v", err)
 	}
@@ -784,7 +784,7 @@ func TestJWTHelper_GenerateAccessToken(t *testing.T) {
 		[]string{testAudience},
 		15*time.Minute,
 		secret,
-		"HS256",
+		jwtAlgoHS256,
 	)
 
 	if err != nil {
@@ -814,8 +814,8 @@ func TestJWTHelper_GenerateAccessToken(t *testing.T) {
 		t.Errorf("expected sub=%s, got %v", testSubject, claims["sub"])
 	}
 
-	if claims["iss"] != testIssuer {
-		t.Errorf("expected iss=%s, got %v", testIssuer, claims["iss"])
+	if claims[jwtClaimIss] != testIssuer {
+		t.Errorf("expected iss=%s, got %v", testIssuer, claims[jwtClaimIss])
 	}
 }
 
@@ -846,7 +846,7 @@ func TestJWT_PanicOnInvalidTokenLookup(t *testing.T) {
 
 func TestJWT_TokenStorage(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateValidToken(secret, "HS256")
+	token := generateValidToken(secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWT(secret))
@@ -879,7 +879,7 @@ func TestJWT_TokenStorage(t *testing.T) {
 
 func TestJWT_TokenFromHeader_WithoutBearer(t *testing.T) {
 	secret := []byte(testSecret)
-	token := generateValidToken(secret, "HS256")
+	token := generateValidToken(secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -922,7 +922,7 @@ func TestJWT_ValidateClaim_WithRegisteredClaims(t *testing.T) {
 		UserID: "123",
 	}
 
-	token := generateTestToken(claims, secret, "HS256")
+	token := generateTestToken(claims, secret, jwtAlgoHS256)
 
 	router := fursy.New()
 	router.Use(JWTWithConfig(JWTConfig{
@@ -966,9 +966,9 @@ func TestJWTHelper_GenerateToken_AllMethods(t *testing.T) {
 		method string
 		key    interface{}
 	}{
-		{"HS256", "HS256", []byte(testSecret)},
-		{"HS384", "HS384", []byte(testSecret)},
-		{"HS512", "HS512", []byte(testSecret)},
+		{"HS256", jwtAlgoHS256, []byte(testSecret)},
+		{"HS384", jwtAlgoHS384, []byte(testSecret)},
+		{"HS512", jwtAlgoHS512, []byte(testSecret)},
 	}
 
 	claims := jwt.MapClaims{
@@ -1002,9 +1002,9 @@ func TestJWTHelper_GenerateToken_RSA_Methods(t *testing.T) {
 		name   string
 		method string
 	}{
-		{"RS256", "RS256"},
-		{"RS384", "RS384"},
-		{"RS512", "RS512"},
+		{"RS256", jwtAlgoRS256},
+		{"RS384", jwtAlgoRS384},
+		{"RS512", jwtAlgoRS512},
 	}
 
 	claims := jwt.MapClaims{
@@ -1033,9 +1033,9 @@ func TestJWTHelper_GenerateToken_ECDSA_Methods(t *testing.T) {
 		method string
 		curve  elliptic.Curve
 	}{
-		{"ES256", "ES256", elliptic.P256()},
-		{"ES384", "ES384", elliptic.P384()},
-		{"ES512", "ES512", elliptic.P521()},
+		{"ES256", jwtAlgoES256, elliptic.P256()},
+		{"ES384", jwtAlgoES384, elliptic.P384()},
+		{"ES512", jwtAlgoES512, elliptic.P521()},
 	}
 
 	claims := jwt.MapClaims{

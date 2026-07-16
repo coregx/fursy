@@ -19,6 +19,16 @@ const (
 	schemaTypeObject  = "object"
 )
 
+// OpenAPI document constants.
+const (
+	openapiVersion             = "3.1.0"
+	mimeApplicationProblemJSON = "application/problem+json"
+	refProblemSchema           = "#/components/schemas/Problem"
+	descSuccess                = "Success"
+	descBadRequest             = "Bad Request"
+	descInternalServerError    = "Internal Server Error"
+)
+
 // OpenAPI represents an OpenAPI 3.1 document.
 //
 // This is the root object of the OpenAPI Description.
@@ -345,7 +355,7 @@ type Tag struct {
 //nolint:gocognit,gocyclo,cyclop // Schema generation requires complex type introspection.
 func generateSchema(t reflect.Type) *Schema {
 	// Handle pointer types.
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 
@@ -412,7 +422,7 @@ func generateSchema(t reflect.Type) *Schema {
 			schema.Properties[fieldName] = fieldSchema
 
 			// Check if required.
-			if !omitempty && field.Type.Kind() != reflect.Ptr {
+			if !omitempty && field.Type.Kind() != reflect.Pointer {
 				required = append(required, fieldName)
 			}
 		}
@@ -450,7 +460,7 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 	}
 
 	doc := &OpenAPI{
-		OpenAPI: "3.1.0",
+		OpenAPI: openapiVersion,
 		Info:    info,
 		Paths:   make(map[string]PathItem),
 		Components: &Components{
@@ -459,9 +469,9 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 				"Problem": {
 					Description: "RFC 9457 Problem Details",
 					Content: map[string]MediaType{
-						"application/problem+json": {
+						mimeApplicationProblemJSON: {
 							Schema: &Schema{
-								Ref: "#/components/schemas/Problem",
+								Ref: refProblemSchema,
 							},
 						},
 					},
@@ -477,33 +487,33 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 
 	// Add RFC 9457 Problem Details schema.
 	doc.Components.Schemas["Problem"] = &Schema{
-		Type:        "object",
+		Type:        schemaTypeObject,
 		Title:       "Problem Details",
 		Description: "RFC 9457 Problem Details for HTTP APIs",
 		Properties: map[string]*Schema{
-			"type": {
-				Type:        "string",
+			fieldType: {
+				Type:        schemaTypeString,
 				Description: "URI reference identifying the problem type",
-				Default:     "about:blank",
+				Default:     defaultProblemType,
 			},
-			"title": {
-				Type:        "string",
+			fieldTitle: {
+				Type:        schemaTypeString,
 				Description: "Short, human-readable summary of the problem type",
 			},
-			"status": {
-				Type:        "integer",
+			fieldStatus: {
+				Type:        schemaTypeInteger,
 				Description: "HTTP status code",
 			},
-			"detail": {
-				Type:        "string",
+			fieldDetail: {
+				Type:        schemaTypeString,
 				Description: "Human-readable explanation specific to this occurrence",
 			},
-			"instance": {
-				Type:        "string",
+			fieldInstance: {
+				Type:        schemaTypeString,
 				Description: "URI reference identifying the specific occurrence",
 			},
 		},
-		Required: []string{"type", "title", "status"},
+		Required: []string{fieldType, fieldTitle, fieldStatus},
 	}
 
 	// Process all registered routes.
@@ -547,7 +557,7 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 			operation.RequestBody = &RequestBody{
 				Required: true,
 				Content: map[string]MediaType{
-					"application/json": {
+					MIMEApplicationJSON: {
 						Schema: schema,
 					},
 				},
@@ -571,34 +581,34 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 			// Default responses.
 			if route.ResponseType != nil {
 				operation.Responses["200"] = Response{
-					Description: "Success",
+					Description: descSuccess,
 					Content: map[string]MediaType{
-						"application/json": {
+						MIMEApplicationJSON: {
 							Schema: generateSchema(route.ResponseType),
 						},
 					},
 				}
 			} else {
 				operation.Responses["200"] = Response{
-					Description: "Success",
+					Description: descSuccess,
 				}
 			}
 		}
 
 		// Add default error responses.
 		operation.Responses["400"] = Response{
-			Description: "Bad Request",
+			Description: descBadRequest,
 			Content: map[string]MediaType{
-				"application/problem+json": {
-					Schema: &Schema{Ref: "#/components/schemas/Problem"},
+				mimeApplicationProblemJSON: {
+					Schema: &Schema{Ref: refProblemSchema},
 				},
 			},
 		}
 		operation.Responses["500"] = Response{
-			Description: "Internal Server Error",
+			Description: descInternalServerError,
 			Content: map[string]MediaType{
-				"application/problem+json": {
-					Schema: &Schema{Ref: "#/components/schemas/Problem"},
+				mimeApplicationProblemJSON: {
+					Schema: &Schema{Ref: refProblemSchema},
 				},
 			},
 		}

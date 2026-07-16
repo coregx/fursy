@@ -24,6 +24,15 @@ const (
 	ReferrerPolicyStrictOrigin = "strict-origin-when-cross-origin"
 )
 
+// Secure strict-mode header values (OWASP 2025 hardened defaults).
+const (
+	secureXFrameDeny       = "DENY"
+	secureNoReferrer       = "no-referrer"
+	secureCSPSelf          = "default-src 'self'"
+	secureRequireCorp      = "require-corp"
+	secureOriginSameOrigin = "same-origin"
+)
+
 // SecureConfig defines the configuration for the Secure middleware.
 type SecureConfig struct {
 	// Skipper defines a function to skip the middleware.
@@ -311,14 +320,14 @@ func SecureDefaults() SecureConfig {
 func SecureStrict() SecureConfig {
 	return SecureConfig{
 		ContentTypeNosniff:        ContentTypeNosniffValue,
-		XFrameOptions:             "DENY",
-		ReferrerPolicy:            "no-referrer",
+		XFrameOptions:             secureXFrameDeny,
+		ReferrerPolicy:            secureNoReferrer,
 		HSTSMaxAge:                63072000, // 2 years
 		HSTSPreloadEnabled:        true,
-		ContentSecurityPolicy:     "default-src 'self'",
-		CrossOriginEmbedderPolicy: "require-corp",
-		CrossOriginOpenerPolicy:   "same-origin",
-		CrossOriginResourcePolicy: "same-origin",
+		ContentSecurityPolicy:     secureCSPSelf,
+		CrossOriginEmbedderPolicy: secureRequireCorp,
+		CrossOriginOpenerPolicy:   secureOriginSameOrigin,
+		CrossOriginResourcePolicy: secureOriginSameOrigin,
 	}
 }
 

@@ -156,6 +156,7 @@ go get github.com/coregx/fursy
 - ✅ **Rate Limiting** - Token bucket algorithm, per-IP/per-user
 - ✅ **Security Headers** - OWASP 2025 compliant (CSP, HSTS, etc.)
 - ✅ **Circuit Breaker** - Failure threshold, auto-recovery
+- ✅ **Trailing Slash Handling** - Strip or redirect, bidirectional, HTTP-correct (301/308)
 - ✅ **Graceful Shutdown** - Connection draining, Kubernetes-ready
 - ✅ **Context Pooling** - Memory-efficient, prevents leaks
 - ✅ **Convenience Methods** - REST-friendly shortcuts (OK, Created, NoContentSuccess)
@@ -435,7 +436,7 @@ router.Use(middleware.CircuitBreakerWithConfig(middleware.CircuitBreakerConfig{
 | **Rate Limit** | ✅ Built-in (RFC headers) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
 | **Security Headers** | ✅ OWASP 2025 | ❌ | 🔧 Plugin | ✅ Basic |
 | **Circuit Breaker** | ✅ Zero deps | ❌ | ❌ | ❌ |
-| **Test Coverage** | **93.8%** | ? | ? | ? |
+| **Test Coverage** | **94.6%** | ? | ? | ? |
 | **Dependencies** | **Core: 0, JWT: 1, RateLimit: 1** | Multiple | Multiple | Multiple |
 
 **Legend**:
@@ -451,6 +452,41 @@ router.Use(middleware.CircuitBreakerWithConfig(middleware.CircuitBreakerConfig{
 
 - **[Middleware Examples](examples/05-middleware/)** - Complete examples for all 8 middleware
 - **[Middleware Source](middleware/)** - Middleware implementations with tests
+
+---
+
+## 🔀 Trailing Slash Handling
+
+By default, `/users` and `/users/` are treated as different routes. Configure trailing slash handling to match your needs:
+
+```go
+// Strip trailing slashes silently (recommended for APIs behind reverse proxies)
+router := fursy.New()
+router.WithTrailingSlash(fursy.StripTrailingSlash)
+
+router.GET("/api/companies", handler)
+// GET /api/companies  → 200 (exact match)
+// GET /api/companies/ → 200 (trailing slash stripped silently)
+```
+
+```go
+// Redirect to canonical URL (SEO-friendly for public APIs)
+router := fursy.New()
+router.WithTrailingSlash(fursy.RedirectTrailingSlash)
+
+router.GET("/api/companies", handler)
+// GET  /api/companies/ → 301 redirect to /api/companies
+// POST /api/companies/ → 308 redirect (preserves HTTP method)
+```
+
+**Bidirectional**: If `/files/` is the registered route and `/files` is requested, the router handles it too — redirecting or serving the `/files/` handler.
+
+**Three modes**:
+| Mode | Behavior |
+|------|----------|
+| `IgnoreTrailingSlash` (default) | `/users` and `/users/` are different routes |
+| `StripTrailingSlash` | Silently serves handler without redirect |
+| `RedirectTrailingSlash` | 301 (GET) or 308 (other methods) redirect |
 
 ---
 
@@ -1152,7 +1188,7 @@ Your fursy application will automatically send traces to Jaeger. No configuratio
 
 **Status**: Production Ready - Complete ecosystem with real-time, database, and production examples
 
-**Coverage**: 93.8% test coverage (total), 94.3% core, 97.7% binding, 95.6% middleware
+**Coverage**: 94.6% test coverage (total), 94.6% core, 97.7% binding, 95.6% middleware
 
 **Performance**: 256 ns/op (static), 326 ns/op (parametric), 1 alloc/op
 

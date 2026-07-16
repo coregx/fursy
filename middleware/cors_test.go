@@ -303,7 +303,7 @@ func TestCORS_DisallowedHeaders(t *testing.T) {
 func TestCORS_NullOrigin(t *testing.T) {
 	r := fursy.New()
 	r.Use(CORSWithConfig(CORSConfig{
-		AllowOrigins: "null",
+		AllowOrigins: corsOriginNull,
 	}))
 
 	r.GET("/test", func(c *fursy.Context) error {
@@ -421,7 +421,7 @@ func TestCORSConfig_IsOriginAllowed(t *testing.T) {
 		expected     bool
 	}{
 		{"wildcard allows all", "*", "https://example.com", true},
-		{"null disallows all", "null", "https://example.com", false},
+		{"null disallows all", corsOriginNull, "https://example.com", false},
 		{"specific origin not allowed", "https://foo.com", "https://example.com", false},
 		{"specific origin allowed", "https://example.com", "https://example.com", true},
 	}

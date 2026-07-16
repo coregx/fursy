@@ -27,6 +27,9 @@ const (
 	headerAllowMethods     = "Access-Control-Allow-Methods"
 	headerExposeHeaders    = "Access-Control-Expose-Headers"
 	headerMaxAge           = "Access-Control-Max-Age"
+
+	// corsOriginNull is the special "null" origin value that disallows all origins.
+	corsOriginNull = "null"
 )
 
 // CORSConfig defines the configuration for the CORS middleware.
@@ -162,7 +165,7 @@ func (cfg *CORSConfig) init() {
 
 // isOriginAllowed checks if the given origin is allowed.
 func (cfg *CORSConfig) isOriginAllowed(origin string) bool {
-	if cfg.AllowOrigins == "null" {
+	if cfg.AllowOrigins == corsOriginNull {
 		return false
 	}
 	return cfg.AllowOrigins == "*" || cfg.allowOriginMap[origin]

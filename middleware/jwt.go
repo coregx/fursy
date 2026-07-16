@@ -22,8 +22,28 @@ const JWTContextKey = "jwt"
 // JWTTokenContextKey is the key used to store the raw JWT token string in the context.
 const JWTTokenContextKey = "jwt_token"
 
-// jwtAlgoNone is the insecure "none" algorithm (forbidden for security).
-const jwtAlgoNone = "none"
+// JWT signing algorithm name constants.
+const (
+	// jwtAlgoNone is the insecure "none" algorithm (forbidden for security).
+	jwtAlgoNone = "none"
+
+	// Supported signing algorithm names.
+	jwtAlgoHS256 = "HS256"
+	jwtAlgoHS384 = "HS384"
+	jwtAlgoHS512 = "HS512"
+	jwtAlgoRS256 = "RS256"
+	jwtAlgoRS384 = "RS384"
+	jwtAlgoRS512 = "RS512"
+	jwtAlgoES256 = "ES256"
+	jwtAlgoES384 = "ES384"
+	jwtAlgoES512 = "ES512"
+)
+
+// JWT claim key constants.
+const (
+	jwtClaimIss = "iss"
+	jwtClaimAud = "aud"
+)
 
 // Common JWT errors.
 var (
@@ -173,7 +193,7 @@ func JWTWithConfig(config JWTConfig) fursy.HandlerFunc {
 
 	// Set defaults.
 	if config.SigningMethod == "" {
-		config.SigningMethod = "HS256"
+		config.SigningMethod = jwtAlgoHS256
 	}
 
 	if config.TokenLookup == "" {
@@ -238,7 +258,7 @@ func JWTWithConfig(config JWTConfig) fursy.HandlerFunc {
 		claims := config.Claims()
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 			// Security: Prevent "none" algorithm attack.
-			if token.Method.Alg() == "none" {
+			if token.Method.Alg() == jwtAlgoNone {
 				return nil, ErrJWTNoneAlgo
 			}
 
@@ -268,14 +288,14 @@ func JWTWithConfig(config JWTConfig) fursy.HandlerFunc {
 
 		// Validate issuer if configured.
 		if config.ValidateIssuer != "" {
-			if !validateClaim(claims, "iss", config.ValidateIssuer) {
+			if !validateClaim(claims, jwtClaimIss, config.ValidateIssuer) {
 				return config.ErrorHandler(c, errors.New("invalid jwt issuer"))
 			}
 		}
 
 		// Validate audience if configured.
 		if config.ValidateAudience != "" {
-			if !validateClaim(claims, "aud", config.ValidateAudience) {
+			if !validateClaim(claims, jwtClaimAud, config.ValidateAudience) {
 				return config.ErrorHandler(c, errors.New("invalid jwt audience"))
 			}
 		}
@@ -338,10 +358,10 @@ func validateClaim(claims jwt.Claims, key, expected string) bool {
 	if !ok {
 		// For custom claims, use GetExpirationTime, GetIssuer, GetAudience methods.
 		switch key {
-		case "iss":
+		case jwtClaimIss:
 			iss, err := claims.GetIssuer()
 			return err == nil && iss == expected
-		case "aud":
+		case jwtClaimAud:
 			aud, err := claims.GetAudience()
 			if err != nil {
 				return false
@@ -368,7 +388,7 @@ func validateClaim(claims jwt.Claims, key, expected string) bool {
 	}
 
 	// Handle audience (can be string or []string).
-	if key == "aud" {
+	if key == jwtClaimAud {
 		if audiences, ok := value.([]interface{}); ok {
 			for _, aud := range audiences {
 				if audStr, ok := aud.(string); ok && audStr == expected {
@@ -408,23 +428,23 @@ func (JWTHelper) GenerateToken(claims jwt.Claims, signingKey interface{}, method
 
 	var signingMethod jwt.SigningMethod
 	switch method {
-	case "HS256":
+	case jwtAlgoHS256:
 		signingMethod = jwt.SigningMethodHS256
-	case "HS384":
+	case jwtAlgoHS384:
 		signingMethod = jwt.SigningMethodHS384
-	case "HS512":
+	case jwtAlgoHS512:
 		signingMethod = jwt.SigningMethodHS512
-	case "RS256":
+	case jwtAlgoRS256:
 		signingMethod = jwt.SigningMethodRS256
-	case "RS384":
+	case jwtAlgoRS384:
 		signingMethod = jwt.SigningMethodRS384
-	case "RS512":
+	case jwtAlgoRS512:
 		signingMethod = jwt.SigningMethodRS512
-	case "ES256":
+	case jwtAlgoES256:
 		signingMethod = jwt.SigningMethodES256
-	case "ES384":
+	case jwtAlgoES384:
 		signingMethod = jwt.SigningMethodES384
-	case "ES512":
+	case jwtAlgoES512:
 		signingMethod = jwt.SigningMethodES512
 	default:
 		return "", fmt.Errorf("unsupported signing method: %s", method)

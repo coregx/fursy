@@ -289,8 +289,14 @@ func (w *metricsResponseWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
+// Flush implements http.Flusher by delegating to the underlying ResponseWriter.
+func (w *metricsResponseWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 // Unwrap returns the underlying ResponseWriter.
-// This is useful for middleware that need to access the original ResponseWriter.
 func (w *metricsResponseWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }

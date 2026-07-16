@@ -492,3 +492,436 @@ func TestRouter_MethodNotAllowed_Disabled(t *testing.T) {
 		t.Errorf("Status code = %d, want %d (404)", w.Code, http.StatusNotFound)
 	}
 }
+
+// TestRouter_TrailingSlash_Default tests that trailing slash is strict by default.
+func TestRouter_TrailingSlash_Default(t *testing.T) {
+	r := New()
+	r.GET("/users", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	tests := []struct {
+		name     string
+		path     string
+		wantCode int
+	}{
+		{"exact match", "/users", 200},
+		{"trailing slash 404", "/users/", 404},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.path, http.NoBody)
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("GET %s: status = %d, want %d", tt.path, w.Code, tt.wantCode)
+			}
+		})
+	}
+}
+
+// TestRouter_StripTrailingSlash tests silent trailing slash removal.
+func TestRouter_StripTrailingSlash(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(StripTrailingSlash)
+
+	r.GET("/users", func(c *Context) error {
+		return c.String(200, "users")
+	})
+	r.GET("/users/:id/posts", func(c *Context) error {
+		return c.String(200, "posts:"+c.Param("id"))
+	})
+
+	tests := []struct {
+		name     string
+		path     string
+		wantCode int
+		wantBody string
+	}{
+		{"exact match", "/users", 200, "users"},
+		{"strip trailing slash", "/users/", 200, "users"},
+		{"param exact", "/users/42/posts", 200, "posts:42"},
+		{"param strip slash", "/users/42/posts/", 200, "posts:42"},
+		{"unregistered path", "/notfound", 404, "Not Found"},
+		{"unregistered with slash", "/notfound/", 404, "Not Found"},
+		{"root path", "/", 404, "Not Found"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.path, http.NoBody)
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("GET %s: status = %d, want %d", tt.path, w.Code, tt.wantCode)
+			}
+			body, _ := io.ReadAll(w.Body)
+			if string(body) != tt.wantBody {
+				t.Errorf("GET %s: body = %q, want %q", tt.path, body, tt.wantBody)
+			}
+		})
+	}
+}
+
+// TestRouter_StripTrailingSlash_Bidirectional tests adding slash when the
+// registered route has a trailing slash.
+func TestRouter_StripTrailingSlash_Bidirectional(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(StripTrailingSlash)
+
+	r.GET("/files/", func(c *Context) error {
+		return c.String(200, "files")
+	})
+
+	tests := []struct {
+		name     string
+		path     string
+		wantCode int
+	}{
+		{"exact with slash", "/files/", 200},
+		{"without slash resolves", "/files", 200},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.path, http.NoBody)
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("GET %s: status = %d, want %d", tt.path, w.Code, tt.wantCode)
+			}
+		})
+	}
+}
+
+// TestRouter_RedirectTrailingSlash tests redirect behavior.
+func TestRouter_RedirectTrailingSlash(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(RedirectTrailingSlash)
+
+	r.GET("/users", func(c *Context) error {
+		return c.String(200, "users")
+	})
+	r.POST("/users", func(c *Context) error {
+		return c.String(201, "created")
+	})
+
+	tests := []struct {
+		name         string
+		method       string
+		path         string
+		wantCode     int
+		wantLocation string
+	}{
+		{"GET exact match", http.MethodGet, "/users", 200, ""},
+		{"GET redirect slash", http.MethodGet, "/users/", 301, "/users"},
+		{"POST exact match", http.MethodPost, "/users", 201, ""},
+		{"POST redirect 308", http.MethodPost, "/users/", 308, "/users"},
+		{"PUT unregistered 405", http.MethodPut, "/users/", 405, ""},
+		{"DELETE unregistered 405", http.MethodDelete, "/users/", 405, ""},
+		{"PATCH unregistered 405", http.MethodPatch, "/users/", 405, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("%s %s: status = %d, want %d", tt.method, tt.path, w.Code, tt.wantCode)
+			}
+			if tt.wantLocation != "" {
+				loc := w.Header().Get("Location")
+				if loc != tt.wantLocation {
+					t.Errorf("%s %s: Location = %q, want %q", tt.method, tt.path, loc, tt.wantLocation)
+				}
+			}
+		})
+	}
+}
+
+// TestRouter_RedirectTrailingSlash_Bidirectional tests redirect when the
+// registered route has a trailing slash.
+// TestRouter_RedirectTrailingSlash_NonGETMethods tests 308 redirects for
+// PUT, DELETE, PATCH when those methods have registered routes.
+func TestRouter_RedirectTrailingSlash_NonGETMethods(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(RedirectTrailingSlash)
+
+	r.PUT("/items/:id", func(c *Context) error {
+		return c.String(200, "updated")
+	})
+	r.DELETE("/items/:id", func(c *Context) error {
+		return c.String(200, "deleted")
+	})
+	r.PATCH("/items/:id", func(c *Context) error {
+		return c.String(200, "patched")
+	})
+
+	methods := []string{http.MethodPut, http.MethodDelete, http.MethodPatch}
+	for _, method := range methods {
+		t.Run(method, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(method, "/items/42/", http.NoBody)
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusPermanentRedirect {
+				t.Errorf("%s /items/42/: status = %d, want 308", method, w.Code)
+			}
+			loc := w.Header().Get("Location")
+			if loc != "/items/42" {
+				t.Errorf("%s /items/42/: Location = %q, want %q", method, loc, "/items/42")
+			}
+		})
+	}
+}
+
+func TestRouter_RedirectTrailingSlash_Bidirectional(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(RedirectTrailingSlash)
+
+	r.GET("/files/", func(c *Context) error {
+		return c.String(200, "files")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/files", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMovedPermanently {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusMovedPermanently)
+	}
+	loc := w.Header().Get("Location")
+	if loc != "/files/" {
+		t.Errorf("Location = %q, want %q", loc, "/files/")
+	}
+}
+
+// TestRouter_RedirectTrailingSlash_PreservesQuery tests that query params
+// are preserved across redirects.
+func TestRouter_RedirectTrailingSlash_PreservesQuery(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(RedirectTrailingSlash)
+
+	r.GET("/search", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/search/?q=test&page=2", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMovedPermanently {
+		t.Errorf("status = %d, want 301", w.Code)
+	}
+	loc := w.Header().Get("Location")
+	want := "/search?q=test&page=2"
+	if loc != want {
+		t.Errorf("Location = %q, want %q", loc, want)
+	}
+}
+
+// TestRouter_TrailingSlash_RootPath tests that root "/" is never altered.
+func TestRouter_TrailingSlash_RootPath(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(StripTrailingSlash)
+
+	r.GET("/", func(c *Context) error {
+		return c.String(200, "root")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("GET /: status = %d, want 200", w.Code)
+	}
+	body, _ := io.ReadAll(w.Body)
+	if string(body) != "root" {
+		t.Errorf("GET /: body = %q, want %q", body, "root")
+	}
+}
+
+// TestRouter_TrailingSlash_MethodNotAllowed tests 405 with trailing slash.
+func TestRouter_TrailingSlash_MethodNotAllowed(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(StripTrailingSlash)
+
+	r.GET("/users", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/users/", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Errorf("POST /users/: status = %d, want 405", w.Code)
+	}
+}
+
+// TestRouter_TrailingSlash_Wildcard tests that wildcard routes are not
+// affected by trailing slash handling.
+func TestRouter_TrailingSlash_Wildcard(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(StripTrailingSlash)
+
+	r.GET("/files/*filepath", func(c *Context) error {
+		return c.String(200, c.Param("filepath"))
+	})
+
+	tests := []struct {
+		name     string
+		path     string
+		wantCode int
+		wantBody string
+	}{
+		{"wildcard normal", "/files/a/b.txt", 200, "a/b.txt"},
+		{"wildcard with trailing", "/files/a/b/", 200, "a/b/"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.path, http.NoBody)
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("GET %s: status = %d, want %d", tt.path, w.Code, tt.wantCode)
+			}
+			body, _ := io.ReadAll(w.Body)
+			if string(body) != tt.wantBody {
+				t.Errorf("GET %s: body = %q, want %q", tt.path, body, tt.wantBody)
+			}
+		})
+	}
+}
+
+// TestRouter_TrailingSlash_WithMiddleware tests that middleware executes
+// correctly with trailing slash handling.
+func TestRouter_TrailingSlash_WithMiddleware(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(StripTrailingSlash)
+
+	middlewareCalled := false
+	r.Use(func(c *Context) error {
+		middlewareCalled = true
+		return c.Next()
+	})
+
+	r.GET("/api/data", func(c *Context) error {
+		return c.String(200, "data")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/data/", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+	if !middlewareCalled {
+		t.Error("middleware was not called")
+	}
+}
+
+// TestRouter_WithTrailingSlash_Fluent tests fluent API chaining.
+func TestRouter_WithTrailingSlash_Fluent(t *testing.T) {
+	r := New()
+	result := r.WithTrailingSlash(StripTrailingSlash)
+
+	if result != r {
+		t.Error("WithTrailingSlash should return same router for chaining")
+	}
+	if r.trailingSlash != StripTrailingSlash {
+		t.Errorf("trailingSlash = %d, want %d", r.trailingSlash, StripTrailingSlash)
+	}
+}
+
+// TestTrailingSlashAlternate tests the path toggle helper.
+func TestTrailingSlashAlternate(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"/users", "/users/"},
+		{"/users/", "/users"},
+		{"/a/b/c", "/a/b/c/"},
+		{"/a/b/c/", "/a/b/c"},
+		{"/", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := trailingSlashAlternate(tt.path)
+			if got != tt.want {
+				t.Errorf("trailingSlashAlternate(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestRouter_RedirectTrailingSlash_NoRedirectLoop ensures no redirect loop
+// when neither path variant matches.
+func TestRouter_RedirectTrailingSlash_NoRedirectLoop(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(RedirectTrailingSlash)
+
+	r.GET("/users", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/notfound/", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404 (not a redirect loop)", w.Code)
+	}
+}
+
+// BenchmarkRouter_TrailingSlash_Strip benchmarks strip trailing slash overhead.
+func BenchmarkRouter_TrailingSlash_Strip(b *testing.B) {
+	r := New()
+	r.WithTrailingSlash(StripTrailingSlash)
+	r.GET("/api/v1/users", func(c *Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/", http.NoBody)
+	w := httptest.NewRecorder()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		r.ServeHTTP(w, req)
+	}
+}
+
+// BenchmarkRouter_TrailingSlash_ExactMatch benchmarks that exact matches
+// have zero overhead when trailing slash is enabled.
+func BenchmarkRouter_TrailingSlash_ExactMatch(b *testing.B) {
+	r := New()
+	r.WithTrailingSlash(StripTrailingSlash)
+	r.GET("/api/v1/users", func(c *Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users", http.NoBody)
+	w := httptest.NewRecorder()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		r.ServeHTTP(w, req)
+	}
+}

@@ -154,6 +154,18 @@ func (w *cbResponseWriter) Status() int {
 	return w.statusCode
 }
 
+// Flush implements http.Flusher by delegating to the underlying ResponseWriter.
+func (w *cbResponseWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap returns the underlying ResponseWriter.
+func (w *cbResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 // requestRecord tracks individual request outcomes for time-based windows.
 type requestRecord struct {
 	timestamp time.Time
