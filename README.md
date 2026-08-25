@@ -1293,3 +1293,14 @@ FURSY stands on the shoulders of giants:
 </div>
 
 ---
+
+
+## Star History
+
+<a href="https://starhistory.io">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.starhistory.io/png?repos=coregx/fursy&style=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.starhistory.io/png?repos=coregx/fursy&style=professional" />
+   <img alt="Star History Chart" src="https://api.starhistory.io/png?repos=coregx/fursy" width="800" />
+ </picture>
+</a>
