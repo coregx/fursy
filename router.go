@@ -884,7 +884,14 @@ func (r *Router) OnShutdown(f func()) {
 //	    log.Printf("Shutdown error: %v", err)
 //	}
 func (r *Router) Shutdown(ctx context.Context) error {
-	// Call shutdown callbacks in reverse order (last registered, first called).
+	// 1. Drain active connections first — active requests must finish
+	// before we close resources they depend on.
+	var serverErr error
+	if r.server != nil {
+		serverErr = r.server.Shutdown(ctx)
+	}
+
+	// 2. Then call cleanup callbacks (db.Close, etc.) in reverse order.
 	r.shutdownMu.Lock()
 	callbacks := make([]func(), len(r.shutdownCallbacks))
 	copy(callbacks, r.shutdownCallbacks)
@@ -894,12 +901,7 @@ func (r *Router) Shutdown(ctx context.Context) error {
 		callbacks[i]()
 	}
 
-	// Shutdown http.Server if configured.
-	if r.server != nil {
-		return r.server.Shutdown(ctx)
-	}
-
-	return nil
+	return serverErr
 }
 
 // SetServer sets the http.Server for graceful shutdown.
