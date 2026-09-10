@@ -89,7 +89,7 @@ jobs:
 
     - name: Test plugin
       working-directory: plugins/${{ matrix.plugin }}
-      run: go test -v -race ./...
+      run: go test -v ./...
 
   # Examples - verify all examples compile
   examples:

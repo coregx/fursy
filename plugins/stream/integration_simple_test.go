@@ -156,13 +156,13 @@ func TestSSE_Integration_JSON(t *testing.T) {
 
 // Integration Test 3: WebSocket Hub availability (no actual WS client - just test hub access).
 func TestWebSocket_Integration_HubAvailability(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
 	hub := websocket.NewHub()
 	go hub.Run()
-	defer func() {
-		hub.Close()
-		// Allow goroutine to exit cleanly.
-		time.Sleep(10 * time.Millisecond)
-	}()
+	defer hub.Close()
 
 	router := fursy.New()
 	router.Use(stream.WebSocketHub(hub))

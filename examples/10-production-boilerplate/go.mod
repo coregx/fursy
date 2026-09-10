@@ -28,4 +28,3 @@ replace github.com/coregx/fursy => ../..
 
 replace github.com/coregx/fursy/plugins/database => ../../plugins/database
 
-replace github.com/coregx/stream => ../../../stream

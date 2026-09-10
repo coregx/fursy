@@ -16,7 +16,6 @@ require (
 replace (
 	github.com/coregx/fursy => ../..
 	github.com/coregx/fursy/plugins/stream => ../../plugins/stream
-	github.com/coregx/stream => D:/projects/coregx/stream
 )
 
 replace github.com/coregx/fursy/plugins/database => ../../plugins/database
