@@ -5,7 +5,7 @@
 package fursy
 
 import (
-	"encoding/json/v2"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"

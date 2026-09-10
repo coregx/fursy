@@ -264,7 +264,7 @@ func TestGroup_NestedGroups(t *testing.T) {
 			return c.Next()
 		})
 
-		// Create v1 group with custom middleware (does NOT inherit api-mw)
+		// Create v1 group with custom middleware (INHERITS api-mw + adds v1-mw).
 		v1 := api.Group("/v1", func(c *Context) error {
 			executed = append(executed, "v1-mw")
 			return c.Next()
@@ -279,12 +279,12 @@ func TestGroup_NestedGroups(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		// Should only execute v1-mw + handler (not api-mw)
-		if len(executed) != 2 {
-			t.Fatalf("expected 2 executions, got %d: %v", len(executed), executed)
+		// Must execute api-mw → v1-mw → handler (parent always inherited).
+		if len(executed) != 3 {
+			t.Fatalf("expected 3 executions, got %d: %v", len(executed), executed)
 		}
 
-		if executed[0] != "v1-mw" || executed[1] != "handler" {
+		if executed[0] != "api-mw" || executed[1] != "v1-mw" || executed[2] != "handler" {
 			t.Errorf("unexpected execution order: %v", executed)
 		}
 	})
@@ -504,4 +504,61 @@ type testError struct {
 
 func (e *testError) Error() string {
 	return e.message
+}
+
+// TestGroup_ChildInheritsParentMiddleware verifies that a child group with
+// explicit middleware APPENDS to parent middleware, not replaces it.
+func TestGroup_ChildInheritsParentMiddleware(t *testing.T) {
+	var trace []string
+
+	r := New()
+	api := r.Group("/api")
+	api.Use(func(c *Context) error {
+		trace = append(trace, "auth")
+		return c.Next()
+	})
+
+	admin := api.Group("/admin", func(c *Context) error {
+		trace = append(trace, "admin-only")
+		return c.Next()
+	})
+
+	admin.Handle("GET", "/stats", func(c *Context) error {
+		trace = append(trace, "handler")
+		return c.String(200, "stats")
+	})
+
+	req := httptest.NewRequest("GET", "/api/admin/stats", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	authFound, adminFound := false, false
+	for _, s := range trace {
+		if s == "auth" {
+			authFound = true
+		}
+		if s == "admin-only" {
+			adminFound = true
+		}
+	}
+	if !authFound {
+		t.Error("parent middleware 'auth' was NOT executed — auth bypass risk")
+	}
+	if !adminFound {
+		t.Error("child middleware 'admin-only' was NOT executed")
+	}
+
+	expected := []string{"auth", "admin-only", "handler"}
+	if len(trace) != len(expected) {
+		t.Fatalf("expected trace %v, got %v", expected, trace)
+	}
+	for i, want := range expected {
+		if trace[i] != want {
+			t.Errorf("trace[%d] = %q, want %q", i, trace[i], want)
+		}
+	}
 }

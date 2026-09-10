@@ -323,8 +323,8 @@ func TestContext_Bind_WithValidator(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	// Should return 500 (handler returned error).
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected status 500 (validation failed), got %d", w.Code)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected status 422 (validation failed), got %d", w.Code)
 	}
 }
 
@@ -410,8 +410,8 @@ func TestContext_Bind_CustomValidationErrors(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	// Validation should fail.
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected status 500 (validation failed), got %d", w.Code)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected status 422 (validation failed), got %d", w.Code)
 	}
 }
 
@@ -530,8 +530,8 @@ func TestValidation_Integration(t *testing.T) {
 
 		r.ServeHTTP(w, req)
 
-		if w.Code != http.StatusInternalServerError {
-			t.Errorf("expected status 500 (validation failed), got %d", w.Code)
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Errorf("expected status 422 (validation failed), got %d", w.Code)
 		}
 	})
 
@@ -544,8 +544,8 @@ func TestValidation_Integration(t *testing.T) {
 
 		r.ServeHTTP(w, req)
 
-		if w.Code != http.StatusInternalServerError {
-			t.Errorf("expected status 500 (validation failed), got %d", w.Code)
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Errorf("expected status 422 (validation failed), got %d", w.Code)
 		}
 	})
 
@@ -558,8 +558,8 @@ func TestValidation_Integration(t *testing.T) {
 
 		r.ServeHTTP(w, req)
 
-		if w.Code != http.StatusInternalServerError {
-			t.Errorf("expected status 500 (validation failed), got %d", w.Code)
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Errorf("expected status 422 (validation failed), got %d", w.Code)
 		}
 	})
 }

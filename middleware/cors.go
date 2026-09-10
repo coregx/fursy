@@ -133,6 +133,11 @@ func CORSWithConfig(config CORSConfig) fursy.HandlerFunc {
 			return c.Next()
 		}
 
+		// Vary: Origin prevents cache poisoning — a shared cache must not
+		// serve a CORS response (with Allow-Origin for origin A) to a
+		// request from origin B.
+		c.Response.Header().Set("Vary", "Origin")
+
 		// Check if this is a preflight request.
 		if c.Request.Method == http.MethodOptions {
 			method := c.Request.Header.Get(headerRequestMethod)

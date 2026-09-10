@@ -1,9 +1,11 @@
 package fursy
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -884,6 +886,126 @@ func TestRouter_RedirectTrailingSlash_NoRedirectLoop(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404 (not a redirect loop)", w.Code)
+	}
+}
+
+// --- F5 audit fix: body size limit ---
+
+// bodyLimitReq is a test request type for body limit tests.
+type bodyLimitReq struct {
+	Data string `json:"data"`
+}
+
+// bodyLimitRes is a test response type for body limit tests.
+type bodyLimitRes struct {
+	OK bool `json:"ok"`
+}
+
+// TestBodyLimit_Large_Returns413 verifies that a request body exceeding
+// the default max body size (4MB) returns 413 Payload Too Large.
+func TestBodyLimit_Large_Returns413(t *testing.T) {
+	r := New()
+
+	r.POST("/upload", func(c *Box[bodyLimitReq, bodyLimitRes]) error {
+		return c.OK(bodyLimitRes{OK: true})
+	})
+
+	// Create a 5MB JSON body.
+	largeData := strings.Repeat("x", 5*1024*1024)
+	body := `{"data":"` + largeData + `"}`
+	req := httptest.NewRequest("POST", "/upload", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("5MB body: want 413, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBodyLimit_Normal_Passes verifies that a small request body passes
+// through the body limit check.
+func TestBodyLimit_Normal_Passes(t *testing.T) {
+	r := New()
+
+	r.POST("/upload", func(c *Box[bodyLimitReq, bodyLimitRes]) error {
+		return c.OK(bodyLimitRes{OK: true})
+	})
+
+	body := `{"data":"hello"}`
+	req := httptest.NewRequest("POST", "/upload", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("small body: want 200, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBodyLimit_Custom verifies that SetMaxBodySize overrides the default.
+func TestBodyLimit_Custom(t *testing.T) {
+	r := New()
+	r.SetMaxBodySize(1 << 20) // 1MB
+
+	r.POST("/upload", func(c *Box[bodyLimitReq, bodyLimitRes]) error {
+		return c.OK(bodyLimitRes{OK: true})
+	})
+
+	// 2MB body should be rejected with 1MB limit.
+	largeData := strings.Repeat("x", 2*1024*1024)
+	body := `{"data":"` + largeData + `"}`
+	req := httptest.NewRequest("POST", "/upload", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("2MB body with 1MB limit: want 413, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBodyLimit_ZeroDisables verifies that SetMaxBodySize(0) disables the limit.
+func TestBodyLimit_ZeroDisables(t *testing.T) {
+	r := New()
+	r.SetMaxBodySize(0) // Disable limit.
+
+	r.POST("/upload", func(c *Box[bodyLimitReq, bodyLimitRes]) error {
+		return c.OK(bodyLimitRes{OK: true})
+	})
+
+	// 5MB body should pass when limit is disabled.
+	largeData := strings.Repeat("x", 5*1024*1024)
+	body := `{"data":"` + largeData + `"}`
+	req := httptest.NewRequest("POST", "/upload", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("5MB body with limit disabled: want 200, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBodyLimit_NonGenericHandler verifies that plain handlers (HandlerFunc)
+// are not affected by body limit — only generic handlers with Bind() are limited.
+func TestBodyLimit_NonGenericHandler(t *testing.T) {
+	r := New()
+
+	r.Handle("POST", "/raw", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	// Large body should pass for plain handler (no automatic Bind).
+	largeData := strings.Repeat("x", 5*1024*1024)
+	body := `{"data":"` + largeData + `"}`
+	req := httptest.NewRequest("POST", "/raw", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("plain handler with large body: want 200, got %d", w.Code)
 	}
 }
 

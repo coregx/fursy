@@ -4,6 +4,8 @@
 
 package fursy
 
+import "net/http"
+
 // Handler is a type-safe handler function for HTTP requests with typed request/response bodies.
 //
 // Type parameters:
@@ -48,6 +50,13 @@ type Handler[Req, Res any] func(*Box[Req, Res]) error
 // This is used internally by Router.GET, Router.POST, etc. to support generic handlers.
 func adaptGenericHandler[Req, Res any](handler Handler[Req, Res]) HandlerFunc {
 	return func(base *Context) error {
+		// Enforce body size limit if configured.
+		// MaxBytesReader wraps the body so that reading beyond the limit
+		// returns http.MaxBytesError, which defaultErrorHandler maps to 413.
+		if base.router != nil && base.router.maxBodySize > 0 && base.Request.Body != nil {
+			base.Request.Body = http.MaxBytesReader(base.Response, base.Request.Body, base.router.maxBodySize)
+		}
+
 		// Create generic context
 		ctx := newBox[Req, Res](base)
 

@@ -66,6 +66,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coregx/fursy/internal/binding"
 	"github.com/coregx/fursy/internal/radix"
 )
 
@@ -109,6 +110,12 @@ const (
 //	router.Handle("GET", "/health", func(c *fursy.Context) error {
 //		return c.Text("OK")
 //	})
+
+// ErrorHandler is a function that handles errors returned by handlers and middleware.
+// It receives the Context and the error, and should write an appropriate response.
+type ErrorHandler func(c *Context, err error)
+
+// Router is the main HTTP router for FURSY.
 type Router struct {
 	// trees stores one radix tree per HTTP method for efficient routing.
 	trees map[string]*radix.Tree
@@ -118,6 +125,9 @@ type Router struct {
 
 	// middleware stores global middleware that executes for all routes.
 	middleware []HandlerFunc
+
+	// errorHandler handles errors from handlers. If nil, uses defaultErrorHandler.
+	errorHandler ErrorHandler
 
 	// validator is an optional validator for automatic request validation.
 	// If set, Box.Bind() will automatically validate request bodies.
@@ -154,7 +164,18 @@ type Router struct {
 
 	// shutdownMu protects shutdown callbacks from concurrent access.
 	shutdownMu sync.Mutex
+
+	// maxBodySize is the maximum allowed request body size in bytes for
+	// generic handlers (those using Box[Req, Res] with automatic binding).
+	// Default: 4MB (4 << 20). Set to 0 to disable the limit.
+	// Plain handlers (HandlerFunc) are not affected.
+	maxBodySize int64
 }
+
+const (
+	// defaultMaxBodySize is the default maximum request body size (4MB).
+	defaultMaxBodySize int64 = 4 << 20
+)
 
 // New creates a new Router instance with default configuration.
 //
@@ -168,6 +189,7 @@ func New() *Router {
 		trees:                  make(map[string]*radix.Tree),
 		handleMethodNotAllowed: true,
 		handleOPTIONS:          true,
+		maxBodySize:            defaultMaxBodySize,
 	}
 
 	// Initialize context pool.
@@ -237,6 +259,47 @@ func (r *Router) Use(middleware ...HandlerFunc) *Router {
 func (r *Router) SetValidator(v Validator) *Router {
 	r.validator = v
 	return r
+}
+
+// SetErrorHandler sets a custom error handler for the router.
+// If not set, the default error handler maps errors to appropriate HTTP responses:
+//   - Problem → uses Problem.Status (e.g. 404, 400)
+//   - ValidationErrors → 422 with RFC 9457 body
+//   - Binding errors → 400
+//   - Unknown errors → 500 without details
+func (r *Router) SetErrorHandler(h ErrorHandler) *Router {
+	r.errorHandler = h
+	return r
+}
+
+// SetMaxBodySize sets the maximum allowed request body size in bytes for
+// generic handlers (Box[Req, Res] with automatic binding).
+//
+// When a request body exceeds this limit, the binding step returns
+// an error that is mapped to 413 Payload Too Large by the default
+// error handler.
+//
+// The default limit is 4MB (4 << 20). Set to 0 to disable the limit.
+// Plain handlers (HandlerFunc) are not affected by this setting.
+//
+// Example:
+//
+//	router := fursy.New()
+//	router.SetMaxBodySize(1 << 20)  // 1MB limit
+//
+//	router.POST("/upload", func(c *Box[UploadReq, UploadRes]) error {
+//	    // Bodies larger than 1MB will be rejected with 413
+//	    return c.OK(UploadRes{OK: true})
+//	})
+func (r *Router) SetMaxBodySize(size int64) *Router {
+	r.maxBodySize = size
+	return r
+}
+
+// MaxBodySize returns the current maximum body size limit in bytes.
+// Returns 0 if the limit is disabled.
+func (r *Router) MaxBodySize() int64 {
+	return r.maxBodySize
 }
 
 // WithInfo sets the API metadata for OpenAPI generation.
@@ -523,6 +586,12 @@ func (r *Router) handleWithGroupMiddleware(method, path string, groupHandlers []
 	if err := tree.Insert(path, wrapper); err != nil {
 		panic("fursy: " + err.Error())
 	}
+
+	// Store route metadata for OpenAPI generation.
+	r.routes = append(r.routes, RouteInfo{
+		Method: method,
+		Path:   path,
+	})
 }
 
 // createGroupHandlerWrapper creates a handler that executes group middleware + handler.
@@ -623,16 +692,101 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	c.aborted = false
 
 	if err := c.Next(); err != nil {
-		_ = c.String(http.StatusInternalServerError, "Internal Server Error")
+		r.handleError(c, err)
 	}
+}
+
+// handleError dispatches the error to the custom or default error handler.
+func (r *Router) handleError(c *Context, err error) {
+	if r.errorHandler != nil {
+		r.errorHandler(c, err)
+		return
+	}
+	defaultErrorHandler(c, err)
+}
+
+// defaultErrorHandler maps errors to appropriate HTTP responses.
+func defaultErrorHandler(c *Context, err error) {
+	// If response headers already sent, don't write again — would corrupt body.
+	if c.written {
+		return
+	}
+
+	// Problem → use its Status field.
+	var prob Problem
+	if errors.As(err, &prob) {
+		_ = c.Problem(prob)
+		return
+	}
+
+	// ValidationErrors → 422 with RFC 9457 body.
+	var valErrs ValidationErrors
+	if errors.As(err, &valErrs) {
+		_ = c.Problem(ValidationProblem(valErrs))
+		return
+	}
+
+	// MaxBytesError → 413 Payload Too Large.
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		_ = c.String(http.StatusRequestEntityTooLarge, "Request Entity Too Large")
+		return
+	}
+
+	// Binding errors → 400 or 415.
+	if errors.Is(err, binding.ErrUnsupportedMediaType) {
+		_ = c.String(http.StatusUnsupportedMediaType, "Unsupported Media Type")
+		return
+	}
+	if errors.Is(err, binding.ErrEmptyRequestBody) {
+		_ = c.String(http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	// JSON/XML decode errors → 400.
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "json:") || strings.Contains(errMsg, "invalid character") ||
+		strings.Contains(errMsg, "xml:") || strings.Contains(errMsg, "cannot unmarshal") {
+		_ = c.String(http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	// Unknown → 500 without details (security: don't leak internals).
+	_ = c.String(http.StatusInternalServerError, "Internal Server Error")
 }
 
 // handleNotFound sends a 404 or 405 response depending on configuration.
 func (r *Router) handleNotFound(c *Context, w http.ResponseWriter, req *http.Request, path string) {
-	if r.handleMethodNotAllowed && r.pathExistsInOtherMethods(path, req.Method) {
+	// F4 fix: if OPTIONS and handleOPTIONS enabled and the path exists for
+	// other methods, run middleware chain with an empty handler so CORS
+	// middleware can respond to the preflight. Without this, OPTIONS
+	// requests to paths without an explicit OPTIONS route get 405 and
+	// middleware never executes.
+	if req.Method == http.MethodOptions && r.handleOPTIONS &&
+		len(r.middleware) > 0 && r.pathExistsInOtherMethods(path, req.Method) {
 		c.init(w, req, r, nil)
-		_ = c.String(http.StatusMethodNotAllowed, "Method Not Allowed")
+		c.handlers = c.handlers[:0]
+		c.handlers = append(c.handlers, r.middleware...)
+		// Terminal no-op handler: if no middleware writes a response,
+		// return 204 (successful OPTIONS with no body).
+		c.handlers = append(c.handlers, func(ctx *Context) error {
+			return ctx.NoContent(http.StatusNoContent)
+		})
+		c.index = -1
+		c.aborted = false
+		if err := c.Next(); err != nil {
+			r.handleError(c, err)
+		}
 		return
+	}
+
+	if r.handleMethodNotAllowed {
+		if allowed := r.allowedMethods(path, req.Method); allowed != "" {
+			c.init(w, req, r, nil)
+			c.SetHeader("Allow", allowed)
+			_ = c.String(http.StatusMethodNotAllowed, "Method Not Allowed")
+			return
+		}
 	}
 	c.init(w, req, r, nil)
 	_ = c.String(http.StatusNotFound, "Not Found")
@@ -667,6 +821,26 @@ func (r *Router) tryTrailingSlashLookup(
 
 // pathExistsInOtherMethods checks if a path exists in other HTTP methods.
 // When trailing slash handling is enabled, also checks the alternate path.
+// allowedMethods returns a comma-separated list of HTTP methods allowed for
+// the path (excluding the given method), or empty string if none.
+func (r *Router) allowedMethods(path, excludeMethod string) string {
+	altPath := ""
+	if r.trailingSlash != IgnoreTrailingSlash {
+		altPath = trailingSlashAlternate(path)
+	}
+
+	var methods []string
+	for m, tree := range r.trees {
+		if m == excludeMethod {
+			continue
+		}
+		if r.existsInTree(tree, path, altPath) {
+			methods = append(methods, m)
+		}
+	}
+	return strings.Join(methods, ", ")
+}
+
 func (r *Router) pathExistsInOtherMethods(path, method string) bool {
 	altPath := ""
 	if r.trailingSlash != IgnoreTrailingSlash {
@@ -811,7 +985,14 @@ func (r *Router) OnShutdown(f func()) {
 //	    log.Printf("Shutdown error: %v", err)
 //	}
 func (r *Router) Shutdown(ctx context.Context) error {
-	// Call shutdown callbacks in reverse order (last registered, first called).
+	// 1. Drain active connections first — active requests must finish
+	// before we close resources they depend on.
+	var serverErr error
+	if r.server != nil {
+		serverErr = r.server.Shutdown(ctx)
+	}
+
+	// 2. Then call cleanup callbacks (db.Close, etc.) in reverse order.
 	r.shutdownMu.Lock()
 	callbacks := make([]func(), len(r.shutdownCallbacks))
 	copy(callbacks, r.shutdownCallbacks)
@@ -821,12 +1002,7 @@ func (r *Router) Shutdown(ctx context.Context) error {
 		callbacks[i]()
 	}
 
-	// Shutdown http.Server if configured.
-	if r.server != nil {
-		return r.server.Shutdown(ctx)
-	}
-
-	return nil
+	return serverErr
 }
 
 // SetServer sets the http.Server for graceful shutdown.

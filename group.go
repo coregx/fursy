@@ -66,14 +66,10 @@ func (g *RouteGroup) Use(middleware ...HandlerFunc) *RouteGroup {
 //	v2.Handle("GET", "/users", handler)           // GET /api/v2/users (ratelimit only)
 func (g *RouteGroup) Group(prefix string, middleware ...HandlerFunc) *RouteGroup {
 	// If no middleware provided, inherit from parent group
-	var groupMiddleware []HandlerFunc
-	if len(middleware) == 0 {
-		// Copy parent middleware to avoid shared slice issues
-		groupMiddleware = make([]HandlerFunc, len(g.middleware))
-		copy(groupMiddleware, g.middleware)
-	} else {
-		groupMiddleware = middleware
-	}
+	// Always inherit parent middleware, then append child-specific.
+	groupMiddleware := make([]HandlerFunc, len(g.middleware), len(g.middleware)+len(middleware))
+	copy(groupMiddleware, g.middleware)
+	groupMiddleware = append(groupMiddleware, middleware...)
 
 	return &RouteGroup{
 		prefix:     g.prefix + prefix,

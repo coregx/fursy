@@ -10,6 +10,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
 
+## [0.5.1] - 2026-09-10
+
+### Fixed
+- **Error pipeline** — `Router.SetErrorHandler()` with default mapping: Problem→status code, ValidationErrors→422, binding errors→400/415, unknown→500 without details. Previously all errors returned plain-text 500
+- **Group middleware inheritance** — child groups with explicit middleware now append to parent middleware instead of replacing it. Prevents auth bypass when nesting groups
+- **Shutdown order** — `Shutdown()` now drains active connections before calling cleanup callbacks. Previously callbacks (e.g. db.Close) ran while requests were still active
+- **CORS preflight** — OPTIONS requests now reach middleware without explicit OPTIONS route. `Vary: Origin` header added on all CORS responses
+- **405 Allow header** — 405 Method Not Allowed now includes `Allow` header listing valid methods (RFC 9110)
+- **Group routes in OpenAPI** — routes registered via RouteGroup now appear in generated OpenAPI spec
+- **Rate limit XFF spoofing** — default KeyFunc now uses `RemoteAddr` instead of trusting `X-Forwarded-For`
+
+### Added
+- `Router.SetErrorHandler(ErrorHandler)` — custom error handler
+- `Router.SetMaxBodySize(int64)` — request body size limit (default 4MB, mapped to 413)
+- `Tree.Contains(path)` — zero-alloc existence check for 405 responses
+
+### Removed
+- `Context.DB()` — broken context key, use `database.GetDB(c)` instead
+- `Context.SSE()` — stub, use `stream.SSEUpgrade(c, handler)` instead
+- `Context.WebSocket()` — stub, use `stream.WebSocketUpgrade(c, handler, opts)` instead
+- `ErrStreamNotImported` — no longer needed
+
+### Changed
+- `encoding/json/v2` imports replaced with `encoding/json` (Go 1.27 default)
+
+### Security
+- Body size limit prevents memory DoS via large request bodies
+- Rate limit no longer trusts spoofable proxy headers by default
+- Error handler does not leak internal error details to clients
+- CORS `Vary: Origin` prevents cache poisoning
+
 ## [0.5.0] - 2026-09-10
 
 ### Added
