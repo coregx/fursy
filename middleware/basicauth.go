@@ -6,6 +6,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
 	"strings"
@@ -158,7 +159,11 @@ func parseBasicAuth(auth string) (username, password string) {
 //	router.Use(middleware.BasicAuth(middleware.BasicAuthAccounts(accounts)))
 func BasicAuthAccounts(accounts map[string]string) ValidatorFunc {
 	return func(_ *fursy.Context, username, password string) (interface{}, error) {
-		if expectedPassword, ok := accounts[username]; ok && expectedPassword == password {
+		expectedPassword, ok := accounts[username]
+		if !ok {
+			return nil, fursy.ErrUnauthorized
+		}
+		if subtle.ConstantTimeCompare([]byte(expectedPassword), []byte(password)) == 1 {
 			return username, nil
 		}
 		return nil, fursy.ErrUnauthorized

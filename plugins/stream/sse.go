@@ -10,7 +10,7 @@
 // Features:
 //   - SSEHub[T] middleware for sharing SSE hubs across handlers
 //   - WebSocketHub middleware for sharing WebSocket hubs
-//   - Context helper methods: c.SSE() and c.WebSocket()
+//   - Plugin helpers: stream.SSEUpgrade() and stream.WebSocketUpgrade()
 //   - Type-safe hub retrieval with generics
 //
 // Example SSE usage:
@@ -23,7 +23,7 @@
 //
 //	router.Handle("GET", "/events", func(c *fursy.Context) error {
 //	    hub, _ := stream.GetSSEHub[Notification](c)
-//	    return c.SSE(func(conn *sse.Conn) error {
+//	    return stream.SSEUpgrade(c, func(conn *sse.Conn) error {
 //	        hub.Register(conn)
 //	        defer hub.Unregister(conn)
 //	        <-conn.Done()

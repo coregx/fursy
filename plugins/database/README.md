@@ -6,7 +6,7 @@ Database integration plugin for fursy HTTP router. Provides seamless integration
 
 - **Database Middleware**: Share database connection across handlers
 - **Transaction Helpers**: Easy transaction management with auto-commit/rollback
-- **Context Integration**: `c.DB()` for convenient database access
+- **Context Integration**: `database.GetDB(c)` for convenient database access
 - **Generic SQL Support**: Works with any `database/sql` driver
 - **Zero External Dependencies**: Only stdlib `database/sql`
 

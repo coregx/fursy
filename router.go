@@ -708,8 +708,8 @@ func (r *Router) handleError(c *Context, err error) {
 
 // defaultErrorHandler maps errors to appropriate HTTP responses.
 func defaultErrorHandler(c *Context, err error) {
-	// If response headers already sent, don't write again — would corrupt body.
-	if c.written {
+	// If response already written, don't write again — would corrupt body.
+	if c.responseWriter.written {
 		return
 	}
 
@@ -745,9 +745,8 @@ func defaultErrorHandler(c *Context, err error) {
 	}
 
 	// JSON/XML decode errors → 400.
-	errMsg := err.Error()
-	if strings.Contains(errMsg, "json:") || strings.Contains(errMsg, "invalid character") ||
-		strings.Contains(errMsg, "xml:") || strings.Contains(errMsg, "cannot unmarshal") {
+	var decodeErr *binding.DecodeError
+	if errors.As(err, &decodeErr) {
 		_ = c.String(http.StatusBadRequest, "Bad Request")
 		return
 	}

@@ -48,6 +48,42 @@ type Param struct {
 	Value string // Parameter value extracted from path
 }
 
+// responseWriter wraps http.ResponseWriter to automatically track whether
+// any bytes have been written. This ensures the error handler never appends
+// to an already-written response body, regardless of which Context method
+// (JSON, XML, Blob, NoContent, Stream, Markdown, or direct Write) was used.
+type responseWriter struct {
+	http.ResponseWriter
+	written bool
+}
+
+// WriteHeader marks the response as written and delegates to the underlying writer.
+func (w *responseWriter) WriteHeader(code int) {
+	w.written = true
+	w.ResponseWriter.WriteHeader(code)
+}
+
+// Write marks the response as written and delegates to the underlying writer.
+func (w *responseWriter) Write(b []byte) (int, error) {
+	w.written = true
+	return w.ResponseWriter.Write(b)
+}
+
+// Flush implements http.Flusher by delegating to the underlying ResponseWriter.
+// Required for SSE streaming and middleware wrappers that check http.Flusher.
+func (w *responseWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap returns the underlying ResponseWriter.
+// This allows middleware wrappers (e.g., logger, circuitbreaker) to access
+// the original ResponseWriter via http.ResponseController or type assertions.
+func (w *responseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 // Context is the base context for all handlers and middleware.
 // It provides access to request/response, routing info, and middleware chain execution.
 //
@@ -62,6 +98,10 @@ type Context struct {
 
 	// Response is the response writer.
 	Response http.ResponseWriter
+
+	// responseWriter is the wrapper that tracks whether bytes have been written.
+	// Context.Response points to this wrapper, which delegates to the real writer.
+	responseWriter responseWriter
 
 	// router reference for accessing router configuration.
 	router *Router
@@ -79,9 +119,6 @@ type Context struct {
 
 	// data stores arbitrary values for passing data between middleware.
 	data map[string]any
-
-	// written tracks if any response body has been written.
-	written bool
 
 	// Middleware chain execution.
 	// Pre-allocated with capacity 16 to avoid allocations for typical middleware chains.
@@ -115,7 +152,9 @@ func newContext() *Context {
 // This is called by Router.ServeHTTP before executing the handler chain.
 func (c *Context) init(w http.ResponseWriter, r *http.Request, router *Router, params []Param) {
 	c.Request = r
-	c.Response = w
+	c.responseWriter.ResponseWriter = w
+	c.responseWriter.written = false
+	c.Response = &c.responseWriter
 	c.router = router
 	c.params = params
 	c.query = nil // reset query cache
@@ -160,7 +199,7 @@ func (c *Context) reset() {
 
 	c.index = -1
 	c.aborted = false
-	c.written = false
+	c.responseWriter.written = false
 }
 
 // Next executes the next handler in the middleware chain.
@@ -336,7 +375,6 @@ func (c *Context) PostForm(name string) string {
 //
 //	return c.String(200, "Hello, World!")
 func (c *Context) String(code int, s string) error {
-	c.written = true
 	c.Response.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	c.Response.WriteHeader(code)
 	_, err := c.Response.Write([]byte(s))
@@ -350,7 +388,6 @@ func (c *Context) String(code int, s string) error {
 //
 //	return c.JSON(200, map[string]string{"message": "success"})
 func (c *Context) JSON(code int, obj any) error {
-	c.written = true
 	c.Response.Header().Set("Content-Type", "application/json; charset=utf-8")
 	c.Response.WriteHeader(code)
 	encoder := json.NewEncoder(c.Response)
@@ -658,7 +695,6 @@ func (c *Context) GetBool(key string) bool {
 // generic handler adapter. If you need custom error handling, check
 // the error returned by your handler logic instead.
 func (c *Context) Problem(p Problem) error {
-	c.written = true
 	c.Response.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 	c.Response.WriteHeader(p.Status)
 	encoder := json.NewEncoder(c.Response)

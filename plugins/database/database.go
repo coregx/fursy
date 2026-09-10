@@ -8,7 +8,7 @@
 //   - DB wrapper for *sql.DB with context support
 //   - Middleware to share database connection across handlers
 //   - Transaction helpers with auto-commit/rollback
-//   - Context integration via c.DB() method
+//   - Context integration via database.GetDB(c) helper
 //
 // Example:
 //
@@ -26,7 +26,10 @@
 //	router.Use(database.Middleware(db))
 //
 //	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
-//	    db := c.DB()
+//	    db, ok := database.GetDB(c)
+//	    if !ok {
+//	        return c.Problem(fursy.InternalServerError("Database not configured"))
+//	    }
 //	    var user User
 //	    err := db.QueryRow(c.Request.Context(),
 //	        "SELECT * FROM users WHERE id = $1", c.Param("id")).
@@ -76,7 +79,7 @@ func NewDB(db *sql.DB) *DB {
 
 // Middleware creates a middleware that stores the database in the request context.
 //
-// This allows handlers to access the database via c.DB() method.
+// This allows handlers to access the database via database.GetDB(c) helper.
 //
 // Example:
 //
@@ -84,7 +87,10 @@ func NewDB(db *sql.DB) *DB {
 //	router.Use(database.Middleware(db))
 //
 //	router.Handle("GET", "/users", func(c *fursy.Context) error {
-//	    db := c.DB()
+//	    db, ok := database.GetDB(c)
+//	    if !ok {
+//	        return c.Problem(fursy.InternalServerError("Database not configured"))
+//	    }
 //	    // Use db for queries...
 //	    return nil
 //	})
