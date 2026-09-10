@@ -785,9 +785,9 @@ func TestNewRateLimiter_StopExported(t *testing.T) {
 // TestRateLimit_HeadersDisable verifies that Headers can be explicitly disabled.
 func TestRateLimit_HeadersDisable(t *testing.T) {
 	rl := NewRateLimiter(RateLimitConfig{
-		Rate:       10,
-		Burst:      20,
-		NoHeaders:  true,
+		Rate:      10,
+		Burst:     20,
+		NoHeaders: true,
 	})
 
 	r := fursy.New()

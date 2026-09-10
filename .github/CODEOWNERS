@@ -6,19 +6,23 @@
 # that modifies code they own.
 
 # Default owner for everything in the repo
-# TODO: Update with actual maintainer GitHub username(s)
 * @kolkov
 
 # Core routing engine - Critical performance and correctness
 /internal/radix/ @kolkov
-/internal/pool/ @kolkov
+/internal/binding/ @kolkov
+/internal/negotiate/ @kolkov
 
 # Public API files - Breaking changes require careful review
 /router.go @kolkov
 /context.go @kolkov
-/handler.go @kolkov
+/context_base.go @kolkov
+/context_generic.go @kolkov
+/handler_generic.go @kolkov
 /group.go @kolkov
 /error.go @kolkov
+/problem.go @kolkov
+/openapi.go @kolkov
 
 # Built-in middleware - Standard middleware implementations
 /middleware/ @kolkov
@@ -38,7 +42,6 @@
 
 # Code quality and linting configuration
 /.golangci.yml @kolkov
-/Makefile @kolkov
 
 # Tests - Ensure coverage and reliability
 *_test.go @kolkov

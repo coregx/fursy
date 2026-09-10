@@ -973,8 +973,8 @@ func (r *Router) OnShutdown(f func()) {
 // Shutdown gracefully shuts down the HTTP server and executes registered callbacks.
 //
 // Shutdown works in two phases:
-//  1. Calls all registered OnShutdown callbacks in reverse order
-//  2. Calls http.Server.Shutdown() to gracefully stop the server
+//  1. Calls http.Server.Shutdown() to drain active connections
+//  2. Calls all registered OnShutdown callbacks in reverse order
 //
 // The server shutdown process:
 //   - Immediately closes all listeners (stops accepting new connections)
