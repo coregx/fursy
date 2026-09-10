@@ -6,6 +6,7 @@
 package middleware
 
 import (
+	"container/list"
 	"fmt"
 	"net/http"
 	"sync"
@@ -90,16 +91,19 @@ type RateLimitStore interface {
 }
 
 // inMemoryStore is the default in-memory store for rate limiters.
+// Uses container/list for true LRU eviction with O(1) operations.
 type inMemoryStore struct {
 	limiters    map[string]*limiterEntry
+	lruList     *list.List               // doubly-linked list for LRU order
+	lruIndex    map[string]*list.Element // key → list element for O(1) lookup
 	mu          sync.RWMutex
 	maxKeys     int
-	insertOrd   []string  // insertion-order list for O(1) eviction
-	cleanupOnce sync.Once // ensures at most one cleanup goroutine
+	cleanupOnce sync.Once
 }
 
 // limiterEntry stores a rate limiter with its last access time.
 type limiterEntry struct {
+	key        string
 	limiter    *rate.Limiter
 	lastAccess time.Time
 }
@@ -127,6 +131,8 @@ func newInMemoryStore(maxKeys int) *inMemoryStore {
 
 	return &inMemoryStore{
 		limiters: make(map[string]*limiterEntry),
+		lruList:  list.New(),
+		lruIndex: make(map[string]*list.Element),
 		maxKeys:  maxKeys,
 	}
 }
@@ -136,41 +142,44 @@ func (s *inMemoryStore) GetLimiter(key string, r rate.Limit, burst int) *rate.Li
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Check if limiter exists.
+	// Check if limiter exists — move to back (most recently used).
 	if entry, ok := s.limiters[key]; ok {
 		entry.lastAccess = time.Now()
+		if elem, ok := s.lruIndex[key]; ok {
+			s.lruList.MoveToBack(elem)
+		}
 		return entry.limiter
 	}
 
-	// Evict oldest entries until under maxKeys (O(1) amortized via insertion-order list).
+	// Evict least recently used entries until under maxKeys.
 	for s.maxKeys > 0 && len(s.limiters) >= s.maxKeys {
-		s.evictOldest()
+		s.evictLRU()
 	}
 
 	// Create new limiter.
 	limiter := rate.NewLimiter(r, burst)
-	s.limiters[key] = &limiterEntry{
+	entry := &limiterEntry{
+		key:        key,
 		limiter:    limiter,
 		lastAccess: time.Now(),
 	}
-	s.insertOrd = append(s.insertOrd, key)
+	s.limiters[key] = entry
+	elem := s.lruList.PushBack(key)
+	s.lruIndex[key] = elem
 
 	return limiter
 }
 
-// evictOldest removes the oldest entry by insertion order.
-// O(1) amortized: pops from front of insertOrd, skipping already-deleted keys.
-func (s *inMemoryStore) evictOldest() {
-	for len(s.insertOrd) > 0 {
-		key := s.insertOrd[0]
-		s.insertOrd = s.insertOrd[1:]
-
-		if _, ok := s.limiters[key]; ok {
-			delete(s.limiters, key)
-			return
-		}
-		// Key was already removed by Cleanup; skip and try next.
+// evictLRU removes the least recently used entry. O(1).
+func (s *inMemoryStore) evictLRU() {
+	front := s.lruList.Front()
+	if front == nil {
+		return
 	}
+	key := front.Value.(string)
+	s.lruList.Remove(front)
+	delete(s.lruIndex, key)
+	delete(s.limiters, key)
 }
 
 // Cleanup removes expired limiters.
@@ -182,6 +191,10 @@ func (s *inMemoryStore) Cleanup(expireAfter time.Duration) {
 	for key, entry := range s.limiters {
 		if now.Sub(entry.lastAccess) > expireAfter {
 			delete(s.limiters, key)
+			if elem, ok := s.lruIndex[key]; ok {
+				s.lruList.Remove(elem)
+				delete(s.lruIndex, key)
+			}
 		}
 	}
 }
