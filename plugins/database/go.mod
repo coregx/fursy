@@ -3,7 +3,7 @@ module github.com/coregx/fursy/plugins/database
 go 1.27
 
 require (
-	github.com/coregx/fursy v0.5.3
+	github.com/coregx/fursy v0.5.4
 	modernc.org/sqlite v1.40.1
 )
 

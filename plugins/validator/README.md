@@ -32,6 +32,9 @@ go get github.com/coregx/fursy/plugins/validator
 package main
 
 import (
+    "log"
+    "net/http"
+
     "github.com/coregx/fursy"
     "github.com/coregx/fursy/plugins/validator"
 )
@@ -64,7 +67,7 @@ func main() {
         return c.Created("/users/"+user.ID, user)
     })
 
-    router.Run(":8080")
+    log.Fatal(http.ListenAndServe(":8080", router))
 }
 ```
 

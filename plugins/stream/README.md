@@ -26,6 +26,7 @@ package main
 
 import (
     "log"
+    "net/http"
     "time"
 
     "github.com/coregx/fursy"
@@ -76,7 +77,7 @@ func main() {
         return c.JSON(200, map[string]string{"status": "sent"})
     })
 
-    log.Fatal(router.Run(":8080"))
+    log.Fatal(http.ListenAndServe(":8080", router))
 }
 ```
 
@@ -98,6 +99,7 @@ package main
 
 import (
     "log"
+    "net/http"
 
     "github.com/coregx/fursy"
     "github.com/coregx/fursy/plugins/stream"
@@ -144,7 +146,7 @@ func main() {
         })
     })
 
-    log.Fatal(router.Run(":8080"))
+    log.Fatal(http.ListenAndServe(":8080", router))
 }
 ```
 

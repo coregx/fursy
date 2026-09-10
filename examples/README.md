@@ -56,8 +56,8 @@ go run main.go
 **1. Basic Router Setup**
 ```go
 router := fursy.New()
-router.GET("/", handler)
-router.Run(":8080")
+router.Handle("GET", "/", handler)
+log.Fatal(http.ListenAndServe(":8080", router))
 ```
 
 **2. With Database**

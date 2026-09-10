@@ -52,6 +52,9 @@ func (s *JWTService) GenerateToken(userID, role string) (string, error) {
 // ValidateToken validates JWT token and returns claims.
 func (s *JWTService) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrInvalidToken
+		}
 		return s.secret, nil
 	})
 

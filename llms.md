@@ -40,7 +40,7 @@
 - **RFC 9457 Problem Details**: Standardized error responses built-in
 - **OpenAPI 3.1 Generation**: Automatic API documentation from code
 - **Minimal Dependencies**: Core = stdlib only, middleware = 2 dependencies (JWT, RateLimit)
-- **Zero-Allocation Routing**: 256 ns/op, 1 alloc/op (production-ready performance)
+- **Zero-Allocation Routing**: ~53 ns/op, 0 alloc/op (production-ready performance)
 - **Production Middleware**: 8 built-in middleware (Logger, Recovery, CORS, BasicAuth, JWT, RateLimit, CircuitBreaker, Secure)
 - **Content Negotiation**: RFC 9110 compliant with AI agent support (Markdown responses)
 
@@ -52,7 +52,7 @@
 - **Coverage**: 88.9% core (exceeds >85% target)
 - **Linter**: 0 issues (golangci-lint strict mode)
 - **Tests**: 150+ test functions, 19 benchmarks
-- **Performance**: 256 ns/op static, 326 ns/op parametric, ~10M req/s throughput
+- **Performance**: ~53 ns/op static, ~75 ns/op parametric, 0 alloc/op
 
 ### Production Ready
 
@@ -76,7 +76,7 @@
 - Current phase and progress (Phase 3 Complete, Phase 4 Ready)
 - Active tasks (currently: documentation and examples)
 - Test coverage (88.9%)
-- Performance metrics (256 ns/op)
+- Performance metrics (53 ns/op, 0 alloc)
 - Recent updates (rebranding FURY → fursy)
 - Kanban status (25 done, 32 in backlog)
 
@@ -137,7 +137,7 @@
 - O(log n) lookup complexity
 - 87.9% test coverage
 
-**Performance**: 256 ns/op (static), 326 ns/op (parametric), 1 alloc/op
+**Performance**: ~53 ns/op (static), ~75 ns/op (parametric), 0 alloc/op
 
 ### Generic Type-Safe Methods (Go 1.27+)
 
@@ -654,19 +654,15 @@ admin.Handle("GET", "/users", listUsers)
 
 ## Development Standards
 
-### 1. JSON: encoding/json/v2 ⚠️ CRITICAL
+### 1. JSON: encoding/json
 
-**MUST use** the new `encoding/json/v2` package:
+Use the standard `encoding/json` package:
 
 ```go
-// ✅ CORRECT:
-import "encoding/json/v2"
-
-// ❌ WRONG:
-import "encoding/json"  // Old version, don't use!
+import "encoding/json"
 ```
 
-**Why**: Go 1.25+ introduced new JSON API with better performance and features.
+Go 1.27 made json/v2 the default implementation behind the `encoding/json` import path, so the import is simply `"encoding/json"`.
 
 ### 2. Logging: log/slog
 
@@ -866,10 +862,10 @@ func BenchmarkRouter_StaticRoute(b *testing.B) {
 ```
 
 **Current performance targets** (achieved):
-- Static routes: <500 ns/op ✅ (256 ns/op)
-- Parametric routes: <500 ns/op ✅ (326 ns/op)
-- Allocations: 1 alloc/op ✅
-- Throughput: >100k req/s ✅ (~10M req/s)
+- Static routes: <500 ns/op ✅ (~53 ns/op)
+- Parametric routes: <500 ns/op ✅ (~75 ns/op)
+- Allocations: 0 alloc/op ✅
+- Throughput: >100k req/s ✅
 
 ---
 
@@ -1147,7 +1143,7 @@ router.Use(middleware.Secure(middleware.SecureConfig{
 | **Content Negotiation** | ✅ RFC 9110 | 🔧 Partial | 🔧 Partial | 🔧 Partial | ❌ No |
 | **OpenAPI Generation** | ✅ Built-in | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin |
 | **Zero Deps (core)** | ✅ Yes | ❌ No | ❌ No | ❌ No | ✅ Yes |
-| **Performance** | ⭐⭐⭐⭐⭐ 256 ns/op | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **Performance** | ⭐⭐⭐⭐⭐ ~53 ns/op | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
 | **Go Version** | 1.27+ | 1.13+ | 1.17+ | 1.17+ | 1.16+ |
 
 **fursy unique advantages**:
@@ -1284,19 +1280,12 @@ router.Use(middleware.Secure(middleware.SecureConfig{
 ### Routing Performance
 
 **Static routes**:
-- 256 ns/op ✅
-- 1 alloc/op ✅
-- ~10.5M ops/s throughput
+- ~53 ns/op ✅
+- 0 alloc/op ✅
 
 **Parametric routes**:
-- 326 ns/op ✅ (1 param)
-- 344 ns/op ✅ (2 params)
-- 561 ns/op ✅ (4 params - deep nesting)
-- 1 alloc/op for all ✅
-
-**Wildcard routes**:
-- 539 ns/op ✅
-- 1 alloc/op ✅
+- ~75 ns/op ✅ (1 param)
+- 0 alloc/op for all ✅
 
 ### Context Operations
 
@@ -1337,17 +1326,13 @@ router.Use(middleware.Secure(middleware.SecureConfig{
 
 ## Common Gotchas
 
-### 1. MUST use encoding/json/v2 ⚠️ CRITICAL
+### 1. JSON: encoding/json
 
 ```go
-// ❌ WRONG:
 import "encoding/json"
-
-// ✅ CORRECT:
-import "encoding/json/v2"
 ```
 
-**Why**: Go 1.25+ introduced new JSON API.
+Go 1.27 made json/v2 the default implementation behind the `encoding/json` import path, so the import is simply `"encoding/json"`.
 
 ### 2. MUST use log/slog for logging
 
@@ -1675,7 +1660,7 @@ import "github.com/coregx/fursy/plugins/validator"
 2. **RFC 9457 Problem Details** - Standard error format everywhere
 3. **OpenAPI 3.1 generation** - Automatic from code
 4. **Minimal dependencies** - Core = stdlib only
-5. **256 ns/op routing** - Zero-allocation, 1 alloc/op
+5. **~53 ns/op routing** - Zero-allocation, 0 alloc/op
 6. **8 production middleware** - Logger, Recovery, CORS, BasicAuth, JWT, RateLimit, CircuitBreaker, Secure
 7. **RFC 9110 content negotiation** - Multi-format responses including Markdown for AI agents
 
@@ -1692,7 +1677,7 @@ import "github.com/coregx/fursy/plugins/validator"
 
 1. **ALWAYS read STATUS.md first** (`.claude/STATUS.md`)
 2. **ALWAYS read LINTER_RULES.md before coding** (`.claude/LINTER_RULES.md`)
-3. **MUST use `encoding/json/v2`** (not `encoding/json`)
+3. **MUST use `encoding/json`** (Go 1.27 json/v2 is the default behind this import path)
 4. **MUST use `log/slog`** (not `log`)
 5. **MUST run `go test -race`** before commit
 6. **MUST pass `golangci-lint run`** with 0 issues

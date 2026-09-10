@@ -473,6 +473,23 @@ func TestMapForm_MissingFormValues(t *testing.T) {
 	}
 }
 
+// TestMapForm_TypeMismatch tests that form type errors return DecodeError.
+func TestMapForm_TypeMismatch(t *testing.T) {
+	form := url.Values{
+		"age": {"not-a-number"},
+	}
+	var result BindTestStruct
+	err := mapForm(&result, form)
+	if err == nil {
+		t.Fatal("expected error for type mismatch, got nil")
+	}
+
+	var decodeErr *DecodeError
+	if !errors.As(err, &decodeErr) {
+		t.Errorf("expected DecodeError, got %T: %v", err, err)
+	}
+}
+
 // TestMapForm_UnexportedFields tests that unexported fields are skipped.
 func TestMapForm_UnexportedFields(t *testing.T) {
 	type withUnexported struct {

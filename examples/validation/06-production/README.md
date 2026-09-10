@@ -346,8 +346,8 @@ Press `Ctrl+C` and observe graceful shutdown:
 - [ ] Change `JWT_SECRET` to strong random value
 - [ ] Use HTTPS in production
 - [ ] Implement password hashing (bcrypt)
-- [ ] Add rate limiting (see `fursy.RateLimit()`)
-- [ ] Add CORS middleware (see `fursy.CORS()`)
+- [ ] Add rate limiting (see `middleware.RateLimit()`)
+- [ ] Add CORS middleware (see `middleware.CORS()`)
 - [ ] Add request ID tracking
 - [ ] Implement proper session management
 - [ ] Add audit logging
