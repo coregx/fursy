@@ -920,7 +920,7 @@ router.Handle("GET", "/api/data", func(c *fursy.Context) error {
 FURSY has first-class support for AI agents via Markdown responses:
 
 ```go
-router.GET("/api/schema", func(c *fursy.Context) error {
+router.Handle("GET", "/api/schema", func(c *fursy.Context) error {
     // AI agents prefer markdown for better understanding
     if c.Accepts(fursy.MIMETextMarkdown) {
         schema := `
@@ -1008,7 +1008,7 @@ func main() {
     router := fursy.New()
     router.Use(opentelemetry.Middleware("my-service"))
 
-    router.GET("/users/:id", func(c *fursy.Context) error {
+    router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
         // Automatically traced! Span includes:
         // - HTTP method, path, status
         // - Request/response headers
@@ -1057,13 +1057,13 @@ func main() {
     // - http.server.request.size (histogram)
     // - http.server.response.size (histogram)
 
-    router.GET("/users", func(c *fursy.Context) error {
+    router.Handle("GET", "/users", func(c *fursy.Context) error {
         users := getAllUsers()
         return c.OK(users)
     })
 
     // Expose metrics at /metrics
-    router.GET("/metrics", promhttp.Handler())
+    router.Handle("GET", "/metrics", promhttp.Handler())
 
     http.ListenAndServe(":8080", router)
 }
@@ -1087,7 +1087,7 @@ Add custom spans to trace specific operations:
 ```go
 import "go.opentelemetry.io/otel"
 
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     // HTTP request span is created automatically by middleware
 
     // Add custom span for database query
@@ -1165,7 +1165,7 @@ Your fursy application will automatically send traces to Jaeger. No configuratio
 | OpenAPI Built-in | ✅ | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin |
 | RFC 9457 Errors | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Go Version | 1.25+ | 1.13+ | 1.17+ | 1.16+ | 1.17+ |
+| Go Version | 1.27+ | 1.13+ | 1.17+ | 1.16+ | 1.17+ |
 
 **FURSY is unique**: Only router combining furious performance, type-safe generics, automatic validation, RFC 9110 content negotiation, OpenAPI, and RFC 9457 with minimal dependencies.
 
@@ -1210,7 +1210,7 @@ We welcome contributions! Please see:
 - [SECURITY.md](SECURITY.md) - Security policy
 
 **Development Requirements**:
-- Go 1.25+
+- Go 1.27+
 - golangci-lint
 - Follow git-flow branching model
 

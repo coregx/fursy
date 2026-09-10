@@ -127,7 +127,7 @@ go test ./...                # Run tests
 
 ### Prerequisites
 
-- **Go 1.25 or later** (required for generics and modern stdlib)
+- **Go 1.27 or later** (required for generic methods on concrete types)
 - **golangci-lint** (for code quality checks)
 - **git** (for version control)
 
@@ -333,7 +333,7 @@ Performance is a core goal. Always benchmark critical paths:
 ```go
 func BenchmarkRouter_StaticRoute(b *testing.B) {
     r := New()
-    r.GET("/users/:id", handler)
+    r.Handle("GET", "/users/:id", handler)
 
     req := httptest.NewRequest("GET", "/users/123", nil)
     w := httptest.NewRecorder()

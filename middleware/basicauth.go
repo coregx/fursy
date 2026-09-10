@@ -61,7 +61,7 @@ type BasicAuthConfig struct {
 //
 // Access user identity in handlers:
 //
-//	router.GET("/protected", func(c *fursy.Context) error {
+//	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 //	    user := c.GetString(middleware.UserContextKey)
 //	    return c.String(200, "Hello, "+user)
 //	})

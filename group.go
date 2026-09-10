@@ -13,11 +13,11 @@ package fursy
 //	api.Use(AuthMiddleware())
 //
 //	v1 := api.Group("/v1")
-//	v1.GET("/users", listUsers)      // GET /api/v1/users
-//	v1.POST("/users", createUser)    // POST /api/v1/users
+//	v1.Handle("GET", "/users", listUsers)      // GET /api/v1/users
+//	v1.Handle("POST", "/users", createUser)    // POST /api/v1/users
 //
 //	v2 := api.Group("/v2")
-//	v2.GET("/users", listUsersV2)    // GET /api/v2/users
+//	v2.Handle("GET", "/users", listUsersV2)    // GET /api/v2/users
 type RouteGroup struct {
 	// prefix is the path prefix for all routes in this group.
 	prefix string
@@ -60,10 +60,10 @@ func (g *RouteGroup) Use(middleware ...HandlerFunc) *RouteGroup {
 //
 //	v1 := api.Group("/v1")              // Inherits logger
 //	v1.Use(AuthMiddleware())            // Adds auth
-//	v1.GET("/users", handler)           // GET /api/v1/users (logger + auth)
+//	v1.Handle("GET", "/users", handler)           // GET /api/v1/users (logger + auth)
 //
 //	v2 := api.Group("/v2", RateLimitMiddleware())  // Custom middleware
-//	v2.GET("/users", handler)           // GET /api/v2/users (ratelimit only)
+//	v2.Handle("GET", "/users", handler)           // GET /api/v2/users (ratelimit only)
 func (g *RouteGroup) Group(prefix string, middleware ...HandlerFunc) *RouteGroup {
 	// If no middleware provided, inherit from parent group
 	var groupMiddleware []HandlerFunc

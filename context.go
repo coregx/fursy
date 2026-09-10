@@ -381,7 +381,7 @@ func (c *Context) XML(code int, obj any) error {
 //
 // Example:
 //
-//	router.GET("/docs.md", func(c *Context) error {
+//	router.Handle("GET", "/docs.md", func(c *Context) error {
 //	    md := `# API Documentation
 //
 //	## Endpoints
@@ -472,7 +472,7 @@ func (c *Context) Stream(code int, contentType string, r io.Reader) error {
 //
 // Example:
 //
-//	router.GET("/users", func(c *fursy.Context) error {
+//	router.Handle("GET", "/users", func(c *fursy.Context) error {
 //	    users := getAllUsers()
 //	    return c.OK(users)  // 200 OK
 //	})
@@ -487,7 +487,7 @@ func (c *Context) OK(obj any) error {
 //
 // Example:
 //
-//	router.POST("/users", func(c *fursy.Context) error {
+//	router.Handle("POST", "/users", func(c *fursy.Context) error {
 //	    newUser := createUser(c)
 //	    return c.Created(newUser)  // 201 Created
 //	})
@@ -502,7 +502,7 @@ func (c *Context) Created(obj any) error {
 //
 // Example:
 //
-//	router.POST("/jobs", func(c *fursy.Context) error {
+//	router.Handle("POST", "/jobs", func(c *fursy.Context) error {
 //	    jobID := startAsyncJob(c)
 //	    return c.Accepted(map[string]string{"jobId": jobID})  // 202 Accepted
 //	})
@@ -518,7 +518,7 @@ func (c *Context) Accepted(obj any) error {
 //
 // Example:
 //
-//	router.DELETE("/users/:id", func(c *fursy.Context) error {
+//	router.Handle("DELETE", "/users/:id", func(c *fursy.Context) error {
 //	    deleteUser(c.Param("id"))
 //	    return c.NoContentSuccess()  // 204 No Content
 //	})
@@ -531,7 +531,7 @@ func (c *Context) NoContentSuccess() error {
 //
 // Example:
 //
-//	router.GET("/ping", func(c *fursy.Context) error {
+//	router.Handle("GET", "/ping", func(c *fursy.Context) error {
 //	    return c.Text("pong")  // 200 OK, text/plain
 //	})
 func (c *Context) Text(s string) error {
@@ -826,7 +826,7 @@ var ErrInvalidRedirectCode = errors.New("fursy: invalid redirect code (must be 3
 //	router := fursy.New()
 //	router.Use(stream.SSEHub(hub))
 //
-//	router.GET("/events", func(c *fursy.Context) error {
+//	router.Handle("GET", "/events", func(c *fursy.Context) error {
 //	    hub, _ := stream.GetSSEHub[Notification](c)
 //
 //	    return c.SSE(func(conn *sse.Conn) error {
@@ -877,7 +877,7 @@ func (c *Context) SSE(handler func(conn any) error) error {
 //	router := fursy.New()
 //	router.Use(stream.WebSocketHub(hub))
 //
-//	router.GET("/ws", func(c *fursy.Context) error {
+//	router.Handle("GET", "/ws", func(c *fursy.Context) error {
 //	    hub, _ := stream.GetWebSocketHub(c)
 //
 //	    return c.WebSocket(func(conn *websocket.Conn) error {
@@ -951,7 +951,7 @@ var ErrStreamNotImported = errors.New("fursy: stream plugin not imported - add '
 //	router := fursy.New()
 //	router.Use(database.Middleware(db))
 //
-//	router.GET("/users/:id", func(c *fursy.Context) error {
+//	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 //	    db := c.DB()
 //	    if db == nil {
 //	        return c.Problem(fursy.InternalServerError("Database not configured"))

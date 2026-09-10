@@ -50,7 +50,7 @@ func main() {
     router.Use(stream.SSEHub(hub))
 
     // SSE endpoint.
-    router.GET("/events", func(c *fursy.Context) error {
+    router.Handle("GET", "/events", func(c *fursy.Context) error {
         hub, _ := stream.GetSSEHub[Notification](c)
 
         return stream.SSEUpgrade(c, func(conn *sse.Conn) error {
@@ -62,7 +62,7 @@ func main() {
     })
 
     // Broadcast endpoint.
-    router.POST("/notify", func(c *fursy.Context) error {
+    router.Handle("POST", "/notify", func(c *fursy.Context) error {
         hub, _ := stream.GetSSEHub[Notification](c)
 
         var notification Notification
@@ -115,7 +115,7 @@ func main() {
     router.Use(stream.WebSocketHub(hub))
 
     // WebSocket endpoint.
-    router.GET("/ws", func(c *fursy.Context) error {
+    router.Handle("GET", "/ws", func(c *fursy.Context) error {
         hub, _ := stream.GetWebSocketHub(c)
 
         return stream.WebSocketUpgrade(c, func(conn *websocket.Conn) error {
@@ -136,7 +136,7 @@ func main() {
     })
 
     // Health check.
-    router.GET("/health", func(c *fursy.Context) error {
+    router.Handle("GET", "/health", func(c *fursy.Context) error {
         hub, _ := stream.GetWebSocketHub(c)
         return c.JSON(200, map[string]any{
             "status":  "ok",

@@ -24,7 +24,7 @@ Production-ready validator plugin for [fursy](https://github.com/coregx/fursy) H
 go get github.com/coregx/fursy/plugins/validator
 ```
 
-**Requirements**: Go 1.25+
+**Requirements**: Go 1.27+
 
 ## Quick Start
 
@@ -55,8 +55,8 @@ func main() {
     // Set validator plugin (one line!)
     router.SetValidator(validator.New())
 
-    // Use type-safe handlers - binding and validation are automatic!
-    router.POST[CreateUserRequest, UserResponse]("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+    // Type-safe handler — Go 1.27 generic methods infer types from handler signature
+    router.POST("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
         // Binding and validation happen automatically using struct tags.
         // If validation fails, an RFC 9457 Problem Details error is returned.
         // c.ReqBody is already parsed, validated, and type-safe!
@@ -286,7 +286,7 @@ router.Use(ValidateMiddleware())
 For cases where you need to validate data outside the automatic binding flow:
 
 ```go
-router.POST[CreateUserRequest, UserResponse]("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+router.POST("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
     // Binding and validation happen automatically — c.ReqBody is ready to use.
     // For manual validation of additional data, use the validator directly:
     extraData := new(SomeOtherStruct)

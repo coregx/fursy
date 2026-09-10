@@ -57,7 +57,7 @@ func main() {
 	router := fursy.New()
 	router.Use(opentelemetry.Middleware("my-service"))
 
-	router.GET("/users/:id", func(c *fursy.Context) error {
+	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 		return c.String(200, "User 123")
 	})
 
@@ -93,7 +93,7 @@ func main() {
 	router := fursy.New()
 	router.Use(opentelemetry.Metrics("my-service"))
 
-	router.GET("/users/:id", func(c *fursy.Context) error {
+	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 		return c.String(200, "User 123")
 	})
 
@@ -196,7 +196,7 @@ The middleware automatically handles W3C Trace Context propagation:
 Example:
 
 ```go
-router.GET("/users", func(c *fursy.Context) error {
+router.Handle("GET", "/users", func(c *fursy.Context) error {
 	// Get trace context from request.
 	ctx := c.Request.Context()
 
@@ -214,7 +214,7 @@ router.GET("/users", func(c *fursy.Context) error {
 Errors are automatically recorded as span events and status:
 
 ```go
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 	user, err := getUserByID(id)
 	if err != nil {
 		// Error will be recorded in span with status=Error.

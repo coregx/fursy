@@ -1,13 +1,19 @@
-// Package fursy provides a high-performance HTTP router for Go 1.25+.
+// Package fursy provides a high-performance HTTP router for Go 1.27+.
 //
-// FURSY combines type-safe routing with modern Go features like generics,
+// FURSY combines type-safe routing with Go 1.27 generic methods,
 // providing fast URL matching (<100ns), zero dependencies, and clean API.
 //
 // # Quick Start
 //
 //	router := fursy.New()
 //
-//	router.GET("/users/:id", func(c *fursy.Context) error {
+//	// Type-safe generic method — type parameters inferred from handler signature
+//	router.POST("/users", func(c *fursy.Box[CreateUserReq, UserResponse]) error {
+//		return c.Created("/users/1", UserResponse{ID: 1, Name: c.ReqBody.Name})
+//	})
+//
+//	// Plain handler via Handle()
+//	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 //		id := c.Param("id")
 //		return c.String(200, "User ID: "+id)
 //	})
@@ -29,8 +35,10 @@
 //
 // # HTTP Methods
 //
-// All standard HTTP methods are supported:
-// GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS.
+// Type-safe generic methods (Go 1.27+): router.GET(), router.POST(), etc.
+// These accept Handler[Req, Res] and infer type parameters from the handler.
+//
+// Plain handlers: router.Handle("GET", path, handler) for HandlerFunc.
 //
 // # URL Parameters
 //
@@ -90,20 +98,17 @@ const (
 //
 // Router implements http.Handler and can be used directly with http.ListenAndServe.
 //
-// Example:
+// Use generic methods (Go 1.27+) for type-safe handlers:
 //
-//	router := fursy.New()
-//	router.GET("/users/:id", func(c *fursy.Context) error {
-//		id := c.Param("id")
-//		return c.String(200, "User ID: "+id)
+//	router.POST("/users", func(c *fursy.Box[CreateReq, UserRes]) error {
+//		return c.Created("/users/1", UserRes{ID: 1, Name: c.ReqBody.Name})
 //	})
-//	http.ListenAndServe(":8080", router)
-
-// Router is the main HTTP router for FURSY.
-// It provides fast URL routing with support for static paths,
-// parameters (:id), and wildcards (*path).
 //
-// Router implements http.Handler and can be used directly with http.ListenAndServe.
+// Use Handle() for plain handlers:
+//
+//	router.Handle("GET", "/health", func(c *fursy.Context) error {
+//		return c.Text("OK")
+//	})
 type Router struct {
 	// trees stores one radix tree per HTTP method for efficient routing.
 	trees map[string]*radix.Tree
@@ -225,7 +230,7 @@ func (r *Router) Use(middleware ...HandlerFunc) *Router {
 //	    Age   int    `json:"age" validate:"gte=18,lte=120"`
 //	}
 //
-//	POST[CreateUserRequest, UserResponse](router, "/users", func(c *Box[CreateUserRequest, UserResponse]) error {
+//	router.POST("/users", func(c *Box[CreateUserRequest, UserResponse]) error {
 //	    // c.ReqBody is already validated here!
 //	    // ...
 //	})
@@ -280,7 +285,7 @@ func (r *Router) WithServer(server Server) *Router {
 //	router := fursy.New()
 //	router.WithTrailingSlash(fursy.StripTrailingSlash)
 //
-//	router.GET("/api/companies", handler)
+//	router.Handle("GET", "/api/companies", handler)
 //	// Now GET /api/companies/ also works (silently stripped)
 //
 //	// Or use redirects:
@@ -309,8 +314,8 @@ func (r *Router) WithTrailingSlash(behavior TrailingSlashBehavior) *Router {
 //	})
 //
 //	// Register your routes
-//	router.GET("/users", handler)
-//	router.POST("/users", handler)
+//	router.Handle("GET", "/users", handler)
+//	router.Handle("POST", "/users", handler)
 //
 //	// Serve OpenAPI specification
 //	router.ServeOpenAPI("/openapi.json")
@@ -353,10 +358,10 @@ func (r *Router) ServeOpenAPI(path string) {
 //	api.Use(AuthMiddleware())       // API-specific
 //
 //	v1 := api.Group("/v1")
-//	v1.GET("/users", handler)       // GET /api/v1/users (logger + auth)
+//	v1.Handle("GET", "/users", handler)       // GET /api/v1/users (logger + auth)
 //
 //	admin := api.Group("/admin", AdminMiddleware())  // Custom middleware
-//	admin.GET("/settings", handler)  // GET /api/admin/settings (admin only)
+//	admin.Handle("GET", "/settings", handler)  // GET /api/admin/settings (admin only)
 func (r *Router) Group(prefix string, middleware ...HandlerFunc) *RouteGroup {
 	return &RouteGroup{
 		prefix:     prefix,
@@ -871,7 +876,7 @@ func (r *Router) SetServer(srv *http.Server) {
 // Example (simple):
 //
 //	router := fursy.New()
-//	router.GET("/health", healthHandler)
+//	router.Handle("GET", "/health", healthHandler)
 //
 //	router.OnShutdown(func() {
 //	    log.Println("Closing database...")
@@ -895,7 +900,7 @@ func (r *Router) SetServer(srv *http.Server) {
 //	router := fursy.New()
 //
 //	// Health check for readiness probe
-//	router.GET("/health", func(c *fursy.Context) error {
+//	router.Handle("GET", "/health", func(c *fursy.Context) error {
 //	    return c.String(200, "OK")
 //	})
 //

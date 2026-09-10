@@ -35,7 +35,8 @@ import (
 //	    Email string `json:"email"`
 //	}
 //
-//	router.POST[CreateUserRequest, UserResponse]("/users", func(c *Box[CreateUserRequest, UserResponse]) error {
+//	// Go 1.27: type parameters inferred from handler signature
+//	router.POST("/users", func(c *Box[CreateUserRequest, UserResponse]) error {
 //	    // ReqBody is automatically bound from JSON
 //	    req := c.ReqBody
 //
@@ -169,7 +170,7 @@ func (c *Box[Req, Res]) InternalServerError(data Res) error {
 //
 // Example:
 //
-//	router.DELETE[DeleteUserRequest, Empty]("/users/:id", func(c *Box[DeleteUserRequest, Empty]) error {
+//	router.DELETE("/users/:id", func(c *Box[DeleteUserRequest, Empty]) error {
 //	    deleteUser(c.ReqBody.ID)
 //	    return c.NoContentSuccess()  // 204 No Content
 //	})
@@ -182,7 +183,7 @@ func (c *Box[Req, Res]) NoContentSuccess() error {
 //
 // Example:
 //
-//	router.PUT[UpdateUserRequest, UserResponse]("/users/:id", func(c *Box[UpdateUserRequest, UserResponse]) error {
+//	router.PUT("/users/:id", func(c *Box[UpdateUserRequest, UserResponse]) error {
 //	    updated := updateUser(c.ReqBody)
 //	    return c.UpdatedOK(updated)  // 200 OK - semantically clear it's an update
 //	})
@@ -195,7 +196,7 @@ func (c *Box[Req, Res]) UpdatedOK(data Res) error {
 //
 // Example:
 //
-//	router.PUT[UpdateUserRequest, Empty]("/users/:id", func(c *Box[UpdateUserRequest, Empty]) error {
+//	router.PUT("/users/:id", func(c *Box[UpdateUserRequest, Empty]) error {
 //	    updateUser(c.ReqBody)
 //	    return c.UpdatedNoContent()  // 204 No Content
 //	})

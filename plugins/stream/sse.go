@@ -21,7 +21,7 @@
 //	router := fursy.New()
 //	router.Use(stream.SSEHub(hub))
 //
-//	router.GET("/events", func(c *fursy.Context) error {
+//	router.Handle("GET", "/events", func(c *fursy.Context) error {
 //	    hub, _ := stream.GetSSEHub[Notification](c)
 //	    return c.SSE(func(conn *sse.Conn) error {
 //	        hub.Register(conn)
