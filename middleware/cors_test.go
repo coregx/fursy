@@ -7,6 +7,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -178,31 +179,23 @@ func TestCORS_AllowCredentials(t *testing.T) {
 	}
 }
 
-// TestCORS_AllowCredentialsWithWildcard tests that credentials forces specific origin.
+// TestCORS_AllowCredentialsWithWildcard tests that wildcard+credentials panics.
 func TestCORS_AllowCredentialsWithWildcard(t *testing.T) {
-	r := fursy.New()
-	r.Use(CORSWithConfig(CORSConfig{
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for AllowOrigins=* with AllowCredentials=true")
+		}
+		msg, ok := r.(string)
+		if !ok || !strings.Contains(msg, "security bypass") {
+			t.Errorf("unexpected panic message: %v", r)
+		}
+	}()
+
+	CORSWithConfig(CORSConfig{
 		AllowOrigins:     "*",
 		AllowCredentials: true,
-	}))
-
-	r.Handle("GET", "/test", func(c *fursy.Context) error {
-		return c.String(200, "OK")
 	})
-
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
-	req.Header.Set("Origin", "https://example.com")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	// Even with AllowOrigins="*", when credentials=true, should use specific origin.
-	if w.Header().Get("Access-Control-Allow-Origin") != "https://example.com" {
-		t.Errorf("with credentials, should use specific origin even with wildcard")
-	}
-
-	if w.Header().Get("Access-Control-Allow-Credentials") != "true" {
-		t.Errorf("expected Allow-Credentials true")
-	}
 }
 
 // TestCORS_ExposeHeaders tests ExposeHeaders configuration.

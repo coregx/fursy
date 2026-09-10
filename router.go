@@ -61,6 +61,7 @@ import (
 	"errors"
 	"net/http"
 	"os/signal"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -838,6 +839,7 @@ func (r *Router) allowedMethods(path, excludeMethod string) string {
 			methods = append(methods, m)
 		}
 	}
+	sort.Strings(methods)
 	return strings.Join(methods, ", ")
 }
 

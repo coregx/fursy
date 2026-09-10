@@ -6,6 +6,7 @@
 package middleware
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -87,6 +88,10 @@ func RecoveryWithConfig(config RecoveryConfig) fursy.HandlerFunc {
 	return func(c *fursy.Context) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
+				// Re-panic http.ErrAbortHandler — Go net/http expects it to propagate.
+				if abortErr, ok := r.(error); ok && errors.Is(abortErr, http.ErrAbortHandler) {
+					panic(r)
+				}
 				err = handlePanic(r, c, logger, config, stackTraceSize)
 			}
 		}()

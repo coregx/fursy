@@ -123,6 +123,13 @@ func CORSWithConfig(config CORSConfig) fursy.HandlerFunc {
 		config.AllowMethods = "GET,HEAD,PUT,POST,DELETE,PATCH"
 	}
 
+	// Reject insecure combination: wildcard origin + credentials.
+	if config.AllowOrigins == "*" && config.AllowCredentials {
+		panic("fursy/middleware: CORS: AllowOrigins=\"*\" with AllowCredentials=true " +
+			"reflects any origin with credentials — browser security bypass. " +
+			"Use specific origins or set AllowCredentials=false")
+	}
+
 	// Initialize lookup maps.
 	config.init()
 
@@ -136,7 +143,7 @@ func CORSWithConfig(config CORSConfig) fursy.HandlerFunc {
 		// Vary: Origin prevents cache poisoning — a shared cache must not
 		// serve a CORS response (with Allow-Origin for origin A) to a
 		// request from origin B.
-		c.Response.Header().Set("Vary", "Origin")
+		c.Response.Header().Add("Vary", "Origin")
 
 		// Check if this is a preflight request.
 		if c.Request.Method == http.MethodOptions {
