@@ -9,7 +9,6 @@ jobs:
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
-    env:
 
     steps:
     - name: Checkout code
