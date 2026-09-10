@@ -1,8 +1,8 @@
 # FURSY Performance Report
 
-> **Generated**: 2025-11-16
+> **Generated**: 2026-09-10 (v0.5.0)
 > **Platform**: Windows AMD64, Intel Core i7-1255U (12th Gen)
-> **Go Version**: 1.25+
+> **Go Version**: 1.27.1
 > **Benchmark Duration**: 2s per test
 
 ---
@@ -29,7 +29,7 @@ BenchmarkRouter_RootPath-12                  9,589,948 ops/s    260 ns/op    256
 BenchmarkRouter_LongStaticPath-12           10,393,009 ops/s    254 ns/op    256 B/op    1 allocs/op
 ```
 
-**Analysis**: Consistent ~256 ns/op regardless of path length. Single allocation is from httptest.NewRecorder (test infrastructure), actual routing is zero-allocation.
+**Analysis**: Consistent ~190-256 ns/op regardless of path length. Single allocation (256 B) is the `[8]Param` buffer in radix tree `Lookup()` — the Go compiler's escape analysis moves it to heap because the params slice is returned to the caller. True zero-alloc requires Param type unification with caller-provided buffer (planned for v0.6.0).
 
 ### Parametric Routes
 ```
