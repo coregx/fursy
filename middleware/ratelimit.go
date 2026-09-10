@@ -249,9 +249,11 @@ func RateLimitWithConfig(config RateLimitConfig) fursy.HandlerFunc {
 	}
 
 	if config.KeyFunc == nil {
-		// Default: IP-based rate limiting.
+		// Default: RemoteAddr-based rate limiting.
+		// Does NOT trust X-Forwarded-For/X-Real-IP by default (XFF spoofing risk).
+		// To use proxy headers, set KeyFunc explicitly with trusted proxy validation.
 		config.KeyFunc = func(c *fursy.Context) string {
-			return getClientIP(c.Request)
+			return cleanIP(c.Request.RemoteAddr)
 		}
 	}
 
