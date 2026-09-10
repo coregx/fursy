@@ -44,7 +44,7 @@ func TestGenericContext_New(t *testing.T) {
 func TestGenericContext_Bind_JSON(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		if c.ReqBody == nil {
 			return c.BadRequest(TestResponse{Message: "Request body is nil"})
 		}
@@ -77,7 +77,7 @@ func TestGenericContext_Bind_JSON(t *testing.T) {
 func TestGenericContext_Bind_EmptyType(t *testing.T) {
 	r := New()
 
-	GET[Empty, TestResponse](r, "/test", func(c *Box[Empty, TestResponse]) error {
+	r.GET("/test", func(c *Box[Empty, TestResponse]) error {
 		// ReqBody should be nil for Empty type
 		if c.ReqBody != nil {
 			return c.InternalServerError(TestResponse{Message: "ReqBody should be nil for Empty type"})
@@ -100,7 +100,7 @@ func TestGenericContext_Bind_EmptyType(t *testing.T) {
 func TestGenericContext_OK(t *testing.T) {
 	r := New()
 
-	GET[Empty, TestResponse](r, "/test", func(c *Box[Empty, TestResponse]) error {
+	r.GET("/test", func(c *Box[Empty, TestResponse]) error {
 		return c.OK(TestResponse{ID: 123, Message: "Hello"})
 	})
 
@@ -123,7 +123,7 @@ func TestGenericContext_OK(t *testing.T) {
 func TestGenericContext_Created(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		return c.Created("/test/123", TestResponse{ID: 123, Message: "Created"})
 	})
 
@@ -153,7 +153,7 @@ func TestGenericContext_Created(t *testing.T) {
 func TestGenericContext_Accepted(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		return c.Accepted(TestResponse{ID: 456, Message: "Accepted"})
 	})
 
@@ -178,7 +178,7 @@ func TestGenericContext_Accepted(t *testing.T) {
 func TestGenericContext_BadRequest(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		return c.BadRequest(TestResponse{Message: "Invalid input"})
 	})
 
@@ -203,7 +203,7 @@ func TestGenericContext_BadRequest(t *testing.T) {
 func TestGenericContext_NotFound(t *testing.T) {
 	r := New()
 
-	GET[Empty, TestResponse](r, "/test/:id", func(c *Box[Empty, TestResponse]) error {
+	r.GET("/test/:id", func(c *Box[Empty, TestResponse]) error {
 		return c.NotFound(TestResponse{Message: "Resource not found"})
 	})
 
@@ -226,7 +226,7 @@ func TestGenericContext_NotFound(t *testing.T) {
 func TestGenericContext_InternalServerError(t *testing.T) {
 	r := New()
 
-	GET[Empty, TestResponse](r, "/test", func(c *Box[Empty, TestResponse]) error {
+	r.GET("/test", func(c *Box[Empty, TestResponse]) error {
 		return c.InternalServerError(TestResponse{Message: "Database error"})
 	})
 
@@ -249,7 +249,7 @@ func TestGenericContext_InternalServerError(t *testing.T) {
 func TestGenericContext_WithParameters(t *testing.T) {
 	r := New()
 
-	GET[Empty, TestResponse](r, "/users/:id", func(c *Box[Empty, TestResponse]) error {
+	r.GET("/users/:id", func(c *Box[Empty, TestResponse]) error {
 		id := c.Param("id")
 		return c.OK(TestResponse{Message: "User ID: " + id})
 	})
@@ -273,7 +273,7 @@ func TestGenericContext_WithParameters(t *testing.T) {
 func TestGenericContext_InvalidJSON(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		// Should not reach here due to binding error
 		return c.OK(TestResponse{Message: "Should not reach here"})
 	})
@@ -295,7 +295,7 @@ func TestGenericContext_InvalidJSON(t *testing.T) {
 func TestBox_NoContentSuccess(t *testing.T) {
 	r := New()
 
-	DELETE[Empty, Empty](r, "/users/:id", func(c *Box[Empty, Empty]) error {
+	r.DELETE("/users/:id", func(c *Box[Empty, Empty]) error {
 		// Simulate deletion
 		return c.NoContentSuccess()
 	})
@@ -320,7 +320,7 @@ func TestBox_NoContentSuccess(t *testing.T) {
 func TestBox_UpdatedOK(t *testing.T) {
 	r := New()
 
-	PUT[TestRequest, TestResponse](r, "/users/:id", func(c *Box[TestRequest, TestResponse]) error {
+	r.PUT("/users/:id", func(c *Box[TestRequest, TestResponse]) error {
 		// Simulate update with response body
 		return c.UpdatedOK(TestResponse{
 			ID:      1,
@@ -351,7 +351,7 @@ func TestBox_UpdatedOK(t *testing.T) {
 func TestBox_UpdatedNoContent(t *testing.T) {
 	r := New()
 
-	PUT[TestRequest, Empty](r, "/users/:id", func(c *Box[TestRequest, Empty]) error {
+	r.PUT("/users/:id", func(c *Box[TestRequest, Empty]) error {
 		// Simulate update without response body
 		return c.UpdatedNoContent()
 	})
@@ -383,7 +383,7 @@ func TestBox_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 	nextID := 1
 
 	// POST - Create user (201 Created)
-	POST[TestRequest, TestResponse](r, "/users", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/users", func(c *Box[TestRequest, TestResponse]) error {
 		user := TestResponse{
 			ID:      nextID,
 			Message: c.ReqBody.Name,
@@ -394,7 +394,7 @@ func TestBox_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 	})
 
 	// PUT - Update user with body (200 OK)
-	PUT[TestRequest, TestResponse](r, "/users/:id", func(c *Box[TestRequest, TestResponse]) error {
+	r.PUT("/users/:id", func(c *Box[TestRequest, TestResponse]) error {
 		id := 1 // Simplified - normally would parse from params
 		updated := TestResponse{
 			ID:      id,
@@ -405,13 +405,13 @@ func TestBox_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 	})
 
 	// PATCH - Update user without body (204 No Content)
-	PATCH[TestRequest, Empty](r, "/users/:id/status", func(c *Box[TestRequest, Empty]) error {
+	r.PATCH("/users/:id/status", func(c *Box[TestRequest, Empty]) error {
 		// Simulate status update
 		return c.UpdatedNoContent()
 	})
 
 	// DELETE - Delete user (204 No Content)
-	DELETE[Empty, Empty](r, "/users/:id", func(c *Box[Empty, Empty]) error {
+	r.DELETE("/users/:id", func(c *Box[Empty, Empty]) error {
 		id := 1 // Simplified
 		delete(users, id)
 		return c.NoContentSuccess()
@@ -460,7 +460,7 @@ func TestBox_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 func TestBox_Unauthorized(t *testing.T) {
 	r := New()
 
-	GET[Empty, TestResponse](r, "/protected", func(c *Box[Empty, TestResponse]) error {
+	r.GET("/protected", func(c *Box[Empty, TestResponse]) error {
 		return c.Unauthorized(TestResponse{Message: "Invalid credentials"})
 	})
 
@@ -482,7 +482,7 @@ func TestBox_Unauthorized(t *testing.T) {
 func TestBox_Forbidden(t *testing.T) {
 	r := New()
 
-	GET[Empty, TestResponse](r, "/admin", func(c *Box[Empty, TestResponse]) error {
+	r.GET("/admin", func(c *Box[Empty, TestResponse]) error {
 		return c.Forbidden(TestResponse{Message: "Insufficient permissions"})
 	})
 
@@ -506,7 +506,7 @@ func TestBox_Forbidden(t *testing.T) {
 func TestBind_Idempotent_JSON(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		// Simulate old example pattern: manual Bind() after auto-bind.
 		if err := c.Bind(); err != nil {
 			t.Fatalf("second Bind() should not fail, got: %v", err)
@@ -539,7 +539,7 @@ func TestBind_Idempotent_JSON(t *testing.T) {
 func TestBind_Idempotent_Form(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		if err := c.Bind(); err != nil {
 			t.Fatalf("second Bind() should not fail for form data, got: %v", err)
 		}
@@ -567,7 +567,7 @@ func TestBind_Idempotent_Form(t *testing.T) {
 func TestBind_Idempotent_MultipleCalls(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		for i := 0; i < 5; i++ {
 			if err := c.Bind(); err != nil {
 				t.Fatalf("Bind() call %d should not fail, got: %v", i+2, err)
@@ -595,7 +595,7 @@ func TestBind_Idempotent_MultipleCalls(t *testing.T) {
 func TestBind_AutoBind_DirectAccess(t *testing.T) {
 	r := New()
 
-	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+	r.POST("/test", func(c *Box[TestRequest, TestResponse]) error {
 		if c.ReqBody == nil {
 			t.Fatal("ReqBody should be auto-bound")
 		}

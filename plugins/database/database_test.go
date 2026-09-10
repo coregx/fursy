@@ -35,7 +35,7 @@ func TestMiddleware(t *testing.T) {
 	router := fursy.New()
 	router.Use(database.Middleware(db))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		retrievedDB, ok := database.GetDB(c)
 		if !ok {
 			t.Error("database not found in context")
@@ -59,7 +59,7 @@ func TestMiddleware(t *testing.T) {
 func TestGetDB_NotFound(t *testing.T) {
 	router := fursy.New()
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		_, ok := database.GetDB(c)
 		if ok {
 			t.Error("expected database not found, but got ok=true")
@@ -281,7 +281,7 @@ func TestTxMiddleware_Commit(t *testing.T) {
 	router.Use(database.Middleware(db))
 	router.Use(database.TxMiddleware(db))
 
-	router.POST("/insert", func(c *fursy.Context) error {
+	router.Handle("POST", "/insert", func(c *fursy.Context) error {
 		tx, ok := database.GetTx(c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("Transaction not available"))
@@ -326,7 +326,7 @@ func TestTxMiddleware_Rollback(t *testing.T) {
 	router.Use(database.Middleware(db))
 	router.Use(database.TxMiddleware(db))
 
-	router.POST("/insert", func(c *fursy.Context) error {
+	router.Handle("POST", "/insert", func(c *fursy.Context) error {
 		tx, ok := database.GetTx(c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("Transaction not available"))

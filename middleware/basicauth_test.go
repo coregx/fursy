@@ -26,7 +26,7 @@ func TestBasicAuth(t *testing.T) {
 	r := fursy.New()
 	r.Use(BasicAuth(validator))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		user := c.GetString(UserContextKey)
 		return c.String(200, "Hello, "+user)
 	})
@@ -55,7 +55,7 @@ func TestBasicAuth_NoAuth(t *testing.T) {
 	r := fursy.New()
 	r.Use(BasicAuth(validator))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -89,7 +89,7 @@ func TestBasicAuth_InvalidCredentials(t *testing.T) {
 	r := fursy.New()
 	r.Use(BasicAuth(validator))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -120,7 +120,7 @@ func TestBasicAuth_CustomRealm(t *testing.T) {
 		Realm:     "Admin Area",
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -149,11 +149,11 @@ func TestBasicAuth_Skipper(t *testing.T) {
 		},
 	}))
 
-	r.GET("/health", func(c *fursy.Context) error {
+	r.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
-	r.GET("/protected", func(c *fursy.Context) error {
+	r.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "Secret")
 	})
 
@@ -197,7 +197,7 @@ func TestBasicAuth_UserIdentity(t *testing.T) {
 	r := fursy.New()
 	r.Use(BasicAuth(validator))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		user := c.Get(UserContextKey).(*User)
 		return c.String(200, user.Name)
 	})
@@ -229,7 +229,7 @@ func TestBasicAuth_WithRouteGroups(t *testing.T) {
 	r.Use(BasicAuth(validator))
 
 	api := r.Group("/api")
-	api.GET("/users", func(c *fursy.Context) error {
+	api.Handle("GET", "/users", func(c *fursy.Context) error {
 		user := c.GetString(UserContextKey)
 		return c.String(200, "user: "+user)
 	})
@@ -317,7 +317,7 @@ func TestBasicAuthAccounts(t *testing.T) {
 	r := fursy.New()
 	r.Use(BasicAuth(BasicAuthAccounts(accounts)))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		user := c.GetString(UserContextKey)
 		return c.String(200, "Hello, "+user)
 	})
@@ -383,7 +383,7 @@ func TestBasicAuth_EmptyCredentials(t *testing.T) {
 	r := fursy.New()
 	r.Use(BasicAuth(validator))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -412,7 +412,7 @@ func TestBasicAuth_MultipleRequests(t *testing.T) {
 	r := fursy.New()
 	r.Use(BasicAuth(validator))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 

@@ -34,7 +34,7 @@ package fursy
 //	    })
 //	}
 //
-//	router.POST[CreateUserRequest, UserResponse]("/users", createUser)
+//	router.POST("/users", createUser)  // Go 1.27: type parameters inferred from handler
 type Handler[Req, Res any] func(*Box[Req, Res]) error
 
 // adaptGenericHandler converts a generic Handler[Req, Res] to a non-generic HandlerFunc.

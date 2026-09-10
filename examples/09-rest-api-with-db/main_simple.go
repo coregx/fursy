@@ -65,7 +65,7 @@ func main() {
 	router.Use(database.Middleware(db))
 
 	// CREATE user - Using GetDBOrError (recommended pattern).
-	router.POST("/users", func(c *fursy.Context) error {
+	router.Handle("POST", "/users", func(c *fursy.Context) error {
 		db, err := database.GetDBOrError(c)
 		if err != nil {
 			var prob fursy.Problem
@@ -96,7 +96,7 @@ func main() {
 	})
 
 	// READ user by ID - Using MustGetDB (prototyping pattern).
-	router.GET("/users/:id", func(c *fursy.Context) error {
+	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 		db := database.MustGetDB(c) // Simpler, but panics if misconfigured.
 
 		var user User

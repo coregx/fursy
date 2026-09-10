@@ -1,5 +1,11 @@
 # FURSY .gitignore
 
+# MCP config (local paths)
+.mcp.json
+
+# GODE knowledge graph (local)
+.gode/
+
 # Binaries
 *.exe
 *.dll

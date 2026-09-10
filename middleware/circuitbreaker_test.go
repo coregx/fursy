@@ -27,7 +27,7 @@ func TestCircuitBreaker_DefaultConsecutiveFailures(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		count := atomic.AddInt32(&failCount, 1)
 		if count <= 3 {
 			return errors.New("simulated failure")
@@ -77,7 +77,7 @@ func TestCircuitBreaker_StateTransitions(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		count := atomic.LoadInt32(&failCount)
 		if count < 2 {
 			atomic.AddInt32(&failCount, 1)
@@ -160,7 +160,7 @@ func TestCircuitBreaker_WindowBasedRatio(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		count := atomic.AddInt32(&requestCount, 1)
 		// Fail requests 1, 3, 5 (3 failures out of 5)
 		if count == 1 || count == 3 || count == 5 {
@@ -197,7 +197,7 @@ func TestCircuitBreaker_TimeBasedWindow(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(_ *fursy.Context) error {
+	router.Handle("GET", "/test", func(_ *fursy.Context) error {
 		return errors.New("fail")
 	})
 
@@ -232,7 +232,7 @@ func TestCircuitBreaker_HalfOpenMaxRequests(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		count := atomic.AddInt32(&requestCount, 1)
 		if count <= 2 {
 			return errors.New("fail")
@@ -290,7 +290,7 @@ func TestCircuitBreaker_CustomReadyToTrip(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		count := atomic.AddInt32(&failCount, 1)
 		// 8 failures out of 10 requests (80% failure rate)
 		if count <= 8 {
@@ -334,7 +334,7 @@ func TestCircuitBreaker_CustomIsSuccessful(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(_ *fursy.Context) error {
+	router.Handle("GET", "/test", func(_ *fursy.Context) error {
 		// Return 400 (will be considered failure with custom IsSuccessful)
 		return errors.New("bad request")
 	})
@@ -372,7 +372,7 @@ func TestCircuitBreaker_CustomErrorHandler(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(_ *fursy.Context) error {
+	router.Handle("GET", "/test", func(_ *fursy.Context) error {
 		return errors.New("fail")
 	})
 
@@ -409,11 +409,11 @@ func TestCircuitBreaker_Skipper(t *testing.T) {
 	})
 	router.Use(cb)
 
-	router.GET("/test", func(_ *fursy.Context) error {
+	router.Handle("GET", "/test", func(_ *fursy.Context) error {
 		return errors.New("fail")
 	})
 
-	router.GET("/health", func(c *fursy.Context) error {
+	router.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "healthy")
 	})
 
@@ -447,7 +447,7 @@ func TestCircuitBreaker_HelperFunctions(t *testing.T) {
 		router := fursy.New()
 		router.Use(CircuitBreakerConsecutive(2, 1*time.Second))
 
-		router.GET("/test", func(_ *fursy.Context) error {
+		router.Handle("GET", "/test", func(_ *fursy.Context) error {
 			return errors.New("fail")
 		})
 
@@ -472,7 +472,7 @@ func TestCircuitBreaker_HelperFunctions(t *testing.T) {
 		router.Use(CircuitBreakerRatio(2, 3, 1*time.Second)) // 2 failures out of 3 requests
 
 		var count int32
-		router.GET("/test", func(c *fursy.Context) error {
+		router.Handle("GET", "/test", func(c *fursy.Context) error {
 			n := atomic.AddInt32(&count, 1)
 			if n <= 2 {
 				return errors.New("fail")
@@ -500,7 +500,7 @@ func TestCircuitBreaker_HelperFunctions(t *testing.T) {
 		router := fursy.New()
 		router.Use(CircuitBreakerTimeWindow(2, 500*time.Millisecond, 1*time.Second))
 
-		router.GET("/test", func(_ *fursy.Context) error {
+		router.Handle("GET", "/test", func(_ *fursy.Context) error {
 			return errors.New("fail")
 		})
 
@@ -531,7 +531,7 @@ func TestCircuitBreaker_ConcurrentRequests(t *testing.T) {
 		Timeout:             1 * time.Second,
 	}))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -589,7 +589,7 @@ func TestCircuitBreaker_DefaultConstructor(t *testing.T) {
 
 	var failCount int32
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		count := atomic.AddInt32(&failCount, 1)
 		if count <= 5 {
 			return errors.New("simulated failure")
@@ -624,7 +624,7 @@ func TestCircuitBreakerWithName_SetsName(t *testing.T) {
 		Timeout:             1 * time.Second,
 	}))
 
-	router.GET("/pay", func(_ *fursy.Context) error {
+	router.Handle("GET", "/pay", func(_ *fursy.Context) error {
 		return errors.New("payment gateway down")
 	})
 

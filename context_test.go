@@ -684,7 +684,7 @@ func TestRouter_ContextIntegration(t *testing.T) {
 	router := New()
 
 	// Register a handler that uses Box methods.
-	router.GET("/users/:id", func(c *Context) error {
+	router.Handle("GET", "/users/:id", func(c *Context) error {
 		id := c.Param("id")
 		return c.JSON(200, map[string]string{"id": id, "name": "User " + id})
 	})
@@ -716,7 +716,7 @@ func TestRouter_ContextPooling(t *testing.T) {
 	router := New()
 
 	callCount := 0
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		callCount++
 		c.Set("call", callCount)
 		return c.String(200, "OK")
@@ -742,7 +742,7 @@ func TestRouter_ContextPooling(t *testing.T) {
 func TestRouter_ContextQuery(t *testing.T) {
 	router := New()
 
-	router.GET("/search", func(c *Context) error {
+	router.Handle("GET", "/search", func(c *Context) error {
 		q := c.Query("q")
 		page := c.QueryDefault("page", "1")
 		return c.JSON(200, map[string]string{"query": q, "page": page})
@@ -769,7 +769,7 @@ func TestRouter_ContextErrorHandling(t *testing.T) {
 	router := New()
 
 	// Handler that returns an error.
-	router.GET("/error", func(_ *Context) error {
+	router.Handle("GET", "/error", func(_ *Context) error {
 		return io.ErrUnexpectedEOF
 	})
 
@@ -793,7 +793,7 @@ func TestRouter_ContextErrorHandling(t *testing.T) {
 func TestContext_DataStorageMiddleware(t *testing.T) {
 	router := New()
 
-	router.GET("/protected", func(c *Context) error {
+	router.Handle("GET", "/protected", func(c *Context) error {
 		// Simulate middleware setting user data.
 		c.Set("userID", "123")
 		c.Set("authenticated", true)
@@ -831,7 +831,7 @@ func TestContext_DataStorageMiddleware(t *testing.T) {
 // TestContext_OK tests the OK convenience method.
 func TestContext_OK(t *testing.T) {
 	router := New()
-	router.GET("/users", func(c *Context) error {
+	router.Handle("GET", "/users", func(c *Context) error {
 		return c.OK(map[string]string{"status": "success"})
 	})
 
@@ -864,7 +864,7 @@ func TestContext_OK(t *testing.T) {
 // TestContext_Created tests the Created convenience method.
 func TestContext_Created(t *testing.T) {
 	router := New()
-	router.POST("/users", func(c *Context) error {
+	router.Handle("POST", "/users", func(c *Context) error {
 		return c.Created(map[string]any{"id": 123, "name": "John"})
 	})
 
@@ -897,7 +897,7 @@ func TestContext_Created(t *testing.T) {
 // TestContext_Accepted tests the Accepted convenience method.
 func TestContext_Accepted(t *testing.T) {
 	router := New()
-	router.POST("/jobs", func(c *Context) error {
+	router.Handle("POST", "/jobs", func(c *Context) error {
 		return c.Accepted(map[string]string{"jobId": "abc123", "status": "pending"})
 	})
 
@@ -924,7 +924,7 @@ func TestContext_Accepted(t *testing.T) {
 // TestContext_NoContentSuccess tests the NoContentSuccess convenience method.
 func TestContext_NoContentSuccess(t *testing.T) {
 	router := New()
-	router.DELETE("/users/:id", func(c *Context) error {
+	router.Handle("DELETE", "/users/:id", func(c *Context) error {
 		// Simulate deletion
 		return c.NoContentSuccess()
 	})
@@ -948,7 +948,7 @@ func TestContext_NoContentSuccess(t *testing.T) {
 // TestContext_Text tests the Text convenience method.
 func TestContext_Text(t *testing.T) {
 	router := New()
-	router.GET("/ping", func(c *Context) error {
+	router.Handle("GET", "/ping", func(c *Context) error {
 		return c.Text("pong")
 	})
 
@@ -983,7 +983,7 @@ func TestContext_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 	nextID := 1
 
 	// GET - list all users (200 OK)
-	router.GET("/users", func(c *Context) error {
+	router.Handle("GET", "/users", func(c *Context) error {
 		userList := make([]map[string]any, 0, len(users))
 		for _, user := range users {
 			userList = append(userList, user)
@@ -992,7 +992,7 @@ func TestContext_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 	})
 
 	// POST - create user (201 Created)
-	router.POST("/users", func(c *Context) error {
+	router.Handle("POST", "/users", func(c *Context) error {
 		id := string(rune(nextID + '0'))
 		user := map[string]any{"id": id, "name": "User" + id}
 		users[id] = user
@@ -1001,7 +1001,7 @@ func TestContext_ConvenienceMethods_RESTWorkflow(t *testing.T) {
 	})
 
 	// DELETE - delete user (204 No Content)
-	router.DELETE("/users/:id", func(c *Context) error {
+	router.Handle("DELETE", "/users/:id", func(c *Context) error {
 		id := c.Param("id")
 		delete(users, id)
 		return c.NoContentSuccess()

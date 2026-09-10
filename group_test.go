@@ -100,7 +100,7 @@ func TestGroup_Routes(t *testing.T) {
 		r := New()
 		g := r.Group("/api")
 
-		g.GET("/users", func(c *Context) error {
+		g.Handle("GET", "/users", func(c *Context) error {
 			return c.String(200, "users")
 		})
 
@@ -126,19 +126,19 @@ func TestGroup_Routes(t *testing.T) {
 		for _, method := range methods {
 			switch method {
 			case "GET":
-				g.GET("/test", func(c *Context) error { return c.String(200, method) })
+				g.Handle("GET", "/test", func(c *Context) error { return c.String(200, method) })
 			case "POST":
-				g.POST("/test", func(c *Context) error { return c.String(200, method) })
+				g.Handle("POST", "/test", func(c *Context) error { return c.String(200, method) })
 			case "PUT":
-				g.PUT("/test", func(c *Context) error { return c.String(200, method) })
+				g.Handle("PUT", "/test", func(c *Context) error { return c.String(200, method) })
 			case "DELETE":
-				g.DELETE("/test", func(c *Context) error { return c.String(200, method) })
+				g.Handle("DELETE", "/test", func(c *Context) error { return c.String(200, method) })
 			case "PATCH":
-				g.PATCH("/test", func(c *Context) error { return c.String(200, method) })
+				g.Handle("PATCH", "/test", func(c *Context) error { return c.String(200, method) })
 			case "HEAD":
-				g.HEAD("/test", func(c *Context) error { return c.NoContent(200) })
+				g.Handle("HEAD", "/test", func(c *Context) error { return c.NoContent(200) })
 			case "OPTIONS":
-				g.OPTIONS("/test", func(c *Context) error { return c.NoContent(200) })
+				g.Handle("OPTIONS", "/test", func(c *Context) error { return c.NoContent(200) })
 			}
 		}
 
@@ -157,7 +157,7 @@ func TestGroup_Routes(t *testing.T) {
 		r := New()
 		g := r.Group("/api/v1")
 
-		g.GET("/users/:id", func(c *Context) error {
+		g.Handle("GET", "/users/:id", func(c *Context) error {
 			id := c.Param("id")
 			return c.String(200, "user:"+id)
 		})
@@ -184,7 +184,7 @@ func TestGroup_NestedGroups(t *testing.T) {
 		api := r.Group("/api")
 		v1 := api.Group("/v1")
 
-		v1.GET("/users", func(c *Context) error {
+		v1.Handle("GET", "/users", func(c *Context) error {
 			return c.String(200, "v1-users")
 		})
 
@@ -208,7 +208,7 @@ func TestGroup_NestedGroups(t *testing.T) {
 		v1 := api.Group("/v1")
 		admin := v1.Group("/admin")
 
-		admin.GET("/settings", func(c *Context) error {
+		admin.Handle("GET", "/settings", func(c *Context) error {
 			return c.String(200, "admin-settings")
 		})
 
@@ -236,7 +236,7 @@ func TestGroup_NestedGroups(t *testing.T) {
 		})
 
 		v1 := api.Group("/v1") // Should inherit api middleware
-		v1.GET("/users", func(c *Context) error {
+		v1.Handle("GET", "/users", func(c *Context) error {
 			executed = append(executed, "handler")
 			return c.String(200, "OK")
 		})
@@ -270,7 +270,7 @@ func TestGroup_NestedGroups(t *testing.T) {
 			return c.Next()
 		})
 
-		v1.GET("/users", func(c *Context) error {
+		v1.Handle("GET", "/users", func(c *Context) error {
 			executed = append(executed, "handler")
 			return c.String(200, "OK")
 		})
@@ -307,7 +307,7 @@ func TestGroup_MiddlewareOrder(t *testing.T) {
 			return c.Next()
 		})
 
-		g.GET("/users", func(c *Context) error {
+		g.Handle("GET", "/users", func(c *Context) error {
 			executed = append(executed, "handler")
 			return c.String(200, "OK")
 		})
@@ -351,7 +351,7 @@ func TestGroup_MiddlewareOrder(t *testing.T) {
 			return c.Next()
 		})
 
-		g.GET("/users", func(c *Context) error {
+		g.Handle("GET", "/users", func(c *Context) error {
 			executed = append(executed, "handler")
 			return c.String(200, "OK")
 		})
@@ -379,7 +379,7 @@ func TestGroup_EdgeCases(t *testing.T) {
 		r := New()
 		g := r.Group("")
 
-		g.GET("/users", func(c *Context) error {
+		g.Handle("GET", "/users", func(c *Context) error {
 			return c.String(200, "users")
 		})
 
@@ -404,7 +404,7 @@ func TestGroup_EdgeCases(t *testing.T) {
 		r := New()
 		g := r.Group("api") // Missing leading slash - should panic
 
-		g.GET("/users", func(c *Context) error {
+		g.Handle("GET", "/users", func(c *Context) error {
 			return c.String(200, "users")
 		})
 	})
@@ -413,12 +413,12 @@ func TestGroup_EdgeCases(t *testing.T) {
 		r := New()
 
 		api := r.Group("/api")
-		api.GET("/users", func(c *Context) error {
+		api.Handle("GET", "/users", func(c *Context) error {
 			return c.String(200, "api-users")
 		})
 
 		admin := r.Group("/admin")
-		admin.GET("/users", func(c *Context) error {
+		admin.Handle("GET", "/users", func(c *Context) error {
 			return c.String(200, "admin-users")
 		})
 
@@ -452,7 +452,7 @@ func TestGroup_DataPassing(t *testing.T) {
 		return c.Next()
 	})
 
-	g.GET("/users", func(c *Context) error {
+	g.Handle("GET", "/users", func(c *Context) error {
 		data := c.GetString("groupData")
 		return c.String(200, "data:"+data)
 	})
@@ -478,7 +478,7 @@ func TestGroup_ErrorHandling(t *testing.T) {
 			return &testError{message: "group error"}
 		})
 
-		g.GET("/users", func(c *Context) error {
+		g.Handle("GET", "/users", func(c *Context) error {
 			handlerCalled = true
 			return c.String(200, "OK")
 		})

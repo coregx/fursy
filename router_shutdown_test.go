@@ -109,7 +109,7 @@ func TestRouter_Shutdown_NoServer(t *testing.T) {
 // TestRouter_Shutdown_WithServer tests shutdown with server.
 func TestRouter_Shutdown_WithServer(t *testing.T) {
 	router := New()
-	router.GET("/test", func(_ *Context) error {
+	router.Handle("GET", "/test", func(_ *Context) error {
 		time.Sleep(50 * time.Millisecond)
 		return nil
 	})
@@ -146,7 +146,7 @@ func TestRouter_Shutdown_ContextTimeout(t *testing.T) {
 	router := New()
 
 	// Create a server with a handler that blocks.
-	router.GET("/block", func(_ *Context) error {
+	router.Handle("GET", "/block", func(_ *Context) error {
 		time.Sleep(5 * time.Second)
 		return nil
 	})
@@ -263,7 +263,7 @@ func TestRouter_ListenAndServeWithShutdown(t *testing.T) {
 
 	t.Run("InvalidAddress", func(t *testing.T) {
 		router := New()
-		router.GET("/test", func(_ *Context) error {
+		router.Handle("GET", "/test", func(_ *Context) error {
 			return nil
 		})
 
@@ -288,7 +288,7 @@ func TestRouter_ListenAndServeWithShutdown(t *testing.T) {
 func TestRouter_ListenAndServeWithShutdown_Timeout(t *testing.T) {
 	// This test verifies that custom timeout is accepted.
 	router := New()
-	router.GET("/test", func(_ *Context) error {
+	router.Handle("GET", "/test", func(_ *Context) error {
 		return nil
 	})
 

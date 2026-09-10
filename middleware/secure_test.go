@@ -18,7 +18,7 @@ func TestSecure_Defaults(t *testing.T) {
 	router := fursy.New()
 	router.Use(Secure())
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -70,7 +70,7 @@ func TestSecure_CustomConfig(t *testing.T) {
 		ReferrerPolicy:     secureNoReferrer,
 	}))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -137,7 +137,7 @@ func TestSecure_HSTS(t *testing.T) {
 				HSTSPreloadEnabled:    tt.preloadEnabled,
 			}))
 
-			router.GET("/test", func(c *fursy.Context) error {
+			router.Handle("GET", "/test", func(c *fursy.Context) error {
 				return c.String(http.StatusOK, "OK")
 			})
 
@@ -190,7 +190,7 @@ func TestSecure_CSP(t *testing.T) {
 				CSPReportOnly:         tt.reportOnly,
 			}))
 
-			router.GET("/test", func(c *fursy.Context) error {
+			router.Handle("GET", "/test", func(c *fursy.Context) error {
 				return c.String(http.StatusOK, "OK")
 			})
 
@@ -225,7 +225,7 @@ func TestSecure_CrossOriginHeaders(t *testing.T) {
 		CrossOriginResourcePolicy: secureOriginSameOrigin,
 	}))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -255,7 +255,7 @@ func TestSecure_PermissionsPolicy(t *testing.T) {
 		PermissionsPolicy: "geolocation=(self), microphone=()",
 	}))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -275,7 +275,7 @@ func TestSecure_XSSProtection(t *testing.T) {
 		XSSProtection: "1; mode=block", // Explicitly set (not recommended)
 	}))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -299,11 +299,11 @@ func TestSecure_Skipper(t *testing.T) {
 		},
 	}))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
-	router.GET("/public/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/public/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -518,7 +518,7 @@ func TestSecure_EmptyValues(t *testing.T) {
 		XSSProtection:             "",
 	}))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -568,7 +568,7 @@ func TestSecure_AllHeadersSet(t *testing.T) {
 		XSSProtection:             "0", // Explicitly disable (recommended per OWASP)
 	}))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -606,7 +606,7 @@ func TestSecure_Integration(t *testing.T) {
 	// Use strict security configuration.
 	router.Use(SecureWithConfig(SecureStrict()))
 
-	router.GET("/api/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/api/users", func(c *fursy.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"user": "john"})
 	})
 

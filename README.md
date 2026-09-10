@@ -1,7 +1,7 @@
 # 🔥 FURSY
 > **F**ast **U**niversal **R**outing **Sy**stem
 
-Next-generation HTTP router for Go with blazing performance, type-safe handlers, and minimal dependencies.
+Next-generation HTTP router for Go 1.27+ with blazing performance, type-safe generic methods, and minimal dependencies.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/coregx/fursy.svg)](https://pkg.go.dev/github.com/coregx/fursy)
 [![Go Report Card](https://goreportcard.com/badge/github.com/coregx/fursy)](https://goreportcard.com/report/github.com/coregx/fursy)
@@ -30,13 +30,13 @@ func main() {
     // Optional: Set validator for automatic validation
     // router.SetValidator(validator.New())
 
-    // Simple text response with convenience method
-    router.GET("/", func(c *fursy.Context) error {
+    // Simple text response — plain handler via Handle()
+    router.Handle("GET", "/", func(c *fursy.Context) error {
         return c.Text("Welcome to FURSY!")  // 200 OK
     })
 
-    // GET with convenience method (200 OK)
-    router.GET("/users/:id", func(c *fursy.Context) error {
+    // GET with convenience method (200 OK) — plain handler via Handle()
+    router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
         id := c.Param("id")
         return c.OK(map[string]string{
             "id":   id,
@@ -44,27 +44,21 @@ func main() {
         })
     })
 
-    // POST with convenience method (201 Created)
-    router.POST("/users", func(c *fursy.Context) error {
-        username := c.Form("username")
-        email := c.Form("email")
-
-        user := map[string]string{
-            "id":    "123",
-            "name":  username,
-            "email": email,
-        }
-        return c.Created(user)  // 201 Created - REST best practice!
+    // POST with type-safe generic method (Go 1.27+)
+    router.POST("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+        // c.ReqBody is automatically bound and validated!
+        user := createUser(c.ReqBody)
+        return c.Created("/users/"+user.ID, user)
     })
 
-    // DELETE with convenience method (204 No Content)
-    router.DELETE("/users/:id", func(c *fursy.Context) error {
-        // Delete user...
+    // DELETE with type-safe generic method
+    router.DELETE("/users/:id", func(c *fursy.Box[DeleteRequest, fursy.Empty]) error {
+        deleteUser(c.Param("id"))
         return c.NoContentSuccess()  // 204 No Content
     })
 
-    // Query parameters
-    router.GET("/search", func(c *fursy.Context) error {
+    // Query parameters — plain handler via Handle()
+    router.Handle("GET", "/search", func(c *fursy.Context) error {
         query := c.Query("q")
         page := c.QueryDefault("page", "1")
         return c.OK(map[string]string{
@@ -78,20 +72,23 @@ func main() {
 }
 ```
 
-> **Note**: The examples above use simple handlers with `*Context`. For type-safe generic handlers `Box[Req, Res]`, see the [Type-Safe Handlers](#type-safe-handlers-first-in-go) section below!
+> **Note**: Plain handlers use `router.Handle("METHOD", path, handler)` with `*Context`. Type-safe generic methods like `router.POST()` use `Box[Req, Res]` with Go 1.27 type inference -- see [Type-Safe Handlers](#type-safe-handlers-first-in-go) below!
 
 ---
 
 ## 🌟 Why FURSY?
 
-### Type-Safe Handlers (First in Go!)
+### Type-Safe Generic Methods (First in Go! Requires Go 1.27+)
+
+Go 1.27 enables generic methods on concrete types. FURSY is the first router to use this:
 
 ```go
-func Handler(box *fursy.Box[Request, Response]) error {
+// Type parameters are inferred from the handler signature — no explicit [Req,Res] needed!
+router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
     // Compile-time type safety
     // Automatic validation
     // Zero boilerplate
-}
+})
 ```
 
 ### Native RFC 9457 Problem Details
@@ -138,14 +135,14 @@ spec := r.OpenAPI(fursy.OpenAPIConfig{
 go get github.com/coregx/fursy
 ```
 
-**Requirements**: Go 1.25+
+**Requirements**: Go 1.27+ (uses generic methods introduced in Go 1.27)
 
 ---
 
 ## 🚀 Features
 
 - ✅ **High Performance Routing** - 256-326 ns/op, 1 alloc/op
-- ✅ **Type-Safe Generic Handlers** - Box[Req, Res] with compile-time safety
+- ✅ **Type-Safe Generic Methods** - `router.POST()` with Box[Req, Res] and Go 1.27 type inference
 - ✅ **Automatic Validation** - Set once, validate everywhere with 100+ tags
 - ✅ **Content Negotiation** - RFC 9110 compliant, AI agent support
 - ✅ **RFC 9457 Problem Details** - Standardized error responses
@@ -464,7 +461,7 @@ By default, `/users` and `/users/` are treated as different routes. Configure tr
 router := fursy.New()
 router.WithTrailingSlash(fursy.StripTrailingSlash)
 
-router.GET("/api/companies", handler)
+router.Handle("GET", "/api/companies", handler)
 // GET /api/companies  → 200 (exact match)
 // GET /api/companies/ → 200 (trailing slash stripped silently)
 ```
@@ -474,7 +471,7 @@ router.GET("/api/companies", handler)
 router := fursy.New()
 router.WithTrailingSlash(fursy.RedirectTrailingSlash)
 
-router.GET("/api/companies", handler)
+router.Handle("GET", "/api/companies", handler)
 // GET  /api/companies/ → 301 redirect to /api/companies
 // POST /api/companies/ → 308 redirect (preserves HTTP method)
 ```
@@ -497,32 +494,32 @@ FURSY provides convenient shortcuts for common HTTP response patterns, following
 ### Context Convenience Methods
 
 ```go
-// GET - 200 OK (most common)
-router.GET("/users", func(c *fursy.Context) error {
+// GET - 200 OK (most common) — plain handler via Handle()
+router.Handle("GET", "/users", func(c *fursy.Context) error {
     users := getAllUsers()
     return c.OK(users)  // Short for c.JSON(200, users)
 })
 
-// POST - 201 Created (resource creation)
-router.POST("/users", func(c *fursy.Context) error {
+// POST - 201 Created (resource creation) — plain handler via Handle()
+router.Handle("POST", "/users", func(c *fursy.Context) error {
     user := createUser(c)
     return c.Created(user)  // 201, not 200!
 })
 
-// DELETE - 204 No Content (successful deletion)
-router.DELETE("/users/:id", func(c *fursy.Context) error {
+// DELETE - 204 No Content (successful deletion) — plain handler via Handle()
+router.Handle("DELETE", "/users/:id", func(c *fursy.Context) error {
     deleteUser(c.Param("id"))
     return c.NoContentSuccess()  // 204, no body
 })
 
-// Async operations - 202 Accepted
-router.POST("/jobs", func(c *fursy.Context) error {
+// Async operations - 202 Accepted — plain handler via Handle()
+router.Handle("POST", "/jobs", func(c *fursy.Context) error {
     jobID := startAsyncJob(c)
     return c.Accepted(map[string]string{"jobId": jobID})
 })
 
-// Simple text - 200 OK
-router.GET("/ping", func(c *fursy.Context) error {
+// Simple text - 200 OK — plain handler via Handle()
+router.Handle("GET", "/ping", func(c *fursy.Context) error {
     return c.Text("pong")  // text/plain, 200
 })
 ```
@@ -545,33 +542,33 @@ return c.Redirect(307, "/new-location")
 ### Box Convenience Methods (Type-Safe)
 
 ```go
-// GET - 200 OK
-router.GET[GetUserRequest, UserResponse]("/users/:id", func(b *fursy.Box[GetUserRequest, UserResponse]) error {
+// GET - 200 OK (type parameters inferred from handler signature)
+router.GET("/users/:id", func(b *fursy.Box[GetUserRequest, UserResponse]) error {
     user := getUser(b.ReqBody.ID)
     return b.OK(user)  // Type-safe 200 OK
 })
 
 // POST - 201 Created with Location header
-router.POST[CreateUserRequest, UserResponse]("/users", func(b *fursy.Box[CreateUserRequest, UserResponse]) error {
+router.POST("/users", func(b *fursy.Box[CreateUserRequest, UserResponse]) error {
     user := createUser(b.ReqBody)
     return b.Created("/users/"+user.ID, user)  // 201 + Location
 })
 
 // PUT - 200 OK with body
-router.PUT[UpdateUserRequest, UserResponse]("/users/:id", func(b *fursy.Box[UpdateUserRequest, UserResponse]) error {
+router.PUT("/users/:id", func(b *fursy.Box[UpdateUserRequest, UserResponse]) error {
     updated := updateUser(b.ReqBody)
     return b.UpdatedOK(updated)  // Semantic clarity
 })
 
 // PUT - 204 No Content (no response body)
-router.PUT[UpdateUserRequest, Empty]("/users/:id", func(b *fursy.Box[UpdateUserRequest, Empty]) error {
+router.PUT("/users/:id/status", func(b *fursy.Box[UpdateUserRequest, Empty]) error {
     updateUser(b.ReqBody)
     return b.UpdatedNoContent()  // 204, no body
 })
 
 // DELETE - 204 No Content
-router.DELETE[Empty, Empty]("/users/:id", func(b *fursy.Box[Empty, Empty]) error {
-    deleteUser(c.Param("id"))
+router.DELETE("/users/:id", func(b *fursy.Box[Empty, Empty]) error {
+    deleteUser(b.Param("id"))
     return b.NoContentSuccess()  // 204
 })
 ```
@@ -596,7 +593,7 @@ router := fursy.New()
 router.Use(database.Middleware(db))
 
 // Access database in handlers
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     db := c.DB().(*database.DB)  // Type assertion
 
     var user User
@@ -614,7 +611,7 @@ router.GET("/users/:id", func(c *fursy.Context) error {
 **Type-safe helper** (recommended):
 
 ```go
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     db, ok := database.GetDB(c)  // Type-safe retrieval
     if !ok {
         return c.Problem(fursy.InternalServerError("Database not configured"))
@@ -640,7 +637,7 @@ defer hub.Close()
 router.Use(stream.SSEHub(hub))
 
 // SSE endpoint
-router.GET("/events", func(c *fursy.Context) error {
+router.Handle("GET", "/events", func(c *fursy.Context) error {
     hub, _ := stream.GetSSEHub[Notification](c)
 
     return stream.SSEUpgrade(c, func(conn *sse.Conn) error {
@@ -669,7 +666,7 @@ defer hub.Close()
 router.Use(stream.WebSocketHub(hub))
 
 // WebSocket endpoint
-router.GET("/ws", func(c *fursy.Context) error {
+router.Handle("GET", "/ws", func(c *fursy.Context) error {
     hub, _ := stream.GetWebSocketHub(c)
 
     return stream.WebSocketUpgrade(c, func(conn *websocket.Conn) error {
@@ -724,14 +721,13 @@ func CreateUser(c *gin.Context) {
 With FURSY's **type-safe handlers**, validation is **automatic and guaranteed**:
 
 ```go
-// ✅ Automatic validation (FURSY)
-router.POST[CreateUserRequest, UserResponse]("/users",
-    func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-        // Binding and validation happen automatically!
-        // c.ReqBody is ALREADY parsed and validated ✅
-        user := createUser(c.ReqBody)
-        return c.Created("/users/"+user.ID, user)
-    })
+// ✅ Automatic validation (FURSY) — Go 1.27 generic methods with type inference
+router.POST("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+    // Binding and validation happen automatically!
+    // c.ReqBody is ALREADY parsed and validated ✅
+    user := createUser(c.ReqBody)
+    return c.Created("/users/"+user.ID, user)
+})
 ```
 
 **Key advantages:**
@@ -768,14 +764,13 @@ func main() {
     // Set validator once - applies to ALL handlers
     router.SetValidator(validator.New())
 
-    // Type-safe handler with automatic binding and validation
-    router.POST[CreateUserRequest, UserResponse]("/users",
-        func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-            // Binding and validation happen automatically!
-            // c.ReqBody is already parsed, validated, and type-safe
-            user := createUser(c.ReqBody)
-            return c.Created("/users/"+user.ID, user)
-        })
+    // Type-safe handler — Go 1.27 generic methods infer types from handler signature
+    router.POST("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+        // Binding and validation happen automatically!
+        // c.ReqBody is already parsed, validated, and type-safe
+        user := createUser(c.ReqBody)
+        return c.Created("/users/"+user.ID, user)
+    })
 
     log.Fatal(http.ListenAndServe(":8080", router))
 }
@@ -840,7 +835,7 @@ FURSY handles this automatically using **RFC 9110** standards with quality value
 The simplest approach - FURSY picks the best format automatically:
 
 ```go
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     user := getUser(c.Param("id"))
 
     // Automatically selects format based on Accept header
@@ -869,7 +864,7 @@ curl -H "Accept: application/xml" http://localhost:8080/users/123
 For finer control, check what the client accepts:
 
 ```go
-router.GET("/docs", func(c *fursy.Context) error {
+router.Handle("GET", "/docs", func(c *fursy.Context) error {
     // Check if client accepts markdown
     if c.Accepts(fursy.MIMETextMarkdown) {
         docs := generateMarkdownDocs()
@@ -886,7 +881,7 @@ router.GET("/docs", func(c *fursy.Context) error {
 RFC 9110 defines quality values to prioritize formats:
 
 ```go
-router.GET("/api/data", func(c *fursy.Context) error {
+router.Handle("GET", "/api/data", func(c *fursy.Context) error {
     data := getData()
 
     // Client sends: Accept: text/html;q=0.9, application/json;q=1.0
@@ -925,7 +920,7 @@ router.GET("/api/data", func(c *fursy.Context) error {
 FURSY has first-class support for AI agents via Markdown responses:
 
 ```go
-router.GET("/api/schema", func(c *fursy.Context) error {
+router.Handle("GET", "/api/schema", func(c *fursy.Context) error {
     // AI agents prefer markdown for better understanding
     if c.Accepts(fursy.MIMETextMarkdown) {
         schema := `
@@ -1013,7 +1008,7 @@ func main() {
     router := fursy.New()
     router.Use(opentelemetry.Middleware("my-service"))
 
-    router.GET("/users/:id", func(c *fursy.Context) error {
+    router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
         // Automatically traced! Span includes:
         // - HTTP method, path, status
         // - Request/response headers
@@ -1062,13 +1057,13 @@ func main() {
     // - http.server.request.size (histogram)
     // - http.server.response.size (histogram)
 
-    router.GET("/users", func(c *fursy.Context) error {
+    router.Handle("GET", "/users", func(c *fursy.Context) error {
         users := getAllUsers()
         return c.OK(users)
     })
 
     // Expose metrics at /metrics
-    router.GET("/metrics", promhttp.Handler())
+    router.Handle("GET", "/metrics", promhttp.Handler())
 
     http.ListenAndServe(":8080", router)
 }
@@ -1092,7 +1087,7 @@ Add custom spans to trace specific operations:
 ```go
 import "go.opentelemetry.io/otel"
 
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     // HTTP request span is created automatically by middleware
 
     // Add custom span for database query
@@ -1170,7 +1165,7 @@ Your fursy application will automatically send traces to Jaeger. No configuratio
 | OpenAPI Built-in | ✅ | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin |
 | RFC 9457 Errors | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Go Version | 1.25+ | 1.13+ | 1.17+ | 1.16+ | 1.17+ |
+| Go Version | 1.27+ | 1.13+ | 1.17+ | 1.16+ | 1.17+ |
 
 **FURSY is unique**: Only router combining furious performance, type-safe generics, automatic validation, RFC 9110 content negotiation, OpenAPI, and RFC 9457 with minimal dependencies.
 
@@ -1215,7 +1210,7 @@ We welcome contributions! Please see:
 - [SECURITY.md](SECURITY.md) - Security policy
 
 **Development Requirements**:
-- Go 1.25+
+- Go 1.27+
 - golangci-lint
 - Follow git-flow branching model
 

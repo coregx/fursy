@@ -42,10 +42,10 @@ func main() {
 	router.Use(stream.SSEHub(hub))
 
 	// SSE endpoint - clients connect here to receive events.
-	router.GET("/events", handleSSE)
+	router.Handle("GET", "/events", handleSSE)
 
 	// POST endpoint - send notification to all connected clients.
-	router.POST("/notify", handleNotify)
+	router.Handle("POST", "/notify", handleNotify)
 
 	// Start periodic notifications (every 5 seconds).
 	go periodicNotifications(hub)

@@ -13,11 +13,11 @@ package fursy
 //	api.Use(AuthMiddleware())
 //
 //	v1 := api.Group("/v1")
-//	v1.GET("/users", listUsers)      // GET /api/v1/users
-//	v1.POST("/users", createUser)    // POST /api/v1/users
+//	v1.Handle("GET", "/users", listUsers)      // GET /api/v1/users
+//	v1.Handle("POST", "/users", createUser)    // POST /api/v1/users
 //
 //	v2 := api.Group("/v2")
-//	v2.GET("/users", listUsersV2)    // GET /api/v2/users
+//	v2.Handle("GET", "/users", listUsersV2)    // GET /api/v2/users
 type RouteGroup struct {
 	// prefix is the path prefix for all routes in this group.
 	prefix string
@@ -60,10 +60,10 @@ func (g *RouteGroup) Use(middleware ...HandlerFunc) *RouteGroup {
 //
 //	v1 := api.Group("/v1")              // Inherits logger
 //	v1.Use(AuthMiddleware())            // Adds auth
-//	v1.GET("/users", handler)           // GET /api/v1/users (logger + auth)
+//	v1.Handle("GET", "/users", handler)           // GET /api/v1/users (logger + auth)
 //
 //	v2 := api.Group("/v2", RateLimitMiddleware())  // Custom middleware
-//	v2.GET("/users", handler)           // GET /api/v2/users (ratelimit only)
+//	v2.Handle("GET", "/users", handler)           // GET /api/v2/users (ratelimit only)
 func (g *RouteGroup) Group(prefix string, middleware ...HandlerFunc) *RouteGroup {
 	// If no middleware provided, inherit from parent group
 	var groupMiddleware []HandlerFunc
@@ -82,89 +82,40 @@ func (g *RouteGroup) Group(prefix string, middleware ...HandlerFunc) *RouteGroup
 	}
 }
 
-// GET registers a GET route on the group.
-//
-// Example:
-//
-//	api := router.Group("/api")
-//	api.GET("/users", func(c *Box) error {
-//	    return c.JSON(200, users)
-//	})
-func (g *RouteGroup) GET(path string, handler HandlerFunc) {
-	g.Handle("GET", path, handler)
+// GET registers a type-safe GET route on the group.
+// Type parameters are inferred from the handler signature.
+func (g *RouteGroup) GET[Req, Res any](path string, handler Handler[Req, Res]) {
+	g.Handle("GET", path, adaptGenericHandler(handler))
 }
 
-// POST registers a POST route on the group.
-//
-// Example:
-//
-//	api := router.Group("/api")
-//	api.POST("/users", func(c *Box) error {
-//	    return c.JSON(201, newUser)
-//	})
-func (g *RouteGroup) POST(path string, handler HandlerFunc) {
-	g.Handle("POST", path, handler)
+// POST registers a type-safe POST route on the group.
+func (g *RouteGroup) POST[Req, Res any](path string, handler Handler[Req, Res]) {
+	g.Handle("POST", path, adaptGenericHandler(handler))
 }
 
-// PUT registers a PUT route on the group.
-//
-// Example:
-//
-//	api := router.Group("/api")
-//	api.PUT("/users/:id", func(c *Box) error {
-//	    return c.JSON(200, updatedUser)
-//	})
-func (g *RouteGroup) PUT(path string, handler HandlerFunc) {
-	g.Handle("PUT", path, handler)
+// PUT registers a type-safe PUT route on the group.
+func (g *RouteGroup) PUT[Req, Res any](path string, handler Handler[Req, Res]) {
+	g.Handle("PUT", path, adaptGenericHandler(handler))
 }
 
-// DELETE registers a DELETE route on the group.
-//
-// Example:
-//
-//	api := router.Group("/api")
-//	api.DELETE("/users/:id", func(c *Box) error {
-//	    return c.NoContent(204)
-//	})
-func (g *RouteGroup) DELETE(path string, handler HandlerFunc) {
-	g.Handle("DELETE", path, handler)
+// DELETE registers a type-safe DELETE route on the group.
+func (g *RouteGroup) DELETE[Req, Res any](path string, handler Handler[Req, Res]) {
+	g.Handle("DELETE", path, adaptGenericHandler(handler))
 }
 
-// PATCH registers a PATCH route on the group.
-//
-// Example:
-//
-//	api := router.Group("/api")
-//	api.PATCH("/users/:id", func(c *Box) error {
-//	    return c.JSON(200, patchedUser)
-//	})
-func (g *RouteGroup) PATCH(path string, handler HandlerFunc) {
-	g.Handle("PATCH", path, handler)
+// PATCH registers a type-safe PATCH route on the group.
+func (g *RouteGroup) PATCH[Req, Res any](path string, handler Handler[Req, Res]) {
+	g.Handle("PATCH", path, adaptGenericHandler(handler))
 }
 
-// HEAD registers a HEAD route on the group.
-//
-// Example:
-//
-//	api := router.Group("/api")
-//	api.HEAD("/users/:id", func(c *Box) error {
-//	    return c.NoContent(200)
-//	})
-func (g *RouteGroup) HEAD(path string, handler HandlerFunc) {
-	g.Handle("HEAD", path, handler)
+// HEAD registers a type-safe HEAD route on the group.
+func (g *RouteGroup) HEAD[Req, Res any](path string, handler Handler[Req, Res]) {
+	g.Handle("HEAD", path, adaptGenericHandler(handler))
 }
 
-// OPTIONS registers an OPTIONS route on the group.
-//
-// Example:
-//
-//	api := router.Group("/api")
-//	api.OPTIONS("/users", func(c *Box) error {
-//	    c.SetHeader("Allow", "GET, POST")
-//	    return c.NoContent(200)
-//	})
-func (g *RouteGroup) OPTIONS(path string, handler HandlerFunc) {
-	g.Handle("OPTIONS", path, handler)
+// OPTIONS registers a type-safe OPTIONS route on the group.
+func (g *RouteGroup) OPTIONS[Req, Res any](path string, handler Handler[Req, Res]) {
+	g.Handle("OPTIONS", path, adaptGenericHandler(handler))
 }
 
 // Handle registers a route with the given HTTP method, path, and handler.

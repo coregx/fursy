@@ -22,11 +22,11 @@ type testUser struct {
 func TestOpenAPI_GenerateBasic(t *testing.T) {
 	router := New()
 
-	router.GET("/users", func(c *Context) error {
+	router.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "users")
 	})
 
-	router.POST("/users", func(c *Context) error {
+	router.Handle("POST", "/users", func(c *Context) error {
 		return c.String(201, "created")
 	})
 
@@ -79,7 +79,7 @@ func TestOpenAPI_WithInfo(t *testing.T) {
 		Description: "Test description",
 	})
 
-	router.GET("/test", func(_ *Context) error {
+	router.Handle("GET", "/test", func(_ *Context) error {
 		return nil
 	})
 
@@ -117,7 +117,7 @@ func TestOpenAPI_WithServer(t *testing.T) {
 		Description: "Staging server",
 	})
 
-	router.GET("/test", func(_ *Context) error {
+	router.Handle("GET", "/test", func(_ *Context) error {
 		return nil
 	})
 
@@ -345,7 +345,7 @@ func TestOpenAPI_SchemaGeneration_Struct(t *testing.T) {
 
 func TestOpenAPI_ProblemDetailsSchema(t *testing.T) {
 	router := New()
-	router.GET("/test", func(_ *Context) error {
+	router.Handle("GET", "/test", func(_ *Context) error {
 		return nil
 	})
 
@@ -388,7 +388,7 @@ func TestOpenAPI_ProblemDetailsSchema(t *testing.T) {
 //nolint:nestif,gocritic // Test validation requires nested checks.
 func TestOpenAPI_DefaultErrorResponses(t *testing.T) {
 	router := New()
-	router.GET("/users", func(_ *Context) error {
+	router.Handle("GET", "/users", func(_ *Context) error {
 		return nil
 	})
 
@@ -439,13 +439,13 @@ func TestOpenAPI_DefaultErrorResponses(t *testing.T) {
 func TestOpenAPI_AllHTTPMethods(t *testing.T) {
 	router := New()
 
-	router.GET("/test", func(_ *Context) error { return nil })
-	router.POST("/test", func(_ *Context) error { return nil })
-	router.PUT("/test", func(_ *Context) error { return nil })
-	router.DELETE("/test", func(_ *Context) error { return nil })
-	router.PATCH("/test", func(_ *Context) error { return nil })
-	router.HEAD("/test", func(_ *Context) error { return nil })
-	router.OPTIONS("/test", func(_ *Context) error { return nil })
+	router.Handle("GET", "/test", func(_ *Context) error { return nil })
+	router.Handle("POST", "/test", func(_ *Context) error { return nil })
+	router.Handle("PUT", "/test", func(_ *Context) error { return nil })
+	router.Handle("DELETE", "/test", func(_ *Context) error { return nil })
+	router.Handle("PATCH", "/test", func(_ *Context) error { return nil })
+	router.Handle("HEAD", "/test", func(_ *Context) error { return nil })
+	router.Handle("OPTIONS", "/test", func(_ *Context) error { return nil })
 
 	doc, err := router.GenerateOpenAPI(Info{
 		Title:   "Test",
@@ -488,7 +488,7 @@ func TestOpenAPI_JSONMarshaling(t *testing.T) {
 		Version: "1.0.0",
 	})
 
-	router.GET("/users", func(_ *Context) error {
+	router.Handle("GET", "/users", func(_ *Context) error {
 		return nil
 	})
 
@@ -526,11 +526,11 @@ func TestRouter_ServeOpenAPI(t *testing.T) {
 		Description: "API for testing",
 	})
 
-	router.GET("/users", func(c *Context) error {
+	router.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "users")
 	})
 
-	router.POST("/users", func(c *Context) error {
+	router.Handle("POST", "/users", func(c *Context) error {
 		return c.String(201, "created")
 	})
 
@@ -604,7 +604,7 @@ func TestOpenAPI_WriteJSON(t *testing.T) {
 		Title:   "Write JSON Test",
 		Version: "1.0.0",
 	})
-	router.GET("/ping", func(_ *Context) error {
+	router.Handle("GET", "/ping", func(_ *Context) error {
 		return nil
 	})
 
@@ -653,7 +653,7 @@ func TestOpenAPI_WriteJSON(t *testing.T) {
 
 func TestOpenAPI_WriteYAML(t *testing.T) {
 	router := New()
-	router.GET("/test", func(_ *Context) error {
+	router.Handle("GET", "/test", func(_ *Context) error {
 		return nil
 	})
 
@@ -681,7 +681,7 @@ func TestOpenAPI_WriteYAML(t *testing.T) {
 func TestRouter_ServeOpenAPI_DefaultInfo(t *testing.T) {
 	router := New()
 
-	router.GET("/test", func(_ *Context) error {
+	router.Handle("GET", "/test", func(_ *Context) error {
 		return nil
 	})
 

@@ -152,7 +152,7 @@ type JWTConfig struct {
 //
 // Access claims in handlers:
 //
-//	router.GET("/protected", func(c *fursy.Context) error {
+//	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 //	    claims := c.Get(middleware.JWTContextKey).(jwt.MapClaims)
 //	    userID := claims["sub"].(string)
 //	    return c.String(200, "Hello, "+userID)

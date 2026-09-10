@@ -79,7 +79,7 @@ func main() {
 	// ===========================================
 
 	// Home endpoint - No middleware
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.OK(map[string]string{
 			"message":    "Welcome to Fursy Middleware Demo",
 			"version":    "1.0.0",
@@ -88,7 +88,7 @@ func main() {
 	})
 
 	// Health check - No middleware (skipped by logger)
-	router.GET("/health", func(c *fursy.Context) error {
+	router.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.OK(map[string]string{
 			"status": "healthy",
 			"time":   time.Now().Format(time.RFC3339),
@@ -96,7 +96,7 @@ func main() {
 	})
 
 	// Panic test - Demonstrates Recovery middleware
-	router.GET("/panic", func(c *fursy.Context) error {
+	router.Handle("GET", "/panic", func(c *fursy.Context) error {
 		panic("intentional panic for testing recovery middleware")
 	})
 
@@ -128,7 +128,7 @@ func main() {
 	}))
 
 	// Public API endpoint
-	api.GET("/public", func(c *fursy.Context) error {
+	api.Handle("GET", "/public", func(c *fursy.Context) error {
 		return c.OK(map[string]interface{}{
 			"message":    "This is a public API endpoint",
 			"cors":       "enabled",
@@ -165,7 +165,7 @@ func main() {
 	}))
 
 	// Protected endpoint - List users
-	protected.GET("/users", func(c *fursy.Context) error {
+	protected.Handle("GET", "/users", func(c *fursy.Context) error {
 		// Access JWT claims
 		claims := c.Get(middleware.JWTContextKey).(jwt.MapClaims)
 		userID := claims["sub"].(string)
@@ -181,7 +181,7 @@ func main() {
 	})
 
 	// Protected endpoint - Create user
-	protected.POST("/users", func(c *fursy.Context) error {
+	protected.Handle("POST", "/users", func(c *fursy.Context) error {
 		claims := c.Get(middleware.JWTContextKey).(jwt.MapClaims)
 		userID := claims["sub"].(string)
 
@@ -206,7 +206,7 @@ func main() {
 	basic.Use(middleware.BasicAuth(middleware.BasicAuthAccounts(accounts)))
 
 	// Basic auth protected endpoint
-	basic.GET("/dashboard", func(c *fursy.Context) error {
+	basic.Handle("GET", "/dashboard", func(c *fursy.Context) error {
 		username := c.GetString(middleware.UserContextKey)
 		return c.OK(map[string]string{
 			"message":  "Welcome to the dashboard",
@@ -244,7 +244,7 @@ func main() {
 
 	// Flaky endpoint for testing circuit breaker
 	failureCount := 0
-	circuit.GET("/flaky", func(c *fursy.Context) error {
+	circuit.Handle("GET", "/flaky", func(c *fursy.Context) error {
 		failureCount++
 
 		// Fail first 3 requests to trigger circuit breaker
@@ -268,7 +268,7 @@ func main() {
 	// TOKEN GENERATION ENDPOINT (For testing JWT)
 	// ===========================================
 
-	router.POST("/auth/token", func(c *fursy.Context) error {
+	router.Handle("POST", "/auth/token", func(c *fursy.Context) error {
 		// Simple token generation (in production, validate credentials!)
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"sub": "user123",                            // User ID

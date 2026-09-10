@@ -3,9 +3,9 @@
 > **DEFINITIVE GUIDE** for AI agents (Claude, ChatGPT, Copilot, etc.) working on fursy HTTP router project.
 >
 > **Project**: fursy - Fast Universal Routing SYstem
-> **Version**: v0.2.0 (Production Ready + Documentation & Examples)
-> **Go**: 1.25+
-> **Status**: Phase 3 Complete → Phase 4 (Ecosystem)
+> **Version**: v0.5.0 (Go 1.27 Generic Methods)
+> **Go**: 1.27+ (uses generic methods on concrete types)
+> **Status**: Phase 4 (Ecosystem)
 
 ---
 
@@ -32,11 +32,11 @@
 
 ## Project Overview
 
-**FURSY** is a next-generation HTTP router for Go 1.25+ that combines blazing performance with modern features:
+**FURSY** is a next-generation HTTP router for Go 1.27+ that combines blazing performance with modern features:
 
 ### Key Features
 
-- **Type-Safe Generic Handlers**: `Context[Req, Res]` with compile-time type safety (FIRST in Go!)
+- **Type-Safe Generic Methods**: `router.POST()` with `Box[Req, Res]` — Go 1.27 generic methods with type inference (FIRST in Go!)
 - **RFC 9457 Problem Details**: Standardized error responses built-in
 - **OpenAPI 3.1 Generation**: Automatic API documentation from code
 - **Minimal Dependencies**: Core = stdlib only, middleware = 2 dependencies (JWT, RateLimit)
@@ -139,9 +139,9 @@
 
 **Performance**: 256 ns/op (static), 326 ns/op (parametric), 1 alloc/op
 
-### Generic Type-Safe Handlers
+### Generic Type-Safe Methods (Go 1.27+)
 
-**Innovation**: First Go router with compile-time type safety for request/response.
+**Innovation**: First Go router with generic methods on concrete types. Go 1.27 enables generic methods, and fursy is the first router to use this for compile-time type safety.
 
 **Traditional approach** (Gin, Echo, Fiber):
 ```go
@@ -155,13 +155,19 @@ func CreateUser(c *gin.Context) {
 }
 ```
 
-**fursy approach** (type-safe):
+**fursy approach** (type-safe generic methods):
 ```go
-func CreateUser(box *fursy.Box[CreateUserRequest, UserResponse]) error {
+// Type parameters are inferred from the handler signature — no explicit [Req,Res] needed!
+router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
     // box.ReqBody is automatically bound, validated, and type-safe!
     user := createUser(box.ReqBody)
     return box.Created("/users/"+user.ID, user)
-}
+})
+
+// For plain handlers without typed bodies, use Handle():
+router.Handle("GET", "/health", func(c *fursy.Context) error {
+    return c.Text("OK")
+})
 ```
 
 **Key types**:
@@ -407,11 +413,11 @@ fursy/
 
 ## Core Concepts
 
-### 1. Type-Safe Handlers with Box[Req, Res]
+### 1. Type-Safe Generic Methods with Box[Req, Res]
 
 **Problem**: Traditional routers have no compile-time type safety.
 
-**Solution**: Generic handlers with `Box[Req, Res]`.
+**Solution**: Go 1.27 generic methods with `Box[Req, Res]` and type inference.
 
 ```go
 // Define request/response types
@@ -426,15 +432,14 @@ type UserResponse struct {
     Email string `json:"email"`
 }
 
-// Type-safe handler
-router.POST[CreateUserRequest, UserResponse]("/users",
-    func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-        // box.ReqBody is automatically bound, type-safe, and validated!
-        user := createUser(box.ReqBody)
+// Type-safe handler — type parameters inferred from handler signature
+router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
+    // box.ReqBody is automatically bound, type-safe, and validated!
+    user := createUser(box.ReqBody)
 
-        // Type-safe response
-        return box.Created("/users/"+user.ID, user)
-    })
+    // Type-safe response
+    return box.Created("/users/"+user.ID, user)
+})
 ```
 
 **Benefits**:
@@ -486,13 +491,13 @@ router := fursy.New()
 
 // Public routes
 public := router.Group("/api/v1")
-public.GET("/health", healthCheck)
+public.Handle("GET", "/health", healthCheck)
 
 // Protected routes with JWT
 auth := public.Group("/admin")
 auth.Use(middleware.JWT(jwtSecret))
-auth.GET("/users", listUsers)      // /api/v1/admin/users
-auth.POST("/users", createUser)    // /api/v1/admin/users
+auth.Handle("GET", "/users", listUsers)      // /api/v1/admin/users
+auth.Handle("POST", "/users", createUser)    // /api/v1/admin/users
 ```
 
 **Nesting**: Groups can nest infinitely, inheriting all parent middleware.
@@ -539,13 +544,13 @@ type CreateUserRequest struct {
 }
 
 // Handler - binding and validation are automatic!
-router.POST[CreateUserRequest, UserResponse]("/users",
-    func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-        // box.ReqBody is automatically bound and validated! ✅
-        // If validation fails, RFC 9457 error (422) is returned before handler runs.
-        user := createUser(box.ReqBody)
-        return box.Created("/users/"+user.ID, user)
-    })
+// Go 1.27 generic methods infer types from handler signature
+router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
+    // box.ReqBody is automatically bound and validated! ✅
+    // If validation fails, RFC 9457 error (422) is returned before handler runs.
+    user := createUser(box.ReqBody)
+    return box.Created("/users/"+user.ID, user)
+})
 ```
 
 **100+ validation tags**: required, email, url, uuid, min, max, gte, lte, len, etc.
@@ -555,7 +560,7 @@ router.POST[CreateUserRequest, UserResponse]("/users",
 **Multi-format responses** based on client preferences:
 
 ```go
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     user := getUser(c.Param("id"))
 
     // Option 1: Automatic selection
@@ -589,13 +594,13 @@ import (
 func main() {
     router := fursy.New()
 
-    // Simple handler
-    router.GET("/", func(c *fursy.Context) error {
+    // Plain handler via Handle()
+    router.Handle("GET", "/", func(c *fursy.Context) error {
         return c.Text("Hello, fursy!")
     })
 
-    // Parametric route
-    router.GET("/users/:id", func(c *fursy.Context) error {
+    // Parametric route — plain handler via Handle()
+    router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
         id := c.Param("id")
         return c.OK(map[string]string{"id": id})
     })
@@ -616,12 +621,12 @@ type UserResponse struct {
     Name string `json:"name"`
 }
 
-router.GET[GetUserRequest, UserResponse]("/users/:id",
-    func(box *fursy.Box[GetUserRequest, UserResponse]) error {
-        // ReqBody is automatically bound and validated
-        user := getUserByID(box.ReqBody.ID)
-        return box.OK(user)
-    })
+// Go 1.27 generic methods — type parameters inferred from handler signature
+router.GET("/users/:id", func(box *fursy.Box[GetUserRequest, UserResponse]) error {
+    // ReqBody is automatically bound and validated
+    user := getUserByID(box.ReqBody.ID)
+    return box.OK(user)
+})
 ```
 
 ### With Middleware
@@ -642,7 +647,7 @@ router.Use(middleware.CORS(middleware.CORSConfig{
 // Protected routes
 admin := router.Group("/admin")
 admin.Use(middleware.JWT(jwtSecret))
-admin.GET("/users", listUsers)
+admin.Handle("GET", "/users", listUsers)
 ```
 
 ---
@@ -661,7 +666,7 @@ import "encoding/json/v2"
 import "encoding/json"  // Old version, don't use!
 ```
 
-**Why**: Go 1.25+ has new JSON API with better performance and features.
+**Why**: Go 1.25+ introduced new JSON API with better performance and features.
 
 ### 2. Logging: log/slog
 
@@ -753,9 +758,9 @@ type Router struct {
     tree *radix.Tree  // Internal implementation hidden
 }
 
-func (r *Router) GET(path string, handler Handler) {
-    // Delegate to internal
-    r.tree.Insert(path, handler)
+func (r *Router) GET[Req, Res any](path string, handler Handler[Req, Res]) {
+    // Delegate to internal via generic method (Go 1.27+)
+    r.Handle(http.MethodGet, path, adaptGenericHandler(handler))
 }
 
 // ❌ WRONG: Exposing internal types
@@ -846,7 +851,7 @@ func TestRouter_GET(t *testing.T) {
 ```go
 func BenchmarkRouter_StaticRoute(b *testing.B) {
     r := fursy.New()
-    r.GET("/users", handler)
+    r.Handle("GET", "/users", handler)
 
     req := httptest.NewRequest("GET", "/users", nil)
     w := httptest.NewRecorder()
@@ -1141,14 +1146,14 @@ router.Use(middleware.Secure(middleware.SecureConfig{
 | **OpenAPI Generation** | ✅ Built-in | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin |
 | **Zero Deps (core)** | ✅ Yes | ❌ No | ❌ No | ❌ No | ✅ Yes |
 | **Performance** | ⭐⭐⭐⭐⭐ 256 ns/op | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| **Go Version** | 1.25+ | 1.13+ | 1.17+ | 1.17+ | 1.16+ |
+| **Go Version** | 1.27+ | 1.13+ | 1.17+ | 1.17+ | 1.16+ |
 
 **fursy unique advantages**:
 1. **Type-safe generics** - Only router with compile-time type safety
 2. **RFC 9457 built-in** - Standard error format everywhere
 3. **RFC 9110 content negotiation** - Full quality value support
 4. **Minimal dependencies** - Core = stdlib only
-5. **Modern Go** - Built for Go 1.25+
+5. **Modern Go** - Built for Go 1.27+ (generic methods)
 6. **AI-ready** - Markdown responses for agents
 
 ### vs ozzo-routing (Reference)
@@ -1159,7 +1164,7 @@ router.Use(middleware.Secure(middleware.SecureConfig{
 - ✅ RFC 9457 Problem Details (standard errors)
 - ✅ OpenAPI 3.1 generation (automatic)
 - ✅ Better performance (<500ns vs ~38μs)
-- ✅ Modern Go 1.25+ features
+- ✅ Modern Go 1.27+ features (generic methods)
 
 **Preserved from ozzo**:
 - ✅ Middleware pipeline architecture
@@ -1340,7 +1345,7 @@ import "encoding/json"
 import "encoding/json/v2"
 ```
 
-**Why**: Go 1.25+ requires new JSON API.
+**Why**: Go 1.25+ introduced new JSON API.
 
 ### 2. MUST use log/slog for logging
 
@@ -1442,12 +1447,11 @@ git commit -m "feat: add feature"
 ```go
 type Empty struct{}
 
-// DELETE with no body
-router.DELETE[Empty, Empty]("/users/:id",
-    func(box *fursy.Box[Empty, Empty]) error {
-        deleteUser(box.Param("id"))
-        return box.NoContentSuccess()  // 204
-    })
+// DELETE with no body — type parameters inferred from handler signature
+router.DELETE("/users/:id", func(box *fursy.Box[Empty, Empty]) error {
+    deleteUser(box.Param("id"))
+    return box.NoContentSuccess()  // 204
+})
 ```
 
 ### 11. ReqBody is automatically bound — no manual Bind() needed
@@ -1456,13 +1460,12 @@ The framework's `adaptGenericHandler` calls `Bind()` automatically before your h
 `ReqBody` is already populated and validated when your handler executes.
 
 ```go
-router.POST[CreateUserRequest, UserResponse]("/users",
-    func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-        // ✅ CORRECT: ReqBody is already bound and validated
-        req := box.ReqBody
-        user := createUser(req)
-        return box.Created("/users/"+user.ID, user)
-    })
+router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
+    // ✅ CORRECT: ReqBody is already bound and validated
+    req := box.ReqBody
+    user := createUser(req)
+    return box.Created("/users/"+user.ID, user)
+})
 ```
 
 ### 12. Middleware order matters
@@ -1644,9 +1647,9 @@ import "github.com/coregx/fursy/plugins/validator"
 
 ### What is fursy?
 
-**fursy** is a production-ready HTTP router for Go 1.25+ that uniquely combines:
+**fursy** is a production-ready HTTP router for Go 1.27+ that uniquely combines:
 
-1. **Type-safe generic handlers** `Box[Req, Res]` - First in Go ecosystem
+1. **Type-safe generic methods** `router.POST()` with `Box[Req, Res]` - First in Go ecosystem (Go 1.27+)
 2. **RFC 9457 Problem Details** - Standard error format everywhere
 3. **OpenAPI 3.1 generation** - Automatic from code
 4. **Minimal dependencies** - Core = stdlib only
@@ -1672,16 +1675,18 @@ import "github.com/coregx/fursy/plugins/validator"
 5. **MUST run `go test -race`** before commit
 6. **MUST pass `golangci-lint run`** with 0 issues
 7. **NO `Co-Authored-By: Claude`** in commits
-8. **Maintain >85% coverage** (currently 88.9%)
+8. **Maintain >85% coverage** (currently 94.6%)
+9. **Use `router.POST()` for typed handlers** (Go 1.27 generic methods with type inference)
+10. **Use `router.Handle("GET", path, handler)` for plain handlers** (non-generic `*Context`)
 
 ### Key Differentiators
 
 **Why fursy is unique**:
-- Only Go router with compile-time type-safe handlers
+- Only Go router with compile-time type-safe generic methods (Go 1.27+)
 - Only router with built-in RFC 9457 (standard error format)
 - Only router with full RFC 9110 content negotiation including AI agent support
 - Minimal dependencies while providing production features
-- Modern Go 1.25+ design from the ground up
+- Modern Go 1.27+ design with generic methods from the ground up
 
 ### Where to Look
 
@@ -1693,7 +1698,7 @@ import "github.com/coregx/fursy/plugins/validator"
 
 ---
 
-**Version**: 1.0
-**Last Updated**: 2025-11-17
-**Project Version**: v0.2.0 (Production Ready + Documentation & Examples)
+**Version**: 2.0
+**Last Updated**: 2026-09-10
+**Project Version**: v0.5.0 (Go 1.27 Generic Methods)
 **For Questions**: See `.claude/STATUS.md` and `.claude/CLAUDE.md`

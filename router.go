@@ -1,13 +1,19 @@
-// Package fursy provides a high-performance HTTP router for Go 1.25+.
+// Package fursy provides a high-performance HTTP router for Go 1.27+.
 //
-// FURSY combines type-safe routing with modern Go features like generics,
+// FURSY combines type-safe routing with Go 1.27 generic methods,
 // providing fast URL matching (<100ns), zero dependencies, and clean API.
 //
 // # Quick Start
 //
 //	router := fursy.New()
 //
-//	router.GET("/users/:id", func(c *fursy.Context) error {
+//	// Type-safe generic method — type parameters inferred from handler signature
+//	router.POST("/users", func(c *fursy.Box[CreateUserReq, UserResponse]) error {
+//		return c.Created("/users/1", UserResponse{ID: 1, Name: c.ReqBody.Name})
+//	})
+//
+//	// Plain handler via Handle()
+//	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 //		id := c.Param("id")
 //		return c.String(200, "User ID: "+id)
 //	})
@@ -29,8 +35,10 @@
 //
 // # HTTP Methods
 //
-// All standard HTTP methods are supported:
-// GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS.
+// Type-safe generic methods (Go 1.27+): router.GET(), router.POST(), etc.
+// These accept Handler[Req, Res] and infer type parameters from the handler.
+//
+// Plain handlers: router.Handle("GET", path, handler) for HandlerFunc.
 //
 // # URL Parameters
 //
@@ -90,20 +98,17 @@ const (
 //
 // Router implements http.Handler and can be used directly with http.ListenAndServe.
 //
-// Example:
+// Use generic methods (Go 1.27+) for type-safe handlers:
 //
-//	router := fursy.New()
-//	router.GET("/users/:id", func(c *fursy.Context) error {
-//		id := c.Param("id")
-//		return c.String(200, "User ID: "+id)
+//	router.POST("/users", func(c *fursy.Box[CreateReq, UserRes]) error {
+//		return c.Created("/users/1", UserRes{ID: 1, Name: c.ReqBody.Name})
 //	})
-//	http.ListenAndServe(":8080", router)
-
-// Router is the main HTTP router for FURSY.
-// It provides fast URL routing with support for static paths,
-// parameters (:id), and wildcards (*path).
 //
-// Router implements http.Handler and can be used directly with http.ListenAndServe.
+// Use Handle() for plain handlers:
+//
+//	router.Handle("GET", "/health", func(c *fursy.Context) error {
+//		return c.Text("OK")
+//	})
 type Router struct {
 	// trees stores one radix tree per HTTP method for efficient routing.
 	trees map[string]*radix.Tree
@@ -225,7 +230,7 @@ func (r *Router) Use(middleware ...HandlerFunc) *Router {
 //	    Age   int    `json:"age" validate:"gte=18,lte=120"`
 //	}
 //
-//	POST[CreateUserRequest, UserResponse](router, "/users", func(c *Box[CreateUserRequest, UserResponse]) error {
+//	router.POST("/users", func(c *Box[CreateUserRequest, UserResponse]) error {
 //	    // c.ReqBody is already validated here!
 //	    // ...
 //	})
@@ -280,7 +285,7 @@ func (r *Router) WithServer(server Server) *Router {
 //	router := fursy.New()
 //	router.WithTrailingSlash(fursy.StripTrailingSlash)
 //
-//	router.GET("/api/companies", handler)
+//	router.Handle("GET", "/api/companies", handler)
 //	// Now GET /api/companies/ also works (silently stripped)
 //
 //	// Or use redirects:
@@ -309,15 +314,15 @@ func (r *Router) WithTrailingSlash(behavior TrailingSlashBehavior) *Router {
 //	})
 //
 //	// Register your routes
-//	router.GET("/users", handler)
-//	router.POST("/users", handler)
+//	router.Handle("GET", "/users", handler)
+//	router.Handle("POST", "/users", handler)
 //
 //	// Serve OpenAPI specification
 //	router.ServeOpenAPI("/openapi.json")
 //
 //	// Now GET /openapi.json returns the OpenAPI 3.1 document
 func (r *Router) ServeOpenAPI(path string) {
-	r.GET(path, func(c *Context) error {
+	r.Handle(http.MethodGet, path, func(c *Context) error {
 		// Use router info if configured, otherwise use minimal defaults.
 		info := Info{
 			Title:   "API Documentation",
@@ -353,10 +358,10 @@ func (r *Router) ServeOpenAPI(path string) {
 //	api.Use(AuthMiddleware())       // API-specific
 //
 //	v1 := api.Group("/v1")
-//	v1.GET("/users", handler)       // GET /api/v1/users (logger + auth)
+//	v1.Handle("GET", "/users", handler)       // GET /api/v1/users (logger + auth)
 //
 //	admin := api.Group("/admin", AdminMiddleware())  // Custom middleware
-//	admin.GET("/settings", handler)  // GET /api/admin/settings (admin only)
+//	admin.Handle("GET", "/settings", handler)  // GET /api/admin/settings (admin only)
 func (r *Router) Group(prefix string, middleware ...HandlerFunc) *RouteGroup {
 	return &RouteGroup{
 		prefix:     prefix,
@@ -365,85 +370,54 @@ func (r *Router) Group(prefix string, middleware ...HandlerFunc) *RouteGroup {
 	}
 }
 
-// GET registers a handler for GET requests to the specified path.
+// GET registers a type-safe handler for GET requests.
+// Type parameters are inferred from the handler signature.
 //
 // Example:
 //
-//	router.GET("/users", func(c *fursy.Context) error {
-//		return c.JSON(200, users)
+//	router.GET("/users/:id", func(c *fursy.Box[fursy.Empty, UserResponse]) error {
+//	    return c.OK(UserResponse{ID: 1, Name: "Alice"})
 //	})
-func (r *Router) GET(path string, handler HandlerFunc) {
-	r.Handle(http.MethodGet, path, handler)
+func (r *Router) GET[Req, Res any](path string, handler Handler[Req, Res]) {
+	r.Handle(http.MethodGet, path, adaptGenericHandler(handler))
 }
 
-// POST registers a handler for POST requests to the specified path.
+// POST registers a type-safe handler for POST requests.
+// The request body is automatically bound and validated.
 //
 // Example:
 //
-//	router.POST("/users", func(c *fursy.Context) error {
-//		return c.JSON(201, newUser)
+//	router.POST("/users", func(c *fursy.Box[CreateUserReq, UserResponse]) error {
+//	    req := c.ReqBody
+//	    return c.Created("/users/1", UserResponse{ID: 1, Name: req.Name})
 //	})
-func (r *Router) POST(path string, handler HandlerFunc) {
-	r.Handle(http.MethodPost, path, handler)
+func (r *Router) POST[Req, Res any](path string, handler Handler[Req, Res]) {
+	r.Handle(http.MethodPost, path, adaptGenericHandler(handler))
 }
 
-// PUT registers a handler for PUT requests to the specified path.
-//
-// Example:
-//
-//	router.PUT("/users/:id", func(c *fursy.Context) error {
-//		id := c.Param("id")
-//		return c.NoContent(204)
-//	})
-func (r *Router) PUT(path string, handler HandlerFunc) {
-	r.Handle(http.MethodPut, path, handler)
+// PUT registers a type-safe handler for PUT requests.
+func (r *Router) PUT[Req, Res any](path string, handler Handler[Req, Res]) {
+	r.Handle(http.MethodPut, path, adaptGenericHandler(handler))
 }
 
-// DELETE registers a handler for DELETE requests to the specified path.
-//
-// Example:
-//
-//	router.DELETE("/users/:id", func(c *fursy.Context) error {
-//		id := c.Param("id")
-//		return c.NoContent(204)
-//	})
-func (r *Router) DELETE(path string, handler HandlerFunc) {
-	r.Handle(http.MethodDelete, path, handler)
+// DELETE registers a type-safe handler for DELETE requests.
+func (r *Router) DELETE[Req, Res any](path string, handler Handler[Req, Res]) {
+	r.Handle(http.MethodDelete, path, adaptGenericHandler(handler))
 }
 
-// PATCH registers a handler for PATCH requests to the specified path.
-//
-// Example:
-//
-//	router.PATCH("/users/:id", func(c *fursy.Context) error {
-//		id := c.Param("id")
-//		return c.JSON(200, updatedUser)
-//	})
-func (r *Router) PATCH(path string, handler HandlerFunc) {
-	r.Handle(http.MethodPatch, path, handler)
+// PATCH registers a type-safe handler for PATCH requests.
+func (r *Router) PATCH[Req, Res any](path string, handler Handler[Req, Res]) {
+	r.Handle(http.MethodPatch, path, adaptGenericHandler(handler))
 }
 
-// HEAD registers a handler for HEAD requests to the specified path.
-//
-// Example:
-//
-//	router.HEAD("/users/:id", func(c *fursy.Context) error {
-//		return c.NoContent(200)
-//	})
-func (r *Router) HEAD(path string, handler HandlerFunc) {
-	r.Handle(http.MethodHead, path, handler)
+// HEAD registers a type-safe handler for HEAD requests.
+func (r *Router) HEAD[Req, Res any](path string, handler Handler[Req, Res]) {
+	r.Handle(http.MethodHead, path, adaptGenericHandler(handler))
 }
 
-// OPTIONS registers a handler for OPTIONS requests to the specified path.
-//
-// Example:
-//
-//	router.OPTIONS("/users", func(c *fursy.Context) error {
-//		c.SetHeader("Allow", "GET, POST, PUT, DELETE")
-//		return c.NoContent(200)
-//	})
-func (r *Router) OPTIONS(path string, handler HandlerFunc) {
-	r.Handle(http.MethodOptions, path, handler)
+// OPTIONS registers a type-safe handler for OPTIONS requests.
+func (r *Router) OPTIONS[Req, Res any](path string, handler Handler[Req, Res]) {
+	r.Handle(http.MethodOptions, path, adaptGenericHandler(handler))
 }
 
 // Handle registers a handler for the given HTTP method and path.
@@ -612,8 +586,8 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Lookup route in radix tree.
-	handler, params, found := tree.Lookup(path)
+	// Lookup route in radix tree (zero-alloc: reuse pooled buffer).
+	handler, radixParams, found := tree.Lookup(path, c.radixBuf[:0])
 
 	// If not found, try the trailing slash alternate path.
 	if !found && r.trailingSlash != IgnoreTrailingSlash {
@@ -622,7 +596,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		if altFound {
-			handler, params, found = altHandler, altParams, altFound
+			handler, radixParams, found = altHandler, altParams, altFound
 		}
 	}
 
@@ -631,9 +605,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Convert internal params to public Param slice.
+	// Convert radix params to public Param slice (both pre-allocated, zero-alloc).
+	c.radixBuf = radixParams
 	c.params = c.params[:0]
-	for _, p := range params {
+	for _, p := range radixParams {
 		c.params = append(c.params, Param{Key: p.Key, Value: p.Value})
 	}
 
@@ -677,7 +652,7 @@ func (r *Router) tryTrailingSlashLookup(
 		return nil, nil, false, false
 	}
 
-	handler, params, found := tree.Lookup(altPath)
+	handler, params, found := tree.Lookup(altPath, nil)
 	if !found {
 		return nil, nil, false, false
 	}
@@ -710,13 +685,11 @@ func (r *Router) pathExistsInOtherMethods(path, method string) bool {
 }
 
 func (r *Router) existsInTree(tree *radix.Tree, path, altPath string) bool {
-	_, _, found := tree.Lookup(path)
-	if found {
+	if tree.Contains(path) {
 		return true
 	}
 	if altPath != "" {
-		_, _, found = tree.Lookup(altPath)
-		return found
+		return tree.Contains(altPath)
 	}
 	return false
 }
@@ -902,7 +875,7 @@ func (r *Router) SetServer(srv *http.Server) {
 // Example (simple):
 //
 //	router := fursy.New()
-//	router.GET("/health", healthHandler)
+//	router.Handle("GET", "/health", healthHandler)
 //
 //	router.OnShutdown(func() {
 //	    log.Println("Closing database...")
@@ -926,7 +899,7 @@ func (r *Router) SetServer(srv *http.Server) {
 //	router := fursy.New()
 //
 //	// Health check for readiness probe
-//	router.GET("/health", func(c *fursy.Context) error {
+//	router.Handle("GET", "/health", func(c *fursy.Context) error {
 //	    return c.String(200, "OK")
 //	})
 //

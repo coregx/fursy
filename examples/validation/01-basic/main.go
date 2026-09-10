@@ -38,7 +38,7 @@ func main() {
 	router.Use(middleware.Recovery())
 
 	// Type-safe POST endpoint with automatic validation.
-	fursy.POST[CreateUserRequest, UserResponse](router, "/users", createUser)
+	router.POST("/users", createUser)
 
 	// Start server.
 	slog.Info("Server starting", "port", 8080)

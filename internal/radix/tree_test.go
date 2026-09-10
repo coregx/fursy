@@ -77,7 +77,7 @@ func TestTree_LookupStatic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler, params, found := tree.Lookup(tt.path)
+			handler, params, found := tree.Lookup(tt.path, nil)
 
 			if found != tt.wantFound {
 				t.Errorf("Lookup() found = %v, want %v", found, tt.wantFound)
@@ -167,7 +167,7 @@ func TestTree_LookupParameter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler, params, found := tree.Lookup(tt.path)
+			handler, params, found := tree.Lookup(tt.path, nil)
 
 			if found != tt.wantFound {
 				t.Errorf("Lookup() found = %v, want %v", found, tt.wantFound)
@@ -259,7 +259,7 @@ func TestTree_LookupWildcard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler, params, found := tree.Lookup(tt.path)
+			handler, params, found := tree.Lookup(tt.path, nil)
 
 			if found != tt.wantFound {
 				t.Errorf("Lookup() found = %v, want %v", found, tt.wantFound)
@@ -360,7 +360,7 @@ func TestTree_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, found := tree.Lookup(tt.path)
+			_, _, found := tree.Lookup(tt.path, nil)
 			if found != tt.wantFound {
 				t.Errorf("Lookup(%s) found = %v, want %v", tt.path, found, tt.wantFound)
 			}
@@ -388,7 +388,7 @@ func TestTree_PriorityOrdering(t *testing.T) {
 
 	// After insertions, check that all routes are findable
 	for _, r := range routes {
-		handler, _, found := tree.Lookup(r.path)
+		handler, _, found := tree.Lookup(r.path, nil)
 		if !found {
 			t.Errorf("Route %s not found after insertion", r.path)
 		}
@@ -421,7 +421,7 @@ func TestTree_LargeRouteSet(t *testing.T) {
 	for i := range routes {
 		// Replace :id with actual value
 		testPath := fmt.Sprintf("/api/v1/resource%d/123", i)
-		handler, params, found := tree.Lookup(testPath)
+		handler, params, found := tree.Lookup(testPath, nil)
 
 		if !found {
 			t.Errorf("Route %s not found", testPath)

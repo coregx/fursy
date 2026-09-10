@@ -282,7 +282,7 @@ func TestDeprecationInfo_SetDeprecationHeaders(t *testing.T) {
 
 	sunsetDate := time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)
 
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		info := DeprecationInfo{
 			Version:    Version{Major: 1},
 			SunsetDate: &sunsetDate,
@@ -328,7 +328,7 @@ func TestDeprecationInfo_SetDeprecationHeaders(t *testing.T) {
 
 func TestContext_APIVersion_FromHeader(t *testing.T) {
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		version := c.APIVersion()
 
 		if version.Major != 2 {
@@ -351,7 +351,7 @@ func TestContext_APIVersion_FromHeader(t *testing.T) {
 
 func TestContext_APIVersion_FromPath(t *testing.T) {
 	router := New()
-	router.GET("/api/v1/test", func(c *Context) error {
+	router.Handle("GET", "/api/v1/test", func(c *Context) error {
 		version := c.APIVersion()
 
 		if version.Major != 1 {
@@ -373,7 +373,7 @@ func TestContext_APIVersion_FromPath(t *testing.T) {
 
 func TestContext_APIVersion_HeaderPriority(t *testing.T) {
 	router := New()
-	router.GET("/api/v1/test", func(c *Context) error {
+	router.Handle("GET", "/api/v1/test", func(c *Context) error {
 		version := c.APIVersion()
 
 		// Header should take priority over path.
@@ -397,7 +397,7 @@ func TestContext_APIVersion_HeaderPriority(t *testing.T) {
 
 func TestContext_APIVersion_NoVersion(t *testing.T) {
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		version := c.APIVersion()
 
 		// No version found - should be zero.
@@ -421,7 +421,7 @@ func TestRequireVersion_Success(t *testing.T) {
 
 	v1 := router.Group("/api/v1")
 	v1.Use(RequireVersion(Version{Major: 1}))
-	v1.GET("/users", func(c *Context) error {
+	v1.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "v1 users")
 	})
 
@@ -444,7 +444,7 @@ func TestRequireVersion_Mismatch(t *testing.T) {
 
 	v2 := router.Group("/api/v2")
 	v2.Use(RequireVersion(Version{Major: 2}))
-	v2.GET("/users", func(c *Context) error {
+	v2.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "v2 users")
 	})
 
@@ -466,7 +466,7 @@ func TestRequireVersion_NoVersion(t *testing.T) {
 
 	v1 := router.Group("/api/v1")
 	v1.Use(RequireVersion(Version{Major: 1}))
-	v1.GET("/users", func(_ *Context) error {
+	v1.Handle("GET", "/users", func(_ *Context) error {
 		return nil
 	})
 
@@ -498,7 +498,7 @@ func TestDeprecateVersion_Middleware(t *testing.T) {
 		Message:    "Please migrate to v2",
 		Link:       "https://api.example.com/docs/v2-migration",
 	}))
-	v1.GET("/users", func(c *Context) error {
+	v1.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "v1 users")
 	})
 
@@ -540,13 +540,13 @@ func TestAPIVersioning_Integration(t *testing.T) {
 		Message:    "Migrate to v2 by June 2025",
 		Link:       "https://api.example.com/docs/migration",
 	}))
-	v1.GET("/users", func(c *Context) error {
+	v1.Handle("GET", "/users", func(c *Context) error {
 		return c.JSON(200, map[string]string{"version": "v1", "status": "deprecated"})
 	})
 
 	// v2 - current.
 	v2 := router.Group("/api/v2")
-	v2.GET("/users", func(c *Context) error {
+	v2.Handle("GET", "/users", func(c *Context) error {
 		return c.JSON(200, map[string]string{"version": "v2", "status": "current"})
 	})
 

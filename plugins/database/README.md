@@ -45,7 +45,7 @@ func main() {
     router.Use(database.Middleware(db))
 
     // Use database in handlers.
-    router.GET("/users/:id", func(c *fursy.Context) error {
+    router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
         retrievedDB, ok := database.GetDB(c)
         if !ok {
             return c.Problem(fursy.InternalServerError("Database not configured"))
@@ -148,7 +148,7 @@ type Tx struct {
 ### Manual Transactions
 
 ```go
-router.POST("/transfer", func(c *fursy.Context) error {
+router.Handle("POST", "/transfer", func(c *fursy.Context) error {
     db, _ := database.GetDB(c)
 
     tx, err := db.BeginTx(c.Request.Context(), nil)
@@ -229,7 +229,7 @@ See [examples/09-rest-api-with-db](../../examples/09-rest-api-with-db/) for a co
 ### Batch Insert with Transaction
 
 ```go
-router.POST("/users/batch", func(c *fursy.Context) error {
+router.Handle("POST", "/users/batch", func(c *fursy.Context) error {
     db, _ := database.GetDB(c)
 
     var users []User
@@ -259,7 +259,7 @@ router.POST("/users/batch", func(c *fursy.Context) error {
 ### Error Handling
 
 ```go
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     db, _ := database.GetDB(c)
 
     var user User
@@ -297,7 +297,7 @@ The **dbcontext pattern** refers to best practices for managing database connect
 **Use when**: You want clean error handling with RFC 9457 Problem Details.
 
 ```go
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     db, err := database.GetDBOrError(c)
     if err != nil {
         return err // Returns 500 Internal Server Error
@@ -328,7 +328,7 @@ router.GET("/users/:id", func(c *fursy.Context) error {
 **Use when**: Rapid prototyping or when DB absence indicates programming error.
 
 ```go
-router.GET("/users", func(c *fursy.Context) error {
+router.Handle("GET", "/users", func(c *fursy.Context) error {
     db := database.MustGetDB(c) // Panics if middleware not configured
 
     rows, err := db.Query(c.Request.Context(), "SELECT * FROM users")
@@ -349,7 +349,7 @@ router.GET("/users", func(c *fursy.Context) error {
 **Use when**: You need custom error handling or conditional DB usage.
 
 ```go
-router.GET("/users", func(c *fursy.Context) error {
+router.Handle("GET", "/users", func(c *fursy.Context) error {
     db, ok := database.GetDB(c)
     if !ok {
         // Custom error handling
@@ -434,7 +434,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*User, error)
 }
 
 // Handler using repository pattern
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     db, err := database.GetDBOrError(c)
     if err != nil {
         return err

@@ -266,7 +266,7 @@ func TestContext_Bind_NoValidator(t *testing.T) {
 		Email string `json:"email"`
 	}
 
-	POST[Request, Request](r, "/test", func(c *Box[Request, Request]) error {
+	r.POST("/test", func(c *Box[Request, Request]) error {
 		if c.ReqBody == nil {
 			return c.BadRequest(Request{Name: "Request body is nil"})
 		}
@@ -310,7 +310,7 @@ func TestContext_Bind_WithValidator(t *testing.T) {
 	// Set failing validator.
 	r.SetValidator(&mockValidator{shouldFail: true})
 
-	POST[Request, Request](r, "/test", func(c *Box[Request, Request]) error {
+	r.POST("/test", func(c *Box[Request, Request]) error {
 		// This should not be reached due to validation failure.
 		return c.OK(*c.ReqBody)
 	})
@@ -340,7 +340,7 @@ func TestContext_Bind_ValidatorSuccess(t *testing.T) {
 	// Set passing validator.
 	r.SetValidator(&mockValidator{shouldFail: false})
 
-	POST[Request, Request](r, "/test", func(c *Box[Request, Request]) error {
+	r.POST("/test", func(c *Box[Request, Request]) error {
 		if c.ReqBody == nil {
 			return c.BadRequest(Request{Name: "Request body is nil"})
 		}
@@ -367,7 +367,7 @@ func TestContext_Bind_EmptyType(t *testing.T) {
 	// Set failing validator - should not be called for Empty type.
 	r.SetValidator(&mockValidator{shouldFail: true})
 
-	GET[Empty, string](r, "/test", func(c *Box[Empty, string]) error {
+	r.GET("/test", func(c *Box[Empty, string]) error {
 		return c.OK("success")
 	})
 
@@ -398,7 +398,7 @@ func TestContext_Bind_CustomValidationErrors(t *testing.T) {
 	}
 	r.SetValidator(&mockValidator{shouldFail: true, errors: customErrors})
 
-	POST[Request, Request](r, "/test", func(c *Box[Request, Request]) error {
+	r.POST("/test", func(c *Box[Request, Request]) error {
 		return c.OK(*c.ReqBody)
 	})
 
@@ -498,7 +498,7 @@ func TestValidation_Integration(t *testing.T) {
 
 	r.SetValidator(&emailValidator{})
 
-	POST[CreateUserRequest, UserResponse](r, "/users", func(c *Box[CreateUserRequest, UserResponse]) error {
+	r.POST("/users", func(c *Box[CreateUserRequest, UserResponse]) error {
 		// If we get here, validation passed.
 		return c.Created("/users/1", UserResponse{
 			ID:    1,

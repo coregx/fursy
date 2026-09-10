@@ -33,7 +33,7 @@ func TestMetrics_RequestDuration(t *testing.T) {
 	router := fursy.New()
 	router.Use(Metrics("test-service"))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		time.Sleep(50 * time.Millisecond)
 		return c.String(200, "OK")
 	})
@@ -113,7 +113,7 @@ func TestMetrics_RequestCounter(t *testing.T) {
 	router := fursy.New()
 	router.Use(Metrics("test-service"))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -170,7 +170,7 @@ func TestMetrics_ResponseStatusCode(t *testing.T) {
 	router := fursy.New()
 	router.Use(Metrics("test-service"))
 
-	router.GET("/error", func(c *fursy.Context) error {
+	router.Handle("GET", "/error", func(c *fursy.Context) error {
 		return c.String(500, "Internal Server Error")
 	})
 
@@ -217,7 +217,7 @@ func TestMetrics_ServerName(t *testing.T) {
 		ServerName: "api.example.com",
 	}))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -268,11 +268,11 @@ func TestMetrics_Skipper(t *testing.T) {
 		},
 	}))
 
-	router.GET("/health", func(c *fursy.Context) error {
+	router.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "Users")
 	})
 
@@ -333,7 +333,7 @@ func TestMetrics_CustomBuckets(t *testing.T) {
 		ExplicitBucketBoundaries: customBuckets,
 	}))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -388,7 +388,7 @@ func TestMetrics_ActiveRequests(t *testing.T) {
 		RecordInFlightRequests: true,
 	}))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -426,7 +426,7 @@ func TestMetrics_RequestResponseSize(t *testing.T) {
 	router := fursy.New()
 	router.Use(Metrics("test-service"))
 
-	router.POST("/users", func(c *fursy.Context) error {
+	router.Handle("POST", "/users", func(c *fursy.Context) error {
 		return c.String(200, "User created successfully")
 	})
 
@@ -493,11 +493,11 @@ func TestMetrics_HTTPMethods(t *testing.T) {
 	router := fursy.New()
 	router.Use(Metrics("test-service"))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "GET")
 	})
 
-	router.POST("/users", func(c *fursy.Context) error {
+	router.Handle("POST", "/users", func(c *fursy.Context) error {
 		return c.String(201, "POST")
 	})
 

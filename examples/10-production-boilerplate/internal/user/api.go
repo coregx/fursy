@@ -22,24 +22,24 @@ func NewAPI(service Service) *API {
 // RegisterRoutes registers user routes.
 func (api *API) RegisterRoutes(r *fursy.Router, authMiddleware fursy.HandlerFunc) {
 	// Public routes
-	r.POST("/api/auth/register", api.register)
-	r.POST("/api/auth/login", api.login)
+	r.Handle("POST", "/api/auth/register", api.register)
+	r.Handle("POST", "/api/auth/login", api.login)
 
 	// Protected routes
 	protected := r.Group("/api")
 	protected.Use(authMiddleware)
 	{
-		protected.GET("/users/me", api.getProfile)
-		protected.PUT("/users/me", api.updateProfile)
-		protected.POST("/users/me/password", api.changePassword)
+		protected.Handle("GET", "/users/me", api.getProfile)
+		protected.Handle("PUT", "/users/me", api.updateProfile)
+		protected.Handle("POST", "/users/me/password", api.changePassword)
 
 		// Admin routes (with role middleware)
 		admin := protected.Group("/users")
 		admin.Use(auth.RequireRole("admin"))
 		{
-			admin.GET("", api.listUsers)
-			admin.POST("/:id/ban", api.banUser)
-			admin.POST("/:id/promote", api.promoteToAdmin)
+			admin.Handle("GET", "", api.listUsers)
+			admin.Handle("POST", "/:id/ban", api.banUser)
+			admin.Handle("POST", "/:id/promote", api.promoteToAdmin)
 		}
 	}
 }

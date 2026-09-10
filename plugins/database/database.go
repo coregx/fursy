@@ -25,7 +25,7 @@
 //	router := fursy.New()
 //	router.Use(database.Middleware(db))
 //
-//	router.GET("/users/:id", func(c *fursy.Context) error {
+//	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 //	    db := c.DB()
 //	    var user User
 //	    err := db.QueryRow(c.Request.Context(),
@@ -83,7 +83,7 @@ func NewDB(db *sql.DB) *DB {
 //	db := database.NewDB(sqlDB)
 //	router.Use(database.Middleware(db))
 //
-//	router.GET("/users", func(c *fursy.Context) error {
+//	router.Handle("GET", "/users", func(c *fursy.Context) error {
 //	    db := c.DB()
 //	    // Use db for queries...
 //	    return nil
@@ -121,7 +121,7 @@ func GetDB(c *fursy.Context) (*DB, bool) {
 //
 // Example:
 //
-//	router.GET("/users", func(c *fursy.Context) error {
+//	router.Handle("GET", "/users", func(c *fursy.Context) error {
 //	    db := database.MustGetDB(c) // Panic if DB not configured
 //	    rows, err := db.Query(c.Request.Context(), "SELECT * FROM users")
 //	    // ...
@@ -147,7 +147,7 @@ func MustGetDB(c *fursy.Context) *DB {
 //
 // Example:
 //
-//	router.GET("/users", func(c *fursy.Context) error {
+//	router.Handle("GET", "/users", func(c *fursy.Context) error {
 //	    db, err := database.GetDBOrError(c)
 //	    if err != nil {
 //	        return c.Problem(err.(fursy.Problem))

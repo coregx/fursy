@@ -9,7 +9,7 @@ import (
 // BenchmarkRouter_StaticRoute benchmarks routing for a simple static route.
 func BenchmarkRouter_StaticRoute(b *testing.B) {
 	router := New()
-	router.GET("/users", func(c *Context) error {
+	router.Handle("GET", "/users", func(c *Context) error {
 		return c.NoContent(http.StatusOK)
 	})
 
@@ -27,7 +27,7 @@ func BenchmarkRouter_StaticRoute(b *testing.B) {
 // BenchmarkRouter_ParameterRoute benchmarks routing with URL parameters.
 func BenchmarkRouter_ParameterRoute(b *testing.B) {
 	router := New()
-	router.GET("/users/:id", func(c *Context) error {
+	router.Handle("GET", "/users/:id", func(c *Context) error {
 		_ = c.Param("id")
 		return c.NoContent(http.StatusOK)
 	})
@@ -46,7 +46,7 @@ func BenchmarkRouter_ParameterRoute(b *testing.B) {
 // BenchmarkRouter_ParameterRoute_MultipleParams benchmarks multiple parameters.
 func BenchmarkRouter_ParameterRoute_MultipleParams(b *testing.B) {
 	router := New()
-	router.GET("/posts/:category/:postID", func(c *Context) error {
+	router.Handle("GET", "/posts/:category/:postID", func(c *Context) error {
 		_ = c.Param("category")
 		_ = c.Param("postID")
 		return c.NoContent(http.StatusOK)
@@ -66,7 +66,7 @@ func BenchmarkRouter_ParameterRoute_MultipleParams(b *testing.B) {
 // BenchmarkRouter_WildcardRoute benchmarks catch-all wildcard routing.
 func BenchmarkRouter_WildcardRoute(b *testing.B) {
 	router := New()
-	router.GET("/files/*path", func(c *Context) error {
+	router.Handle("GET", "/files/*path", func(c *Context) error {
 		_ = c.Param("path")
 		return c.NoContent(http.StatusOK)
 	})
@@ -108,7 +108,7 @@ func BenchmarkRouter_MultipleRoutes(b *testing.B) {
 	}
 
 	for _, route := range routes {
-		router.GET(route, handler)
+		router.Handle("GET", route, handler)
 	}
 
 	req := httptest.NewRequest("GET", "/users/123", http.NoBody)
@@ -125,7 +125,7 @@ func BenchmarkRouter_MultipleRoutes(b *testing.B) {
 // BenchmarkRouter_DeepNesting benchmarks deeply nested routes.
 func BenchmarkRouter_DeepNesting(b *testing.B) {
 	router := New()
-	router.GET("/api/v1/organizations/:orgID/projects/:projectID/issues/:issueID/comments/:commentID",
+	router.Handle("GET", "/api/v1/organizations/:orgID/projects/:projectID/issues/:issueID/comments/:commentID",
 		func(c *Context) error {
 			_ = c.Param("orgID")
 			_ = c.Param("projectID")
@@ -148,7 +148,7 @@ func BenchmarkRouter_DeepNesting(b *testing.B) {
 // BenchmarkRouter_NotFound benchmarks 404 lookup performance.
 func BenchmarkRouter_NotFound(b *testing.B) {
 	router := New()
-	router.GET("/users", func(c *Context) error {
+	router.Handle("GET", "/users", func(c *Context) error {
 		return c.NoContent(http.StatusOK)
 	})
 
@@ -166,7 +166,7 @@ func BenchmarkRouter_NotFound(b *testing.B) {
 // BenchmarkRouter_MethodNotAllowed benchmarks 405 lookup performance.
 func BenchmarkRouter_MethodNotAllowed(b *testing.B) {
 	router := New()
-	router.GET("/users", func(c *Context) error {
+	router.Handle("GET", "/users", func(c *Context) error {
 		return c.NoContent(http.StatusOK)
 	})
 
@@ -215,7 +215,7 @@ func BenchmarkContext_Query(b *testing.B) {
 // BenchmarkRouter_RootPath benchmarks root path routing.
 func BenchmarkRouter_RootPath(b *testing.B) {
 	router := New()
-	router.GET("/", func(c *Context) error {
+	router.Handle("GET", "/", func(c *Context) error {
 		return c.NoContent(http.StatusOK)
 	})
 
@@ -233,7 +233,7 @@ func BenchmarkRouter_RootPath(b *testing.B) {
 // BenchmarkRouter_LongStaticPath benchmarks long static paths.
 func BenchmarkRouter_LongStaticPath(b *testing.B) {
 	router := New()
-	router.GET("/api/v1/organizations/settings/security/authentication/providers", func(c *Context) error {
+	router.Handle("GET", "/api/v1/organizations/settings/security/authentication/providers", func(c *Context) error {
 		return c.NoContent(http.StatusOK)
 	})
 
@@ -253,11 +253,11 @@ func BenchmarkRouter_MixedRoutes(b *testing.B) {
 	router := New()
 
 	// Mix of static and parametric routes.
-	router.GET("/api/users", func(_ *Context) error { return nil })
-	router.GET("/api/users/:id", func(_ *Context) error { return nil })
-	router.GET("/api/posts", func(_ *Context) error { return nil })
-	router.GET("/api/posts/:category/:id", func(_ *Context) error { return nil })
-	router.GET("/api/comments/:id", func(_ *Context) error { return nil })
+	router.Handle("GET", "/api/users", func(_ *Context) error { return nil })
+	router.Handle("GET", "/api/users/:id", func(_ *Context) error { return nil })
+	router.Handle("GET", "/api/posts", func(_ *Context) error { return nil })
+	router.Handle("GET", "/api/posts/:category/:id", func(_ *Context) error { return nil })
+	router.Handle("GET", "/api/comments/:id", func(_ *Context) error { return nil })
 
 	req := httptest.NewRequest("GET", "/api/posts/tech/42", http.NoBody)
 	w := httptest.NewRecorder()
@@ -316,7 +316,7 @@ func BenchmarkContext_String(b *testing.B) {
 // BenchmarkContext_Pooling benchmarks Context pooling efficiency.
 func BenchmarkContext_Pooling(b *testing.B) {
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 

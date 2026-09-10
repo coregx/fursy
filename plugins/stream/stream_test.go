@@ -25,7 +25,7 @@ func TestSSEHub_Middleware(t *testing.T) {
 	router := fursy.New()
 	router.Use(stream.SSEHub(hub))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		retrievedHub, ok := stream.GetSSEHub[string](c)
 		if !ok {
 			t.Error("hub not found in context")
@@ -55,7 +55,7 @@ func TestWebSocketHub_Middleware(t *testing.T) {
 	router := fursy.New()
 	router.Use(stream.WebSocketHub(hub))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		retrievedHub, ok := stream.GetWebSocketHub(c)
 		if !ok {
 			t.Error("hub not found in context")
@@ -81,7 +81,7 @@ func TestGetSSEHub_NotFound(t *testing.T) {
 
 	router := fursy.New()
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		_, ok := stream.GetSSEHub[string](c)
 		if ok {
 			t.Error("expected hub not found, but got ok=true")
@@ -108,7 +108,7 @@ func TestGetSSEHub_WrongType(t *testing.T) {
 	router := fursy.New()
 	router.Use(stream.SSEHub(hub))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		// Try to get hub with wrong type (int instead of string).
 		_, ok := stream.GetSSEHub[int](c)
 		if ok {
@@ -132,7 +132,7 @@ func TestGetWebSocketHub_NotFound(t *testing.T) {
 
 	router := fursy.New()
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		_, ok := stream.GetWebSocketHub(c)
 		if ok {
 			t.Error("expected hub not found, but got ok=true")
@@ -160,7 +160,7 @@ func TestSSEHub_MultipleHandlers(t *testing.T) {
 	router.Use(stream.SSEHub(hub))
 
 	// Handler 1: Check hub exists.
-	router.GET("/handler1", func(c *fursy.Context) error {
+	router.Handle("GET", "/handler1", func(c *fursy.Context) error {
 		_, ok := stream.GetSSEHub[string](c)
 		if !ok {
 			t.Error("hub not found in handler1")
@@ -169,7 +169,7 @@ func TestSSEHub_MultipleHandlers(t *testing.T) {
 	})
 
 	// Handler 2: Check hub exists.
-	router.GET("/handler2", func(c *fursy.Context) error {
+	router.Handle("GET", "/handler2", func(c *fursy.Context) error {
 		_, ok := stream.GetSSEHub[string](c)
 		if !ok {
 			t.Error("hub not found in handler2")
@@ -205,7 +205,7 @@ func TestWebSocketHub_MultipleHandlers(t *testing.T) {
 	router.Use(stream.WebSocketHub(hub))
 
 	// Handler 1: Check hub exists.
-	router.GET("/handler1", func(c *fursy.Context) error {
+	router.Handle("GET", "/handler1", func(c *fursy.Context) error {
 		_, ok := stream.GetWebSocketHub(c)
 		if !ok {
 			t.Error("hub not found in handler1")
@@ -214,7 +214,7 @@ func TestWebSocketHub_MultipleHandlers(t *testing.T) {
 	})
 
 	// Handler 2: Check hub exists.
-	router.GET("/handler2", func(c *fursy.Context) error {
+	router.Handle("GET", "/handler2", func(c *fursy.Context) error {
 		_, ok := stream.GetWebSocketHub(c)
 		if !ok {
 			t.Error("hub not found in handler2")
@@ -251,7 +251,7 @@ func TestSSEHub_NestedGroups(t *testing.T) {
 
 	// Group /api.
 	api := router.Group("/api")
-	api.GET("/events", func(c *fursy.Context) error {
+	api.Handle("GET", "/events", func(c *fursy.Context) error {
 		_, ok := stream.GetSSEHub[string](c)
 		if !ok {
 			t.Error("hub not found in /api/events")
@@ -261,7 +261,7 @@ func TestSSEHub_NestedGroups(t *testing.T) {
 
 	// Nested group /api/v1.
 	v1 := api.Group("/v1")
-	v1.GET("/notifications", func(c *fursy.Context) error {
+	v1.Handle("GET", "/notifications", func(c *fursy.Context) error {
 		_, ok := stream.GetSSEHub[string](c)
 		if !ok {
 			t.Error("hub not found in /api/v1/notifications")
@@ -294,7 +294,7 @@ func TestSSEUpgrade_DifferentMethods(t *testing.T) {
 	router := fursy.New()
 
 	// SSE endpoint that accepts POST (unconventional but valid).
-	router.POST("/events", func(c *fursy.Context) error {
+	router.Handle("POST", "/events", func(c *fursy.Context) error {
 		return stream.SSEUpgrade(c, func(conn *sse.Conn) error {
 			// Send a test event and close.
 			return conn.SendData("test")
@@ -322,7 +322,7 @@ func TestWebSocketUpgrade_InvalidRequest(t *testing.T) {
 
 	router := fursy.New()
 
-	router.GET("/ws", func(c *fursy.Context) error {
+	router.Handle("GET", "/ws", func(c *fursy.Context) error {
 		// WebSocket requires Upgrade header.
 		return stream.WebSocketUpgrade(c, func(_ *websocket.Conn) error {
 			return nil
