@@ -492,3 +492,126 @@ func TestCORSConfig_IsPreflightAllowed(t *testing.T) {
 		}
 	})
 }
+
+// --- F4 audit fix: CORS preflight unreachable + Vary: Origin ---
+
+// TestCORS_PreflightWithoutRoute verifies that an OPTIONS preflight request
+// is handled by CORS middleware even when only GET is registered for the path.
+// Before the fix, this returned 405 because route matching failed before
+// middleware could execute.
+func TestCORS_PreflightWithoutRoute(t *testing.T) {
+	r := fursy.New()
+	r.Use(CORSWithConfig(CORSConfig{
+		AllowOrigins: "https://example.com",
+		AllowMethods: "GET,POST,PUT,DELETE",
+		AllowHeaders: "Content-Type,Authorization",
+	}))
+
+	// Only register GET — no OPTIONS handler.
+	r.Handle("GET", "/api/users", func(c *fursy.Context) error {
+		return c.String(200, "users")
+	})
+
+	// Send OPTIONS preflight.
+	req := httptest.NewRequest("OPTIONS", "/api/users", http.NoBody)
+	req.Header.Set("Origin", "https://example.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "Content-Type")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Must be 204, not 405.
+	if w.Code != http.StatusNoContent {
+		t.Errorf("OPTIONS preflight without route: want 204, got %d; body: %s", w.Code, w.Body.String())
+	}
+
+	// Must have CORS headers.
+	if w.Header().Get("Access-Control-Allow-Origin") != "https://example.com" {
+		t.Errorf("want Allow-Origin https://example.com, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+	if w.Header().Get("Access-Control-Allow-Methods") == "" {
+		t.Error("want Allow-Methods header to be set")
+	}
+}
+
+// TestCORS_PreflightWithoutRoute_NoMiddleware verifies that OPTIONS without
+// CORS middleware still returns 405 (no implicit CORS).
+func TestCORS_PreflightWithoutRoute_NoMiddleware(t *testing.T) {
+	r := fursy.New()
+
+	r.Handle("GET", "/api/users", func(c *fursy.Context) error {
+		return c.String(200, "users")
+	})
+
+	req := httptest.NewRequest("OPTIONS", "/api/users", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Without CORS middleware, OPTIONS to a GET-only route should be 405.
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Errorf("OPTIONS without middleware: want 405, got %d", w.Code)
+	}
+}
+
+// TestCORS_VaryHeader verifies that all CORS responses include Vary: Origin
+// to prevent cache poisoning.
+func TestCORS_VaryHeader(t *testing.T) {
+	t.Run("actual request", func(t *testing.T) {
+		r := fursy.New()
+		r.Use(CORS())
+
+		r.Handle("GET", "/test", func(c *fursy.Context) error {
+			return c.String(200, "OK")
+		})
+
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
+		req.Header.Set("Origin", "https://example.com")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		vary := w.Header().Get("Vary")
+		if vary != "Origin" {
+			t.Errorf("actual CORS request: want Vary=Origin, got %q", vary)
+		}
+	})
+
+	t.Run("preflight request", func(t *testing.T) {
+		r := fursy.New()
+		r.Use(CORSWithConfig(CORSConfig{
+			AllowOrigins: "https://example.com",
+		}))
+
+		r.Handle("GET", "/test", func(c *fursy.Context) error {
+			return c.String(200, "OK")
+		})
+
+		req := httptest.NewRequest("OPTIONS", "/test", http.NoBody)
+		req.Header.Set("Origin", "https://example.com")
+		req.Header.Set("Access-Control-Request-Method", "GET")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		vary := w.Header().Get("Vary")
+		if vary != "Origin" {
+			t.Errorf("preflight request: want Vary=Origin, got %q", vary)
+		}
+	})
+
+	t.Run("no origin header skips vary", func(t *testing.T) {
+		r := fursy.New()
+		r.Use(CORS())
+
+		r.Handle("GET", "/test", func(c *fursy.Context) error {
+			return c.String(200, "OK")
+		})
+
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		// No Origin header = not a CORS request, no Vary needed.
+		if w.Header().Get("Vary") != "" {
+			t.Errorf("non-CORS request should not have Vary header, got %q", w.Header().Get("Vary"))
+		}
+	})
+}

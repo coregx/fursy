@@ -164,7 +164,18 @@ type Router struct {
 
 	// shutdownMu protects shutdown callbacks from concurrent access.
 	shutdownMu sync.Mutex
+
+	// maxBodySize is the maximum allowed request body size in bytes for
+	// generic handlers (those using Box[Req, Res] with automatic binding).
+	// Default: 4MB (4 << 20). Set to 0 to disable the limit.
+	// Plain handlers (HandlerFunc) are not affected.
+	maxBodySize int64
 }
+
+const (
+	// defaultMaxBodySize is the default maximum request body size (4MB).
+	defaultMaxBodySize int64 = 4 << 20
+)
 
 // New creates a new Router instance with default configuration.
 //
@@ -178,6 +189,7 @@ func New() *Router {
 		trees:                  make(map[string]*radix.Tree),
 		handleMethodNotAllowed: true,
 		handleOPTIONS:          true,
+		maxBodySize:            defaultMaxBodySize,
 	}
 
 	// Initialize context pool.
@@ -258,6 +270,36 @@ func (r *Router) SetValidator(v Validator) *Router {
 func (r *Router) SetErrorHandler(h ErrorHandler) *Router {
 	r.errorHandler = h
 	return r
+}
+
+// SetMaxBodySize sets the maximum allowed request body size in bytes for
+// generic handlers (Box[Req, Res] with automatic binding).
+//
+// When a request body exceeds this limit, the binding step returns
+// an error that is mapped to 413 Payload Too Large by the default
+// error handler.
+//
+// The default limit is 4MB (4 << 20). Set to 0 to disable the limit.
+// Plain handlers (HandlerFunc) are not affected by this setting.
+//
+// Example:
+//
+//	router := fursy.New()
+//	router.SetMaxBodySize(1 << 20)  // 1MB limit
+//
+//	router.POST("/upload", func(c *Box[UploadReq, UploadRes]) error {
+//	    // Bodies larger than 1MB will be rejected with 413
+//	    return c.OK(UploadRes{OK: true})
+//	})
+func (r *Router) SetMaxBodySize(size int64) *Router {
+	r.maxBodySize = size
+	return r
+}
+
+// MaxBodySize returns the current maximum body size limit in bytes.
+// Returns 0 if the limit is disabled.
+func (r *Router) MaxBodySize() int64 {
+	return r.maxBodySize
 }
 
 // WithInfo sets the API metadata for OpenAPI generation.
@@ -678,6 +720,13 @@ func defaultErrorHandler(c *Context, err error) {
 		return
 	}
 
+	// MaxBytesError → 413 Payload Too Large.
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		_ = c.String(http.StatusRequestEntityTooLarge, "Request Entity Too Large")
+		return
+	}
+
 	// Binding errors → 400 or 415.
 	if errors.Is(err, binding.ErrUnsupportedMediaType) {
 		_ = c.String(http.StatusUnsupportedMediaType, "Unsupported Media Type")
@@ -702,6 +751,29 @@ func defaultErrorHandler(c *Context, err error) {
 
 // handleNotFound sends a 404 or 405 response depending on configuration.
 func (r *Router) handleNotFound(c *Context, w http.ResponseWriter, req *http.Request, path string) {
+	// F4 fix: if OPTIONS and handleOPTIONS enabled and the path exists for
+	// other methods, run middleware chain with an empty handler so CORS
+	// middleware can respond to the preflight. Without this, OPTIONS
+	// requests to paths without an explicit OPTIONS route get 405 and
+	// middleware never executes.
+	if req.Method == http.MethodOptions && r.handleOPTIONS &&
+		len(r.middleware) > 0 && r.pathExistsInOtherMethods(path, req.Method) {
+		c.init(w, req, r, nil)
+		c.handlers = c.handlers[:0]
+		c.handlers = append(c.handlers, r.middleware...)
+		// Terminal no-op handler: if no middleware writes a response,
+		// return 204 (successful OPTIONS with no body).
+		c.handlers = append(c.handlers, func(ctx *Context) error {
+			return ctx.NoContent(http.StatusNoContent)
+		})
+		c.index = -1
+		c.aborted = false
+		if err := c.Next(); err != nil {
+			r.handleError(c, err)
+		}
+		return
+	}
+
 	if r.handleMethodNotAllowed && r.pathExistsInOtherMethods(path, req.Method) {
 		c.init(w, req, r, nil)
 		_ = c.String(http.StatusMethodNotAllowed, "Method Not Allowed")
