@@ -63,6 +63,10 @@ type RateLimitConfig struct {
 	// Default: true (always enabled, recommended by RFC)
 	Headers bool
 
+	// NoHeaders disables X-RateLimit-* response headers.
+	// Takes precedence over Headers when true.
+	NoHeaders bool
+
 	// MaxKeys is the maximum number of keys to store in memory.
 	// Prevents memory exhaustion from key explosion.
 	// When exceeded, oldest keys are evicted (LRU).
@@ -88,6 +92,40 @@ type RateLimitStore interface {
 
 	// Cleanup removes expired limiters (optional, for memory management).
 	Cleanup(expireAfter time.Duration)
+}
+
+// RateLimiter wraps a rate-limiting handler with lifecycle management.
+// Use NewRateLimiter to create, Handler() to get the middleware, Stop() to
+// release the cleanup goroutine when the limiter is no longer needed.
+type RateLimiter struct {
+	handler fursy.HandlerFunc
+	store   RateLimitStore
+}
+
+// NewRateLimiter creates a RateLimiter with exported Stop for cleanup.
+func NewRateLimiter(config RateLimitConfig) *RateLimiter {
+	rl := &RateLimiter{}
+	if config.Store == nil {
+		store := newInMemoryStore(config.MaxKeys)
+		config.Store = store
+		rl.store = store
+	} else {
+		rl.store = config.Store
+	}
+	rl.handler = RateLimitWithConfig(config)
+	return rl
+}
+
+// Handler returns the middleware HandlerFunc for use with router.Use().
+func (rl *RateLimiter) Handler() fursy.HandlerFunc {
+	return rl.handler
+}
+
+// Stop releases the cleanup goroutine. Safe to call multiple times.
+func (rl *RateLimiter) Stop() {
+	if ms, ok := rl.store.(*inMemoryStore); ok {
+		ms.Stop()
+	}
 }
 
 // inMemoryStore is the default in-memory store for rate limiters.
@@ -308,9 +346,9 @@ func RateLimitWithConfig(config RateLimitConfig) fursy.HandlerFunc {
 		config.ErrorHandler = defaultRateLimitErrorHandler
 	}
 
-	// Headers always enabled (RFC-compliant) unless explicitly disabled.
-	if !config.Headers {
-		// Enable headers by default.
+	if config.NoHeaders {
+		config.Headers = false
+	} else if !config.Headers {
 		config.Headers = true
 	}
 
