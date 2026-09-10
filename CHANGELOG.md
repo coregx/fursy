@@ -8,8 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Go 1.27 upgrade with generic methods on Router (v0.5.0)
-- Zero-allocation static route lookup (v0.5.0)
+- ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
+
+## [0.5.0] - 2026-09-10
+
+### Added
+- **Go 1.27 Generic Methods on Router** — first Go HTTP router with native generic methods. `router.POST("/users", handler)` with type inference from handler signature. No explicit `[Req, Res]` needed at call site.
+- **Generic Methods on RouteGroup** — `group.POST("/users", handler)` with same type inference
+- **`Contains()` method on radix Tree** — zero-alloc existence check for 405 responses
+
+### Changed
+- **Go 1.27 required** (was 1.25) — needed for generic methods on concrete types
+- **Breaking: non-generic verb methods removed** — `router.GET(path, HandlerFunc)` replaced by `router.Handle("GET", path, handler)`. Same for Group.
+- **Package-level functions deprecated** — `fursy.POST[Req,Res](router, ...)` still works but deprecated; use `router.POST(path, handler)` instead
+- **Dependency bump** — golang.org/x/time v0.15.0 → v0.16.0
+- **CI updated** — Go 1.27, removed obsolete `GOEXPERIMENT=jsonv2` (now default in Go 1.27)
+
+### Performance
+- **Zero-allocation routing** — caller-provided param buffer from `sync.Pool`:
+  - Static: 256 ns → **53 ns** (4.8x faster), 1 alloc → **0 alloc**
+  - Parametric: 326 ns → **64 ns** (5.1x faster), 0 alloc
+  - Root path: 256 ns → **46 ns** (5.6x faster), 0 alloc
+  - Wildcard: 539 ns → **58 ns** (9.3x faster), 0 alloc
+  - Deep nesting (4 params): 561 ns → **143 ns** (3.9x faster), 0 alloc
 
 ## [0.4.1] - 2026-09-10
 

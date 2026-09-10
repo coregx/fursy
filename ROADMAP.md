@@ -3,7 +3,7 @@
 > **Strategic Advantage**: Modern Go 1.25+ features + proven routing patterns!
 > **Approach**: Combine best practices from httprouter, Gin, Echo with type-safe generics
 
-**Last Updated**: 2026-09-10 | **Current Version**: v0.4.1 (Production Ready + 94.6% Coverage) | **Phase**: Phase 4 In Progress (Ecosystem) | **Target**: v1.0.0 LTS (TBD, after full API stabilization)
+**Last Updated**: 2026-09-10 | **Current Version**: v0.5.0 (Go 1.27 Generic Methods + Zero-Alloc) | **Phase**: Phase 4 In Progress (Ecosystem) | **Target**: v1.0.0 LTS (TBD, after full API stabilization)
 
 ---
 
