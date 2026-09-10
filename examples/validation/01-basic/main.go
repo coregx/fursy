@@ -52,13 +52,7 @@ func main() {
 
 // createUser handles user creation with automatic validation.
 func createUser(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-	// Bind request body and validate automatically.
-	// If validation fails, returns RFC 9457 Problem Details.
-	if err := c.Bind(); err != nil {
-		return err
-	}
-
-	// ReqBody is now validated and type-safe!
+	// ReqBody is automatically bound and validated.
 	req := c.ReqBody
 
 	// Simulate user creation (in real app, save to database).

@@ -55,15 +55,11 @@ func main() {
     // Set validator plugin (one line!)
     router.SetValidator(validator.New())
 
-    // Use type-safe handlers - validation is automatic!
+    // Use type-safe handlers - binding and validation are automatic!
     router.POST[CreateUserRequest, UserResponse]("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-        // c.Bind() automatically validates using struct tags
-        if err := c.Bind(); err != nil {
-            // Returns RFC 9457 Problem Details with validation errors
-            return err
-        }
-
-        // ReqBody is validated and type-safe!
+        // Binding and validation happen automatically using struct tags.
+        // If validation fails, an RFC 9457 Problem Details error is returned.
+        // c.ReqBody is already parsed, validated, and type-safe!
         user := createUser(c.ReqBody)
         return c.Created("/users/"+user.ID, user)
     })
@@ -276,8 +272,8 @@ if err != nil {
 ```go
 func ValidateMiddleware() fursy.HandlerFunc {
     return func(c *fursy.Context) error {
-        // Validation happens automatically in c.Bind()
-        // This middleware can add extra checks
+        // Binding and validation happen automatically.
+        // This middleware can add extra checks before/after the handler.
         return c.Next()
     }
 }
@@ -287,21 +283,14 @@ router.Use(ValidateMiddleware())
 
 ### Manual Validation
 
+For cases where you need to validate data outside the automatic binding flow:
+
 ```go
 router.POST[CreateUserRequest, UserResponse]("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-    // Option 1: Automatic validation via Bind
-    if err := c.Bind(); err != nil {
-        return err
-    }
-
-    // Option 2: Manual validation
-    req := new(CreateUserRequest)
-    if err := c.BindJSON(req); err != nil {
-        return err
-    }
-
-    // Manually validate
-    if err := c.Router().Validator().Validate(req); err != nil {
+    // Binding and validation happen automatically — c.ReqBody is ready to use.
+    // For manual validation of additional data, use the validator directly:
+    extraData := new(SomeOtherStruct)
+    if err := c.Router().Validator().Validate(extraData); err != nil {
         return err
     }
 

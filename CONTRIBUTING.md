@@ -2,123 +2,51 @@
 
 Thank you for considering contributing to FURSY! This document outlines the development workflow and guidelines.
 
-## Git Workflow (Git-Flow)
+## Git Workflow (GitHub Flow)
 
-This project uses Git-Flow branching model for development.
+This project uses GitHub Flow — a simple branch-based workflow.
 
 ### Branch Structure
 
 ```
 main                 # Production-ready code (tagged releases)
-  └─ develop         # Integration branch for next release
-       ├─ feature/*  # New features
-       ├─ bugfix/*   # Bug fixes
-       └─ hotfix/*   # Critical fixes from main
+  ├─ feat/*          # New features
+  ├─ fix/*           # Bug fixes
+  └─ chore/*         # Maintenance (deps, docs, CI)
 ```
 
-### Branch Purposes
+### Rules
 
-- **main**: Production-ready code. Only releases are merged here.
-- **develop**: Active development branch. All features merge here first.
-- **feature/\***: New features. Branch from `develop`, merge back to `develop`.
-- **bugfix/\***: Bug fixes. Branch from `develop`, merge back to `develop`.
-- **hotfix/\***: Critical production fixes. Branch from `main`, merge to both `main` and `develop`.
+- **`main`** is the only long-lived branch. All PRs target `main`.
+- **Never push directly to `main`** — all changes go through Pull Requests.
+- Small, self-contained changes (typos, dep bumps) can be a single commit.
+- Larger features should use a feature branch.
 
-### Workflow Commands
-
-#### Starting a New Feature
+### Contributing a Feature or Fix
 
 ```bash
-# Create feature branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b feature/my-new-feature
+# 1. Fork the repo and clone your fork
+git clone https://github.com/YOUR_USERNAME/fursy.git
+cd fursy
 
-# Work on your feature...
+# 2. Create a branch from main
+git checkout main
+git pull origin main
+git checkout -b feat/my-new-feature
+
+# 3. Work on your changes...
 git add .
 git commit -m "feat: add my new feature"
 
-# When done, merge back to develop
-git checkout develop
-git merge --no-ff feature/my-new-feature
-git branch -d feature/my-new-feature
-git push origin develop
+# 4. Push to your fork
+git push origin feat/my-new-feature
+
+# 5. Open a Pull Request targeting main on coregx/fursy
 ```
 
-#### Fixing a Bug
+### After PR is Merged
 
-```bash
-# Create bugfix branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b bugfix/fix-issue-123
-
-# Fix the bug...
-git add .
-git commit -m "fix: resolve issue #123"
-
-# Merge back to develop
-git checkout develop
-git merge --no-ff bugfix/fix-issue-123
-git branch -d bugfix/fix-issue-123
-git push origin develop
-```
-
-#### Creating a Release
-
-```bash
-# Create release branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b release/v0.4.0
-
-# Update version numbers, CHANGELOG, etc.
-git add .
-git commit -m "chore: prepare release v0.4.0"
-
-# Merge to main and tag
-git checkout main
-git merge --no-ff release/v0.4.0
-git tag -a v0.4.0 -m "Release v0.4.0"
-
-# Merge back to develop
-git checkout develop
-git merge --no-ff release/v0.4.0
-
-# Delete release branch
-git branch -d release/v0.4.0
-
-# Push everything
-git push origin main develop --tags
-```
-
-#### Hotfix (Critical Production Bug)
-
-```bash
-# Create hotfix branch from main
-git checkout main
-git pull origin main
-git checkout -b hotfix/critical-bug
-
-# Fix the bug...
-git add .
-git commit -m "fix: critical production bug"
-
-# Merge to main and tag
-git checkout main
-git merge --no-ff hotfix/critical-bug
-git tag -a v0.3.1 -m "Hotfix v0.3.1"
-
-# Merge to develop
-git checkout develop
-git merge --no-ff hotfix/critical-bug
-
-# Delete hotfix branch
-git branch -d hotfix/critical-bug
-
-# Push everything
-git push origin main develop --tags
-```
+Your branch is automatically deleted. Tags and releases are created by maintainers.
 
 ## Semantic Versioning
 
@@ -167,7 +95,7 @@ docs: update README with OpenAPI examples
 refactor(radix): simplify tree traversal logic
 test(middleware): add benchmarks for chain execution
 perf(pool): optimize context pooling strategy
-chore: update golangci-lint to v1.60
+chore: update golangci-lint to v2.13
 ```
 
 ## Code Quality Standards
@@ -177,14 +105,10 @@ chore: update golangci-lint to v1.60
 Run the pre-commit checks:
 
 ```bash
-bash scripts/pre-release-check.sh
+gofmt -l .                  # Verify formatting (must be empty)
+golangci-lint run            # Lint (0 issues required)
+go test ./...                # Run tests
 ```
-
-This script runs:
-1. `go fmt ./...` - Format code
-2. `golangci-lint run` - Lint code
-3. `go test -race -coverprofile=coverage.txt ./...` - Run tests with race detector
-4. Coverage check (>85% for Phase 1, >90% for Phase 2+)
 
 ### Pull Request Requirements
 
@@ -196,7 +120,6 @@ This script runs:
 - [ ] Documentation updated (if applicable)
 - [ ] Commit messages follow Conventional Commits
 - [ ] No sensitive data (credentials, tokens, etc.)
-- [ ] Uses `encoding/json/v2` (NOT `encoding/json`)
 - [ ] Uses `log/slog` for logging
 - [ ] No external dependencies in core package
 
@@ -258,32 +181,38 @@ fursy/
 ├── .github/
 │   └── workflows/        # CI/CD pipelines
 ├── docs/                 # Public documentation
+│   └── PERFORMANCE.md   # Benchmark results
 ├── examples/             # Usage examples
-│   ├── hello-world/
-│   └── rest-api/
+│   ├── 01-hello-world/
+│   ├── 02-rest-api-crud/
+│   ├── validation/      # Validation examples (01-basic through 06-production)
+│   └── ...              # More examples (middleware, SSE, WebSocket, DB)
 ├── internal/             # Internal implementation (not in Go docs)
 │   ├── radix/           # Radix tree routing engine
-│   └── pool/            # Context pooling
-├── middleware/           # Built-in middleware
-│   ├── logger/
-│   ├── recovery/
-│   ├── cors/
-│   ├── ratelimit/
-│   └── auth/
+│   ├── binding/         # Request body binding (JSON, XML, form)
+│   ├── negotiate/       # Content negotiation
+│   └── validation/      # Validation internals
+├── middleware/           # Built-in middleware (flat package, not subdirs)
+│   ├── logger.go        # log/slog logging
+│   ├── recovery.go      # Panic recovery
+│   ├── cors.go          # CORS headers
+│   ├── basicauth.go     # Basic authentication
+│   ├── jwt.go           # JWT authentication
+│   ├── ratelimit.go     # Rate limiting
+│   ├── circuitbreaker.go # Circuit breaker
+│   └── secure.go        # Security headers (OWASP)
 ├── plugins/              # Optional plugins (can have dependencies)
-│   ├── opentelemetry/
-│   ├── validator/
-│   └── openapi/
-├── scripts/              # Development scripts
-│   └── pre-release-check.sh
-├── router.go             # Public API - Router (wrapper over internal/radix)
-├── context.go            # Public API - Context (HTTP context)
-├── box.go                # Public API - Box[Req, Res] (type-safe container)
-├── handler.go            # Public API - Handler types
-├── group.go              # Public API - Route groups
-├── error.go              # Public API - RFC 9457 Problem Details
-├── CONTRIBUTING.md       # This file
-├── README.md             # Main documentation
+│   ├── opentelemetry/   # Tracing + metrics
+│   ├── validator/       # go-playground/validator integration
+│   ├── stream/          # SSE + WebSocket
+│   └── database/        # SQL with transactions
+├── router.go             # Public API - Router
+├── context.go            # Public API - Context (non-generic)
+├── box.go                # Public API - Box[Req, Res] (type-safe generic context)
+├── handler_generic.go    # Generic handler adapter
+├── group.go              # Route groups
+├── problem.go            # RFC 9457 Problem Details
+├── openapi.go            # OpenAPI 3.1 generation
 └── go.mod                # Go module
 ```
 
@@ -295,13 +224,15 @@ FURSY uses a **wrapper architecture** to keep the public API clean:
 
 ```
 github.com/coregx/fursy/          ← Public API (in Go docs)
-├── router.go                    ← Wrapper over internal/radix
-├── context.go                   ← Public API
-└── handler.go                   ← Public types
+├── router.go                    ← Router + route registration
+├── context.go                   ← Non-generic HTTP context
+├── box.go                       ← Box[Req, Res] generic context
+└── problem.go                   ← RFC 9457 Problem Details
 
 github.com/coregx/fursy/internal/ ← Implementation (NOT in Go docs)
-├── radix/                       ← Real routing implementation
-└── pool/                        ← Context pooling
+├── radix/                       ← Radix tree routing engine
+├── binding/                     ← Request body binding
+└── negotiate/                   ← Content negotiation
 ```
 
 **Why?**
@@ -334,14 +265,14 @@ type Box[Req, Res any] struct {
 
 1. Check if issue exists, if not create one
 2. Discuss approach in the issue
-3. Create feature branch from `develop`
+3. Create feature branch from `main`
 4. Write tests FIRST (TDD approach)
 5. Implement feature
 6. Add benchmarks for performance-critical code
 7. Update documentation
-8. Run quality checks (`bash scripts/pre-release-check.sh`)
-9. Create pull request to `develop`
-10. Wait for code review
+8. Run quality checks (`gofmt -l . && golangci-lint run && go test ./...`)
+9. Create pull request targeting `main`
+10. Wait for code review and CI
 11. Address feedback
 12. Merge when approved
 
@@ -366,17 +297,7 @@ type Box[Req, Res any] struct {
 
 ### Required Standards
 
-#### 1. Use encoding/json/v2
-
-```go
-// ✅ CORRECT
-import "encoding/json/v2"
-
-// ❌ WRONG - Do NOT use old version
-import "encoding/json"
-```
-
-#### 2. Use log/slog
+#### 1. Use log/slog
 
 ```go
 import "log/slog"
@@ -389,12 +310,12 @@ slog.Info("request processed",
 )
 ```
 
-#### 3. Error Handling with RFC 9457
+#### 2. Error Handling with RFC 9457
 
 ```go
-// Always use RFC 9457 Problem Details
-return c.Error(404, fursy.NotFound("User not found"))
-return c.Error(400, fursy.BadRequest("Invalid email"))
+// Use RFC 9457 Problem Details
+return c.Problem(fursy.NotFound("User not found"))
+return c.Problem(fursy.BadRequest("Invalid email"))
 ```
 
 ### Testing
@@ -410,7 +331,7 @@ return c.Error(400, fursy.BadRequest("Invalid email"))
 Performance is a core goal. Always benchmark critical paths:
 
 ```go
-func BenchmarkRouter_SimpleRoute(b *testing.B) {
+func BenchmarkRouter_StaticRoute(b *testing.B) {
     r := New()
     r.GET("/users/:id", handler)
 
@@ -437,20 +358,18 @@ func BenchmarkRouter_SimpleRoute(b *testing.B) {
 - Read documentation in `docs/`
 - Review examples in `examples/`
 - Ask questions in GitHub Issues
-- Check [.claude/STATUS.md](.claude/STATUS.md) for current project status
 
 ## Performance Benchmarking
 
-FURSY prioritizes performance. See [PERFORMANCE.md](PERFORMANCE.md) for:
+FURSY prioritizes performance. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for:
 - Current benchmark results
 - Performance optimization techniques
 - Comparison with other routers
 
-**Current metrics** (Phase 3):
+**Current metrics** (v0.4.0):
 - Static routes: 256 ns/op, 1 alloc/op
 - Parametric routes: 326 ns/op, 1 alloc/op
-- Deep nesting (4 params): 561 ns/op, 1 alloc/op
-- Coverage: 91.7%
+- Coverage: 94.6%
 
 ## License
 

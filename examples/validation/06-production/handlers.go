@@ -28,11 +28,7 @@ func init() {
 // HandleLogin handles user login and returns JWT token.
 func HandleLogin(cfg *Config) fursy.Handler[LoginRequest, LoginResponse] {
 	return func(c *fursy.Box[LoginRequest, LoginResponse]) error {
-		// Validate request.
-		if err := c.Bind(); err != nil {
-			return err
-		}
-
+		// ReqBody is automatically bound and validated.
 		req := c.ReqBody
 
 		// Find user by email (simplified - in real app, check password hash).
@@ -71,11 +67,7 @@ func HandleLogin(cfg *Config) fursy.Handler[LoginRequest, LoginResponse] {
 
 // HandleCreateUser handles user creation (admin only).
 func HandleCreateUser(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-	// Validate request.
-	if err := c.Bind(); err != nil {
-		return err
-	}
-
+	// ReqBody is automatically bound and validated.
 	req := c.ReqBody
 
 	// Check if user already exists.
@@ -141,11 +133,7 @@ func HandleGetProfile(c *fursy.Box[fursy.Empty, UserResponse]) error {
 
 // HandleUpdateProfile updates current user's profile.
 func HandleUpdateProfile(c *fursy.Box[UpdateProfileRequest, UserResponse]) error {
-	// Validate request.
-	if err := c.Bind(); err != nil {
-		return err
-	}
-
+	// ReqBody is automatically bound and validated.
 	req := c.ReqBody
 
 	// Get user ID from context.

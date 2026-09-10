@@ -71,11 +71,7 @@ func main() {
 }
 
 func createUser(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-	// Bind and validate - errors use custom messages!
-	if err := c.Bind(); err != nil {
-		return err
-	}
-
+	// ReqBody is automatically bound and validated.
 	req := c.ReqBody
 
 	// Simulate user creation.

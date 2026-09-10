@@ -64,11 +64,7 @@ func main() {
 }
 
 func createUser(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-	// Bind request body and validate nested structures automatically.
-	if err := c.Bind(); err != nil {
-		return err
-	}
-
+	// ReqBody is automatically bound and validated.
 	req := c.ReqBody
 
 	// Simulate user creation.

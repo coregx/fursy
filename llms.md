@@ -158,10 +158,7 @@ func CreateUser(c *gin.Context) {
 **fursy approach** (type-safe):
 ```go
 func CreateUser(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-    if err := box.Bind(); err != nil {
-        return err  // Automatic RFC 9457 error
-    }
-    // box.ReqBody is VALIDATED and type-safe!
+    // box.ReqBody is automatically bound, validated, and type-safe!
     user := createUser(box.ReqBody)
     return box.Created("/users/"+user.ID, user)
 }
@@ -172,7 +169,7 @@ func CreateUser(box *fursy.Box[CreateUserRequest, UserResponse]) error {
 // Generic context
 type Box[Req, Res any] struct {
     *Context          // Embedded base context
-    ReqBody *Req      // Validated request (after Bind())
+    ReqBody *Req      // Automatically bound and validated request body
     ResBody *Res      // Response to serialize
 }
 
@@ -432,12 +429,7 @@ type UserResponse struct {
 // Type-safe handler
 router.POST[CreateUserRequest, UserResponse]("/users",
     func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-        // Bind and validate request
-        if err := box.Bind(); err != nil {
-            return err  // Automatic RFC 9457 response
-        }
-
-        // box.ReqBody is type-safe and validated!
+        // box.ReqBody is automatically bound, type-safe, and validated!
         user := createUser(box.ReqBody)
 
         // Type-safe response
@@ -546,13 +538,13 @@ type CreateUserRequest struct {
     Password string `json:"password" validate:"required,min=8"`
 }
 
-// Handler - validation is automatic!
+// Handler - binding and validation are automatic!
 router.POST[CreateUserRequest, UserResponse]("/users",
     func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-        if err := box.Bind(); err != nil {
-            return err  // Returns 422 with RFC 9457 error details
-        }
-        // box.ReqBody is validated! ✅
+        // box.ReqBody is automatically bound and validated! ✅
+        // If validation fails, RFC 9457 error (422) is returned before handler runs.
+        user := createUser(box.ReqBody)
+        return box.Created("/users/"+user.ID, user)
     })
 ```
 
@@ -626,10 +618,7 @@ type UserResponse struct {
 
 router.GET[GetUserRequest, UserResponse]("/users/:id",
     func(box *fursy.Box[GetUserRequest, UserResponse]) error {
-        if err := box.Bind(); err != nil {
-            return err
-        }
-
+        // ReqBody is automatically bound and validated
         user := getUserByID(box.ReqBody.ID)
         return box.OK(user)
     })
@@ -815,8 +804,10 @@ go test -bench=. -benchmem ./...
 # Lint (MUST be 0 issues!)
 golangci-lint run
 
-# Pre-release check (all validations)
-bash scripts/pre-release-check.sh
+# Pre-release checks
+gofmt -l .
+golangci-lint run
+go test ./...
 ```
 
 ### Test Structure
@@ -881,14 +872,13 @@ func BenchmarkRouter_StaticRoute(b *testing.B) {
 
 ### Branching Model
 
-**Git-flow pattern**:
+**GitHub Flow** (single main branch):
 
 ```bash
 main          # Production releases (v1.0.0, v1.1.0, etc.)
-  ├── develop # Development branch (default)
-      ├── feature/TASK-XXX-description
-      ├── bugfix/issue-123
-      └── hotfix/critical-fix
+  ├── feature/TASK-XXX-description
+  ├── bugfix/issue-123
+  └── hotfix/critical-fix
 ```
 
 ### Commit Convention
@@ -929,9 +919,7 @@ perf(radix): optimize parameter extraction
 
 ### Merge Strategy
 
-**feature → develop**: Squash merge
-**bugfix → develop**: Squash merge
-**develop → main**: --no-ff merge (preserve history)
+**feature → main**: Squash merge via PR
 
 ---
 
@@ -1212,7 +1200,7 @@ router.Use(middleware.Secure(middleware.SecureConfig{
 **`context_generic.go`**:
 - Generic Box[Req, Res] type
 - Type-safe request/response
-- Bind() for validation
+- Automatic binding and validation
 - Generic convenience methods
 
 ### Handlers
@@ -1462,19 +1450,18 @@ router.DELETE[Empty, Empty]("/users/:id",
     })
 ```
 
-### 11. Bind() is required for validation
+### 11. ReqBody is automatically bound — no manual Bind() needed
+
+The framework's `adaptGenericHandler` calls `Bind()` automatically before your handler runs.
+`ReqBody` is already populated and validated when your handler executes.
 
 ```go
 router.POST[CreateUserRequest, UserResponse]("/users",
     func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-        // ❌ WRONG: Accessing ReqBody before Bind()
-        // user := box.ReqBody  // nil!
-
-        // ✅ CORRECT: Bind first
-        if err := box.Bind(); err != nil {
-            return err
-        }
-        user := box.ReqBody  // Now populated and validated!
+        // ✅ CORRECT: ReqBody is already bound and validated
+        req := box.ReqBody
+        user := createUser(req)
+        return box.Created("/users/"+user.ID, user)
     })
 ```
 
@@ -1524,7 +1511,7 @@ router.Use(middleware.Recovery())
 
 1. **Create feature branch**:
    ```bash
-   git checkout develop
+   git checkout main
    git checkout -b feature/TASK-XXX-description
    ```
 
@@ -1571,7 +1558,7 @@ router.Use(middleware.Recovery())
 8. **Push and merge**:
    ```bash
    git push origin feature/TASK-XXX-description
-   # Create PR to develop (squash merge)
+   # Create PR to main (squash merge)
    ```
 
 ### Pre-Release Checklist
@@ -1580,12 +1567,10 @@ router.Use(middleware.Recovery())
 
 ```bash
 # Full validation
-bash scripts/pre-release-check.sh
-
-# Includes:
-# - All tests
-# - Race detector
-# - Coverage check
+gofmt -l .                    # Formatting
+golangci-lint run              # Linting (0 issues)
+go test -race ./...            # Tests + race detector
+go test -coverprofile=c.out ./... # Coverage check
 # - Linter
 # - Build verification
 ```
@@ -1617,9 +1602,6 @@ go test -bench=. -benchmem ./...          # Benchmarks
 
 # Linting
 golangci-lint run                          # Lint (MUST be 0 issues) ⭐
-
-# Pre-release
-bash scripts/pre-release-check.sh          # Full validation ⭐
 
 # Build
 go build ./...                             # All packages

@@ -638,14 +638,9 @@ func (c *Context) GetBool(key string) bool {
 //	    WithExtension("field", "email").
 //	    WithExtension("reason", "already exists"))
 //
-// For validation errors, use ValidationProblem:
-//
-//	if err := c.Bind(); err != nil {
-//	    if verr, ok := err.(ValidationErrors); ok {
-//	        return c.Problem(ValidationProblem(verr))
-//	    }
-//	    return c.Problem(BadRequest(err.Error()))
-//	}
+// Binding and validation errors are handled automatically by the
+// generic handler adapter. If you need custom error handling, check
+// the error returned by your handler logic instead.
 func (c *Context) Problem(p Problem) error {
 	// Set proper Content-Type for RFC 9457.
 	c.Response.Header().Set("Content-Type", "application/problem+json; charset=utf-8")

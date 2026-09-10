@@ -27,7 +27,7 @@ A minimal example demonstrating basic validation with a single POST endpoint.
 **What you'll learn**:
 - Setting up validator plugin
 - Using validation struct tags
-- Automatic validation with `c.Bind()`
+- Automatic binding and validation
 - RFC 9457 error responses
 
 **Run**:
@@ -233,14 +233,11 @@ type UserResponse struct {
     Email string `json:"email"`
 }
 
-// Type-safe handler with automatic validation
+// Type-safe handler with automatic binding and validation
 router.POST[CreateUserRequest, UserResponse]("/users",
     func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-        if err := c.Bind(); err != nil {
-            return err // Returns RFC 9457 validation errors
-        }
-
-        // ReqBody is validated and type-safe!
+        // Binding and validation happen automatically!
+        // c.ReqBody is already parsed, validated, and type-safe
         user := createUser(c.ReqBody)
         return c.JSON(200, user)
     },
@@ -249,7 +246,7 @@ router.POST[CreateUserRequest, UserResponse]("/users",
 
 ### Automatic Validation
 
-Validation happens automatically when you call `c.Bind()`:
+Binding and validation happen automatically before your handler runs:
 
 1. Request body is parsed (JSON/XML/Form)
 2. Data is unmarshaled into `Req` type
@@ -276,7 +273,7 @@ Validation works seamlessly with middleware:
 router.Use(middleware.Logger())
 router.Use(middleware.Recovery())
 
-// Validation happens in handler via c.Bind()
+// Binding and validation happen automatically
 router.POST[Req, Res]("/api/users", handler)
 ```
 
@@ -306,14 +303,7 @@ Validation errors respect Accept header:
    router.SetValidator(validator.New())
    ```
 
-2. **Ensure c.Bind() is called**:
-   ```go
-   if err := c.Bind(); err != nil {
-       return err
-   }
-   ```
-
-3. **Verify struct tags are correct**:
+2. **Verify struct tags are correct**:
    ```go
    type User struct {
        Email string `validate:"required,email"` // Correct

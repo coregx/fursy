@@ -311,11 +311,8 @@ router.GET[fursy.Empty, UserResponse]("/users/:id", h.GetUser)
 
 **Validation Errors** (automatic):
 
-```go
-if err := c.Bind(); err != nil {
-    return err  // Returns 422 with validation errors
-}
-```
+Binding and validation happen automatically before your handler runs.
+If validation fails, a 422 response with RFC 9457 error details is returned.
 
 **Business Logic Errors**:
 

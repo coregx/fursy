@@ -727,11 +727,8 @@ With FURSY's **type-safe handlers**, validation is **automatic and guaranteed**:
 // ✅ Automatic validation (FURSY)
 router.POST[CreateUserRequest, UserResponse]("/users",
     func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-        if err := c.Bind(); err != nil {
-            return err  // Automatic RFC 9457 error response
-        }
-
-        // c.ReqBody is ALREADY validated! ✅
+        // Binding and validation happen automatically!
+        // c.ReqBody is ALREADY parsed and validated ✅
         user := createUser(c.ReqBody)
         return c.Created("/users/"+user.ID, user)
     })
@@ -771,14 +768,11 @@ func main() {
     // Set validator once - applies to ALL handlers
     router.SetValidator(validator.New())
 
-    // Type-safe handler with automatic validation
+    // Type-safe handler with automatic binding and validation
     router.POST[CreateUserRequest, UserResponse]("/users",
         func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-            if err := c.Bind(); err != nil {
-                return err  // Automatic RFC 9457 response
-            }
-
-            // c.ReqBody is validated and type-safe!
+            // Binding and validation happen automatically!
+            // c.ReqBody is already parsed, validated, and type-safe
             user := createUser(c.ReqBody)
             return c.Created("/users/"+user.ID, user)
         })
@@ -1218,7 +1212,6 @@ Features           OpenAPI          DDD Boilerplate
 We welcome contributions! Please see:
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Development workflow and guidelines
-- [RELEASE_GUIDE.md](RELEASE_GUIDE.md) - Release process
 - [SECURITY.md](SECURITY.md) - Security policy
 
 **Development Requirements**:
