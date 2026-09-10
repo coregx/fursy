@@ -55,7 +55,7 @@ func TestTree_ParamWithMultipleStaticChildren(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			value, params, found := tree.Lookup(tt.path)
+			value, params, found := tree.Lookup(tt.path, nil)
 			if !found || value == nil {
 				t.Fatalf("Expected route %s to be found", tt.path)
 			}
@@ -114,7 +114,7 @@ func TestTree_NestedParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			value, params, found := tree.Lookup(tt.path)
+			value, params, found := tree.Lookup(tt.path, nil)
 			if !found || value == nil {
 				t.Fatalf("Expected route %s to be found", tt.path)
 			}
@@ -170,7 +170,7 @@ func TestTree_AlternatingParamStatic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			value, params, found := tree.Lookup(tt.path)
+			value, params, found := tree.Lookup(tt.path, nil)
 
 			if tt.wantFound && (!found || value == nil) {
 				t.Errorf("Lookup(%q) expected to find route, but got nil", tt.path)
@@ -228,7 +228,7 @@ func TestTree_ParamWithLongStaticTail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			value, params, found := tree.Lookup(tt.path)
+			value, params, found := tree.Lookup(tt.path, nil)
 
 			if tt.wantFound && (!found || value == nil) {
 				t.Errorf("Lookup(%q) expected to find route", tt.path)
@@ -284,7 +284,7 @@ func TestTree_ConsecutiveParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			value, params, found := tree.Lookup(tt.path)
+			value, params, found := tree.Lookup(tt.path, nil)
 
 			if tt.wantFound && (!found || value == nil) {
 				t.Errorf("Lookup(%q) expected to find route", tt.path)
@@ -346,7 +346,7 @@ func TestTree_StaticVsParam(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			value, params, found := tree.Lookup(tt.path)
+			value, params, found := tree.Lookup(tt.path, nil)
 
 			if !found || value == nil {
 				t.Fatalf("Lookup(%q) expected to find route", tt.path)

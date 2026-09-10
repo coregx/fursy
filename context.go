@@ -14,6 +14,7 @@ import (
 	"net/http"
 
 	"github.com/coregx/fursy/internal/negotiate"
+	"github.com/coregx/fursy/internal/radix"
 )
 
 // NOTE: This package provides two context types:
@@ -69,6 +70,10 @@ type Context struct {
 	// Pre-allocated with capacity 8 to avoid allocations for typical routes.
 	params []Param
 
+	// radixBuf is a pre-allocated buffer for radix tree Lookup results.
+	// Passed to Lookup() to avoid heap allocation on every request.
+	radixBuf []radix.Param
+
 	// query is a lazy-loaded cache of parsed query parameters.
 	query map[string][]string
 
@@ -98,6 +103,7 @@ func newContext() *Context {
 	return &Context{
 		data:     make(map[string]any),
 		params:   make([]Param, 0, 8),        // Pre-allocate params buffer (typical: 1-4 params).
+		radixBuf: make([]radix.Param, 0, 8),  // Pre-allocate radix Lookup buffer (zero-alloc routing).
 		handlers: make([]HandlerFunc, 0, 16), // Pre-allocate handlers buffer (typical: 3-8 middleware).
 	}
 }
@@ -124,11 +130,15 @@ func (c *Context) reset() {
 	// Reset params slice: keep capacity if reasonable, otherwise reallocate.
 	// This prevents memory leaks from holding large backing arrays.
 	if cap(c.params) > maxParamsCapacity {
-		// Capacity grew too large, allocate new buffer.
 		c.params = make([]Param, 0, 8)
 	} else {
-		// Reuse buffer, reset length only (keep capacity).
 		c.params = c.params[:0]
+	}
+
+	if cap(c.radixBuf) > maxParamsCapacity {
+		c.radixBuf = make([]radix.Param, 0, 8)
+	} else {
+		c.radixBuf = c.radixBuf[:0]
 	}
 
 	// Clear data map but keep allocation.

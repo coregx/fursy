@@ -357,15 +357,27 @@ func (t *Tree) insertWildcard(path string, handler interface{}, n *node, fullPat
 }
 
 // Lookup finds a handler for the given path and extracts parameters.
+// The params slice is caller-provided for zero-allocation reuse (pass buf[:0]).
 // Returns the handler, extracted parameters, and whether a match was found.
-func (t *Tree) Lookup(path string) (handler interface{}, params []Param, found bool) {
+func (t *Tree) Lookup(path string, params []Param) (handler interface{}, outParams []Param, found bool) {
 	if path == "" {
-		return nil, nil, false
+		return nil, params, false
 	}
 
-	var buf [8]Param
-	params = buf[:0]
+	if params == nil {
+		params = make([]Param, 0, 8)
+	}
+
 	return t.lookupNode(path, t.root, params)
+}
+
+// Contains checks if a handler exists for the given path without allocating params.
+func (t *Tree) Contains(path string) bool {
+	if path == "" {
+		return false
+	}
+	_, _, found := t.lookupNode(path, t.root, nil)
+	return found
 }
 
 // lookupNode is the recursive implementation of Lookup.

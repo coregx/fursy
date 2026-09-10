@@ -586,8 +586,8 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Lookup route in radix tree.
-	handler, params, found := tree.Lookup(path)
+	// Lookup route in radix tree (zero-alloc: reuse pooled buffer).
+	handler, radixParams, found := tree.Lookup(path, c.radixBuf[:0])
 
 	// If not found, try the trailing slash alternate path.
 	if !found && r.trailingSlash != IgnoreTrailingSlash {
@@ -596,7 +596,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		if altFound {
-			handler, params, found = altHandler, altParams, altFound
+			handler, radixParams, found = altHandler, altParams, altFound
 		}
 	}
 
@@ -605,9 +605,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Convert internal params to public Param slice.
+	// Convert radix params to public Param slice (both pre-allocated, zero-alloc).
+	c.radixBuf = radixParams
 	c.params = c.params[:0]
-	for _, p := range params {
+	for _, p := range radixParams {
 		c.params = append(c.params, Param{Key: p.Key, Value: p.Value})
 	}
 
@@ -651,7 +652,7 @@ func (r *Router) tryTrailingSlashLookup(
 		return nil, nil, false, false
 	}
 
-	handler, params, found := tree.Lookup(altPath)
+	handler, params, found := tree.Lookup(altPath, nil)
 	if !found {
 		return nil, nil, false, false
 	}
@@ -684,13 +685,11 @@ func (r *Router) pathExistsInOtherMethods(path, method string) bool {
 }
 
 func (r *Router) existsInTree(tree *radix.Tree, path, altPath string) bool {
-	_, _, found := tree.Lookup(path)
-	if found {
+	if tree.Contains(path) {
 		return true
 	}
 	if altPath != "" {
-		_, _, found = tree.Lookup(altPath)
-		return found
+		return tree.Contains(altPath)
 	}
 	return false
 }

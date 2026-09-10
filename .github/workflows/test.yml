@@ -2,9 +2,8 @@ name: Tests
 
 # Testing Strategy:
 # - Tests run on Linux, macOS, and Windows (cross-platform HTTP router)
-# - Go 1.25+ required (matches go.mod requirement)
+# - Go 1.27+ required (matches go.mod requirement)
 # - Minimal dependencies (core routing: stdlib only, middleware: jwt + x/time)
-# - GOEXPERIMENT=jsonv2 required for encoding/json/v2 support
 #
 # Branch Strategy (GitHub Flow):
 # - feature/*, release/*, hotfix/* branches: Development work
@@ -28,9 +27,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.25']  # Match go.mod requirement
+        go-version: ['1.27']  # Match go.mod requirement
     env:
-      GOEXPERIMENT: jsonv2  # Required for encoding/json/v2
 
     steps:
     - name: Checkout code
@@ -57,7 +55,7 @@ jobs:
       run: go test -short -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
     - name: Upload coverage to Codecov
-      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25'
+      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.27'
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
@@ -72,7 +70,6 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: false  # Strict for production library
     env:
-      GOEXPERIMENT: jsonv2  # Required for encoding/json/v2
 
     steps:
     - name: Checkout code
@@ -81,7 +78,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.27'
         cache: true
 
     - name: Run golangci-lint
@@ -95,7 +92,6 @@ jobs:
     name: Code Formatting
     runs-on: ubuntu-latest
     env:
-      GOEXPERIMENT: jsonv2  # Required for encoding/json/v2
 
     steps:
     - name: Checkout code
@@ -104,7 +100,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.27'
         cache: true
 
     - name: Check formatting
