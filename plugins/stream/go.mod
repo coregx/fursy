@@ -9,4 +9,3 @@ require (
 
 // Local development - replace with actual module paths.
 replace github.com/coregx/fursy => ../..
-

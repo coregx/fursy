@@ -1,6 +1,6 @@
 module example.com/hello-world
 
-go 1.25.0
+go 1.27
 
 replace github.com/coregx/fursy => ../..
 

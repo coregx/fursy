@@ -1,6 +1,6 @@
 module example.com/validation
 
-go 1.25.0
+go 1.27
 
 replace github.com/coregx/fursy => ../../..
 
@@ -22,5 +22,5 @@ require (
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
+	golang.org/x/time v0.16.0 // indirect
 )

@@ -1,6 +1,6 @@
 module example.com/middleware
 
-go 1.25.0
+go 1.27
 
 replace github.com/coregx/fursy => ../..
 
@@ -9,4 +9,4 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 )
 
-require golang.org/x/time v0.15.0 // indirect
+require golang.org/x/time v0.16.0 // indirect
