@@ -80,6 +80,9 @@ type Context struct {
 	// data stores arbitrary values for passing data between middleware.
 	data map[string]any
 
+	// written tracks if any response body has been written.
+	written bool
+
 	// Middleware chain execution.
 	// Pre-allocated with capacity 16 to avoid allocations for typical middleware chains.
 	handlers []HandlerFunc
@@ -157,6 +160,7 @@ func (c *Context) reset() {
 
 	c.index = -1
 	c.aborted = false
+	c.written = false
 }
 
 // Next executes the next handler in the middleware chain.
@@ -332,6 +336,7 @@ func (c *Context) PostForm(name string) string {
 //
 //	return c.String(200, "Hello, World!")
 func (c *Context) String(code int, s string) error {
+	c.written = true
 	c.Response.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	c.Response.WriteHeader(code)
 	_, err := c.Response.Write([]byte(s))
@@ -345,6 +350,7 @@ func (c *Context) String(code int, s string) error {
 //
 //	return c.JSON(200, map[string]string{"message": "success"})
 func (c *Context) JSON(code int, obj any) error {
+	c.written = true
 	c.Response.Header().Set("Content-Type", "application/json; charset=utf-8")
 	c.Response.WriteHeader(code)
 	encoder := json.NewEncoder(c.Response)
@@ -652,7 +658,7 @@ func (c *Context) GetBool(key string) bool {
 // generic handler adapter. If you need custom error handling, check
 // the error returned by your handler logic instead.
 func (c *Context) Problem(p Problem) error {
-	// Set proper Content-Type for RFC 9457.
+	c.written = true
 	c.Response.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 	c.Response.WriteHeader(p.Status)
 	encoder := json.NewEncoder(c.Response)

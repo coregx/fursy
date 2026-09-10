@@ -66,6 +66,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coregx/fursy/internal/binding"
 	"github.com/coregx/fursy/internal/radix"
 )
 
@@ -109,6 +110,12 @@ const (
 //	router.Handle("GET", "/health", func(c *fursy.Context) error {
 //		return c.Text("OK")
 //	})
+
+// ErrorHandler is a function that handles errors returned by handlers and middleware.
+// It receives the Context and the error, and should write an appropriate response.
+type ErrorHandler func(c *Context, err error)
+
+// Router is the main HTTP router for FURSY.
 type Router struct {
 	// trees stores one radix tree per HTTP method for efficient routing.
 	trees map[string]*radix.Tree
@@ -118,6 +125,9 @@ type Router struct {
 
 	// middleware stores global middleware that executes for all routes.
 	middleware []HandlerFunc
+
+	// errorHandler handles errors from handlers. If nil, uses defaultErrorHandler.
+	errorHandler ErrorHandler
 
 	// validator is an optional validator for automatic request validation.
 	// If set, Box.Bind() will automatically validate request bodies.
@@ -236,6 +246,17 @@ func (r *Router) Use(middleware ...HandlerFunc) *Router {
 //	})
 func (r *Router) SetValidator(v Validator) *Router {
 	r.validator = v
+	return r
+}
+
+// SetErrorHandler sets a custom error handler for the router.
+// If not set, the default error handler maps errors to appropriate HTTP responses:
+//   - Problem → uses Problem.Status (e.g. 404, 400)
+//   - ValidationErrors → 422 with RFC 9457 body
+//   - Binding errors → 400
+//   - Unknown errors → 500 without details
+func (r *Router) SetErrorHandler(h ErrorHandler) *Router {
+	r.errorHandler = h
 	return r
 }
 
@@ -623,8 +644,60 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	c.aborted = false
 
 	if err := c.Next(); err != nil {
-		_ = c.String(http.StatusInternalServerError, "Internal Server Error")
+		r.handleError(c, err)
 	}
+}
+
+// handleError dispatches the error to the custom or default error handler.
+func (r *Router) handleError(c *Context, err error) {
+	if r.errorHandler != nil {
+		r.errorHandler(c, err)
+		return
+	}
+	defaultErrorHandler(c, err)
+}
+
+// defaultErrorHandler maps errors to appropriate HTTP responses.
+func defaultErrorHandler(c *Context, err error) {
+	// If response headers already sent, don't write again — would corrupt body.
+	if c.written {
+		return
+	}
+
+	// Problem → use its Status field.
+	var prob Problem
+	if errors.As(err, &prob) {
+		_ = c.Problem(prob)
+		return
+	}
+
+	// ValidationErrors → 422 with RFC 9457 body.
+	var valErrs ValidationErrors
+	if errors.As(err, &valErrs) {
+		_ = c.Problem(ValidationProblem(valErrs))
+		return
+	}
+
+	// Binding errors → 400 or 415.
+	if errors.Is(err, binding.ErrUnsupportedMediaType) {
+		_ = c.String(http.StatusUnsupportedMediaType, "Unsupported Media Type")
+		return
+	}
+	if errors.Is(err, binding.ErrEmptyRequestBody) {
+		_ = c.String(http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	// JSON/XML decode errors → 400.
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "json:") || strings.Contains(errMsg, "invalid character") ||
+		strings.Contains(errMsg, "xml:") || strings.Contains(errMsg, "cannot unmarshal") {
+		_ = c.String(http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	// Unknown → 500 without details (security: don't leak internals).
+	_ = c.String(http.StatusInternalServerError, "Internal Server Error")
 }
 
 // handleNotFound sends a 404 or 405 response depending on configuration.

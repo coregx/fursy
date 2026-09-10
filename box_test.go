@@ -285,9 +285,9 @@ func TestGenericContext_InvalidJSON(t *testing.T) {
 
 	r.ServeHTTP(w, req)
 
-	// Should return 500 due to binding error (handled by router error handling)
-	if w.Code != 500 {
-		t.Errorf("expected status 500, got %d", w.Code)
+	// Should return 400 due to binding error (malformed JSON → Bad Request).
+	if w.Code != 400 {
+		t.Errorf("expected status 400, got %d", w.Code)
 	}
 }
 
