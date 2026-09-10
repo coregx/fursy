@@ -121,9 +121,8 @@ spec := r.OpenAPI(fursy.OpenAPIConfig{
 
 ### Production-Ready Performance
 
-- **256 ns/op** static routes, **326 ns/op** parametric routes
-- **1 allocation/op** (routing hot path)
-- **~10M req/s** throughput (simple routes)
+- **~53 ns/op** static routes, **~75 ns/op** parametric routes
+- **0 allocations/op** (zero-allocation routing)
 - Zero-allocation radix tree routing
 - Efficient context pooling
 
@@ -141,7 +140,7 @@ go get github.com/coregx/fursy
 
 ## 🚀 Features
 
-- ✅ **High Performance Routing** - 256-326 ns/op, 1 alloc/op
+- ✅ **High Performance Routing** - ~53 ns/op static, ~75 ns/op parametric, 0 alloc/op
 - ✅ **Type-Safe Generic Methods** - `router.POST()` with Box[Req, Res] and Go 1.27 type inference
 - ✅ **Automatic Validation** - Set once, validate everywhere with 100+ tags
 - ✅ **Content Negotiation** - RFC 9110 compliant, AI agent support
@@ -1171,7 +1170,7 @@ Your fursy application will automatically send traces to Jaeger. No configuratio
 
 **Coverage**: 94.6% test coverage (total), 94.6% core, 97.7% binding, 95.6% middleware
 
-**Performance**: 256 ns/op (static), 326 ns/op (parametric), 1 alloc/op
+**Performance**: ~53 ns/op (static), ~75 ns/op (parametric), 0 alloc/op
 
 **Roadmap**:
 

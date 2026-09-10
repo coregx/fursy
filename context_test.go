@@ -783,9 +783,9 @@ func TestRouter_ContextErrorHandling(t *testing.T) {
 		t.Errorf("Status code = %d, want 500", w.Code)
 	}
 
-	body := w.Body.String()
-	if body != "Internal Server Error" {
-		t.Errorf("Body = %q, want %q", body, "Internal Server Error")
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "application/problem+json") {
+		t.Errorf("Content-Type = %q, want application/problem+json", ct)
 	}
 }
 

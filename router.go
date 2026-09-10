@@ -723,29 +723,29 @@ func defaultErrorHandler(c *Context, err error) {
 	// MaxBytesError → 413 Payload Too Large.
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {
-		_ = c.String(http.StatusRequestEntityTooLarge, "Request Entity Too Large")
+		_ = c.Problem(NewProblem(http.StatusRequestEntityTooLarge, "Request Entity Too Large", ""))
 		return
 	}
 
 	// Binding errors → 400 or 415.
 	if errors.Is(err, binding.ErrUnsupportedMediaType) {
-		_ = c.String(http.StatusUnsupportedMediaType, "Unsupported Media Type")
+		_ = c.Problem(NewProblem(http.StatusUnsupportedMediaType, "Unsupported Media Type", ""))
 		return
 	}
 	if errors.Is(err, binding.ErrEmptyRequestBody) {
-		_ = c.String(http.StatusBadRequest, "Bad Request")
+		_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", "request body is empty"))
 		return
 	}
 
 	// JSON/XML decode errors → 400.
 	var decodeErr *binding.DecodeError
 	if errors.As(err, &decodeErr) {
-		_ = c.String(http.StatusBadRequest, "Bad Request")
+		_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", decodeErr.Error()))
 		return
 	}
 
 	// Unknown → 500 without details (security: don't leak internals).
-	_ = c.String(http.StatusInternalServerError, "Internal Server Error")
+	_ = c.Problem(NewProblem(http.StatusInternalServerError, "Internal Server Error", ""))
 }
 
 // handleNotFound sends a 404 or 405 response depending on configuration.
@@ -773,7 +773,7 @@ func (r *Router) handleNotFound(c *Context, w http.ResponseWriter, req *http.Req
 		if allowed := r.allowedMethods(path, req.Method); allowed != "" {
 			terminalHandler = func(ctx *Context) error {
 				ctx.SetHeader("Allow", allowed)
-				return ctx.String(http.StatusMethodNotAllowed, "Method Not Allowed")
+				return ctx.Problem(NewProblem(http.StatusMethodNotAllowed, "Method Not Allowed", ""))
 			}
 		}
 	}
@@ -781,7 +781,7 @@ func (r *Router) handleNotFound(c *Context, w http.ResponseWriter, req *http.Req
 	// 404 Not Found: default.
 	if terminalHandler == nil {
 		terminalHandler = func(ctx *Context) error {
-			return ctx.String(http.StatusNotFound, "Not Found")
+			return ctx.Problem(NewProblem(http.StatusNotFound, "Not Found", ""))
 		}
 	}
 
@@ -973,8 +973,8 @@ func (r *Router) OnShutdown(f func()) {
 // Shutdown gracefully shuts down the HTTP server and executes registered callbacks.
 //
 // Shutdown works in two phases:
-//  1. Calls all registered OnShutdown callbacks in reverse order
-//  2. Calls http.Server.Shutdown() to gracefully stop the server
+//  1. Calls http.Server.Shutdown() to drain active connections
+//  2. Calls all registered OnShutdown callbacks in reverse order
 //
 // The server shutdown process:
 //   - Immediately closes all listeners (stops accepting new connections)

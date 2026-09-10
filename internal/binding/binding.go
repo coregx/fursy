@@ -172,7 +172,7 @@ func mapForm(ptr any, form map[string][]string) error {
 
 		// Set field value
 		if err := setField(field, values[0]); err != nil {
-			return fmt.Errorf("set field %s error: %w", structField.Name, err)
+			return &DecodeError{Err: fmt.Errorf("field %s: %w", structField.Name, err)}
 		}
 	}
 

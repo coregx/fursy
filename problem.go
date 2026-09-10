@@ -148,21 +148,25 @@ func (p Problem) WithInstance(instance string) Problem {
 
 // WithExtension adds an extension field to the problem.
 func (p Problem) WithExtension(key string, value any) Problem {
-	if p.Extensions == nil {
-		p.Extensions = make(map[string]any)
+	ext := make(map[string]any, len(p.Extensions)+1)
+	for k, v := range p.Extensions {
+		ext[k] = v
 	}
-	p.Extensions[key] = value
+	ext[key] = value
+	p.Extensions = ext
 	return p
 }
 
 // WithExtensions sets multiple extension fields at once.
 func (p Problem) WithExtensions(extensions map[string]any) Problem {
-	if p.Extensions == nil {
-		p.Extensions = make(map[string]any)
+	ext := make(map[string]any, len(p.Extensions)+len(extensions))
+	for k, v := range p.Extensions {
+		ext[k] = v
 	}
 	for k, v := range extensions {
-		p.Extensions[k] = v
+		ext[k] = v
 	}
+	p.Extensions = ext
 	return p
 }
 

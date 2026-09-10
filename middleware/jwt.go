@@ -421,7 +421,7 @@ func validateClaim(claims jwt.Claims, key, expected string) bool {
 // defaultJWTErrorHandler is the default error handler for JWT validation failures.
 // Does not expose error details to prevent information leakage.
 func defaultJWTErrorHandler(c *fursy.Context, _ error) error {
-	return c.String(http.StatusUnauthorized, "Unauthorized")
+	return c.Problem(fursy.NewProblem(http.StatusUnauthorized, "Unauthorized", ""))
 }
 
 // JWTHelper provides helper functions for working with JWT tokens.

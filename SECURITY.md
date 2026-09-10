@@ -6,9 +6,8 @@ FURSY HTTP Router is currently in active development (0.x versions). We provide 
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.2.x   | :white_check_mark: |
-| 0.1.x   | :white_check_mark: |
-| < 0.1.0 | :x:                |
+| 0.5.x   | :white_check_mark: |
+| < 0.5.0 | :x:                |
 
 Future stable releases (v1.0+) will follow semantic versioning with LTS support.
 
@@ -105,7 +104,7 @@ router.GET("/files/:path", func(c *fursy.Context) error {
 
 **Mitigation**:
 - ✅ Efficient radix tree routing (O(log n) lookups)
-- ✅ Zero-allocation routing (1 alloc/op)
+- ✅ Zero-allocation routing (0 alloc/op)
 - ✅ Context pooling (prevents memory leaks)
 - ✅ Graceful shutdown (prevents resource leaks)
 - ✅ Circuit breaker middleware (prevents cascade failures)
@@ -113,15 +112,14 @@ router.GET("/files/:path", func(c *fursy.Context) error {
 
 **User Recommendations**:
 ```go
-// ✅ Use built-in middleware for protection
-router.Use(fursy.RateLimit(100, time.Minute))  // 100 req/min
-router.Use(fursy.CircuitBreaker(0.5, 100))     // 50% error rate threshold
+import "github.com/coregx/fursy/middleware"
 
-// ✅ Set reasonable timeouts
-router.Use(fursy.Timeout(30 * time.Second))
+// ✅ Use built-in middleware for protection
+router.Use(middleware.RateLimit(100, 200))        // 100 req/s, burst 200
+router.Use(middleware.CircuitBreaker())            // Default: 5 consecutive failures, 60s timeout
 
 // ✅ Limit request body size
-router.Use(fursy.BodyLimit(10 * 1024 * 1024))  // 10MB max
+router.SetMaxBodySize(10 * 1024 * 1024)  // 10MB max
 ```
 
 ### 3. Injection Attacks
@@ -137,7 +135,7 @@ router.Use(fursy.BodyLimit(10 * 1024 * 1024))  // 10MB max
 
 **Mitigation**:
 - ✅ Parameter extraction is safe (no SQL/command execution)
-- ✅ JSON parsing uses `encoding/json/v2` (safe unmarshaling)
+- ✅ JSON parsing uses `encoding/json` (safe unmarshaling)
 - ✅ Header handling through stdlib (validated)
 - 🔄 **User Responsibility**: Sanitize data before database/external use
 
@@ -176,22 +174,22 @@ router.POST("/search", func(c *fursy.Context) error {
 
 **User Best Practices**:
 ```go
+import "github.com/coregx/fursy/middleware"
+
 // ✅ Use JWT middleware for authentication
-jwtMiddleware := fursy.JWT(fursy.JWTConfig{
-    Secret:     os.Getenv("JWT_SECRET"),
-    Expiration: 24 * time.Hour,
-})
+jwtMiddleware := middleware.JWT([]byte(os.Getenv("JWT_SECRET")))
 
 // Protected routes
-protected := router.Group("/api", jwtMiddleware)
-protected.GET("/users", getUsersHandler)
-protected.POST("/users", createUserHandler)
+protected := router.Group("/api")
+protected.Use(jwtMiddleware)
+protected.Handle("GET", "/users", getUsersHandler)
+protected.Handle("POST", "/users", createUserHandler)
 
 // ✅ Implement authorization in handlers
 func getUsersHandler(c *fursy.Context) error {
     user := c.Get("user").(User)
     if !user.IsAdmin() {
-        return c.Error(403, fursy.Forbidden("Admin required"))
+        return c.Problem(fursy.Forbidden("Admin required"))
     }
     // ...
 }
@@ -207,19 +205,20 @@ func getUsersHandler(c *fursy.Context) error {
 - DOM-based XSS (client-side rendering)
 
 **Mitigation**:
-- ✅ JSON responses automatically escaped (`encoding/json/v2`)
+- ✅ JSON responses automatically escaped (`encoding/json`)
 - ✅ Content-Type headers set correctly
 - ✅ Security headers middleware (CSP, X-XSS-Protection)
 - 🔄 **User Responsibility**: Sanitize HTML/JS output
 
 **User Best Practices**:
 ```go
+import "github.com/coregx/fursy/middleware"
+
 // ✅ Use security headers middleware
-router.Use(fursy.SecurityHeaders(fursy.SecurityConfig{
+router.Use(middleware.SecureWithConfig(middleware.SecureConfig{
     ContentSecurityPolicy: "default-src 'self'",
     XFrameOptions:         "DENY",
-    XContentTypeOptions:   "nosniff",
-    XSSProtection:         "1; mode=block",
+    ContentTypeNosniff:    "nosniff",
 }))
 
 // ✅ Return JSON (auto-escaped)
@@ -241,24 +240,25 @@ router.GET("/profile", func(c *fursy.Context) error {
 **Risk**: Forged requests from malicious sites.
 
 **Mitigation**:
-- ✅ CSRF token middleware available
 - ✅ SameSite cookie support
-- ✅ Origin header validation
-- 🔄 **User Responsibility**: Enable CSRF protection
+- ✅ Origin header validation via CORS middleware
+- 🔄 **User Responsibility**: Implement CSRF protection
+
+**Note**: CSRF middleware is not yet implemented -- planned for a future release. In the meantime, use SameSite cookies and CORS origin validation to mitigate CSRF risks.
 
 **User Best Practices**:
 ```go
-// ✅ Enable CSRF protection for state-changing operations
-csrfMiddleware := fursy.CSRF(fursy.CSRFConfig{
-    TokenLength: 32,
-    CookieName:  "_csrf",
-    HeaderName:  "X-CSRF-Token",
-})
+import "github.com/coregx/fursy/middleware"
 
-router.Use(csrfMiddleware)
+// ✅ Use CORS with strict origin validation
+router.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+    AllowOrigins:     "https://example.com",
+    AllowMethods:     "GET,POST,PUT,DELETE",
+    AllowCredentials: true,
+}))
 
-// Safe methods (GET, HEAD, OPTIONS) are exempt
-// POST, PUT, DELETE require CSRF token
+// ✅ Use SameSite cookies for session management
+// Set SameSite=Strict or SameSite=Lax on session cookies
 ```
 
 ## Security Best Practices for Users
@@ -295,14 +295,15 @@ router.POST("/users", func(c *fursy.Context) error {
 Protect against abuse with rate limiting:
 
 ```go
-// Global rate limit
-router.Use(fursy.RateLimit(1000, time.Hour))
+import "github.com/coregx/fursy/middleware"
 
-// Per-route rate limits
-router.POST("/login",
-    fursy.RateLimit(5, time.Minute),  // 5 attempts per minute
-    loginHandler,
-)
+// Global rate limit (rate per second, burst)
+router.Use(middleware.RateLimit(100, 200))
+
+// Per-group rate limits
+loginGroup := router.Group("/login")
+loginGroup.Use(middleware.RateLimit(5, 10))  // 5 req/s, burst 10
+loginGroup.Handle("POST", "", loginHandler)
 ```
 
 ### Error Handling
@@ -333,16 +334,17 @@ router.GET("/users/:id", func(c *fursy.Context) error {
 Always use HTTPS in production:
 
 ```go
-// ✅ Redirect HTTP to HTTPS
-router.Use(fursy.HTTPSRedirect())
+import "github.com/coregx/fursy/middleware"
 
-// ✅ Set secure headers
-router.Use(fursy.SecurityHeaders(fursy.SecurityConfig{
+// ✅ Set HSTS headers to enforce HTTPS
+router.Use(middleware.SecureWithConfig(middleware.SecureConfig{
     HSTSMaxAge:            31536000,  // 1 year
-    HSTSIncludeSubdomains: true,
-    HSTSPreload:           true,
+    HSTSExcludeSubdomains: false,
+    HSTSPreloadEnabled:    true,
 }))
 ```
+
+**Note**: HTTPS redirect middleware is not yet implemented. Use a reverse proxy (nginx, Caddy) or cloud load balancer for HTTP-to-HTTPS redirection.
 
 ## Known Security Considerations
 

@@ -118,7 +118,7 @@ func BasicAuthWithConfig(config BasicAuthConfig) fursy.HandlerFunc {
 
 		// Authentication failed - send WWW-Authenticate header.
 		c.SetHeader("WWW-Authenticate", `Basic realm="`+config.Realm+`"`)
-		return c.String(http.StatusUnauthorized, "Unauthorized")
+		return c.Problem(fursy.NewProblem(http.StatusUnauthorized, "Unauthorized", ""))
 	}
 }
 

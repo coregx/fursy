@@ -24,6 +24,9 @@ package main
 
 import (
     "database/sql"
+    "log"
+    "net/http"
+
     "github.com/coregx/fursy"
     "github.com/coregx/fursy/plugins/database"
     _ "github.com/lib/pq" // PostgreSQL driver
@@ -66,7 +69,7 @@ func main() {
         return c.JSON(200, user)
     })
 
-    router.Run(":8080")
+    log.Fatal(http.ListenAndServe(":8080", router))
 }
 ```
 

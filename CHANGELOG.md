@@ -11,6 +11,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
 - Radix tree edge cases (root path + param routes) — tracked by differential fuzz
 
+## [0.6.0] - 2026-09-11
+
+### Security
+- **CORS preflight echo bypass** — preflight responses now return only filtered allowed headers, not raw `Access-Control-Request-Headers` value
+- **Example JWT alg confusion** — production boilerplate validates `*jwt.SigningMethodHMAC` before returning key
+- **PanicHandler re-panics `http.ErrAbortHandler`** — matches Recovery() behavior, Go net/http expects propagation
+
+### Added
+- **`NewRateLimiter()`** — returns `*RateLimiter` with exported `Handler()` and `Stop()` methods for lifecycle management
+- **`RateLimitConfig.NoHeaders`** — opt-out from `X-RateLimit-*` response headers (previously impossible to disable)
+
+### Changed
+- **RFC 9457 Problem Details is now the default error response** for all auto-generated errors:
+  - Router: 404, 405, 413, 415, 400 (binding/decode), 500
+  - Middleware: JWT 401, BasicAuth 401, RateLimit 429, CircuitBreaker 503, Recovery 500
+  - Content-Type changed from `text/plain` to `application/problem+json`
+- **Form binding type errors** (e.g., `age=abc`) now return 400 Bad Request (was 500 Internal Server Error)
+- **`Problem.WithExtension`/`WithExtensions`** — deep-copy map to prevent aliasing between chained calls
+- **Shutdown godoc** — fixed order description (drain connections first, then callbacks)
+
+### Fixed
+- **CODEOWNERS** — removed references to non-existent `/internal/pool/`, `/handler.go`, `/Makefile`
+- **SECURITY.md** — removed non-existent APIs (CSRF, Timeout, BodyLimit, HTTPSRedirect), fixed RateLimit signature, updated supported versions to 0.5.x
+- **llms.md** — corrected `encoding/json/v2` → `encoding/json`, fixed stale API examples
+- **Plugin READMEs** — replaced `router.Run()` with `http.ListenAndServe()`
+- **README.md** — updated performance numbers (256 ns → 53 ns, 0 alloc)
+
+### Dependencies
+- plugins/opentelemetry: OTel v1.38.0 → v1.46.0
+- plugins/validator: go-playground/validator v10.24.0 → v10.30.4
+- plugins/database: modernc.org/sqlite v1.40.1 → v1.58.0
+- plugins: fursy v0.5.3 → v0.5.4, stream v0.1.4 → v0.1.5
+
 ## [0.5.4] - 2026-09-10
 
 ### Changed

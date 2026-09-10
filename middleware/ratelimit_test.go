@@ -754,3 +754,57 @@ func TestRateLimit_StopIdempotent(_ *testing.T) {
 	store.Stop()
 	store.Stop()
 }
+
+// TestNewRateLimiter_StopExported verifies that NewRateLimiter returns a
+// RateLimiter with an exported Stop() method that stops the cleanup goroutine.
+func TestNewRateLimiter_StopExported(t *testing.T) {
+	rl := NewRateLimiter(RateLimitConfig{
+		Rate:  10,
+		Burst: 20,
+	})
+
+	r := fursy.New()
+	r.Use(rl.Handler())
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
+		return c.String(200, "OK")
+	})
+
+	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	// Stop must not panic and must be callable from user code.
+	rl.Stop()
+	rl.Stop() // idempotent
+}
+
+// TestRateLimit_HeadersDisable verifies that Headers can be explicitly disabled.
+func TestRateLimit_HeadersDisable(t *testing.T) {
+	rl := NewRateLimiter(RateLimitConfig{
+		Rate:      10,
+		Burst:     20,
+		NoHeaders: true,
+	})
+
+	r := fursy.New()
+	r.Use(rl.Handler())
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
+		return c.String(200, "OK")
+	})
+
+	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	if got := w.Header().Get("X-RateLimit-Limit"); got != "" {
+		t.Errorf("expected no X-RateLimit-Limit header when disabled, got %q", got)
+	}
+}

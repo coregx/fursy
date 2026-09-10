@@ -486,6 +486,45 @@ func TestCORSConfig_IsPreflightAllowed(t *testing.T) {
 	})
 }
 
+// TestCORS_PreflightFilteredHeaders verifies that preflight responses only
+// echo back headers that are in the AllowHeaders list, not the raw
+// Access-Control-Request-Headers value. Echoing unfiltered headers lets
+// browsers believe disallowed headers are permitted (allowlist bypass).
+func TestCORS_PreflightFilteredHeaders(t *testing.T) {
+	r := fursy.New()
+	r.Use(CORSWithConfig(CORSConfig{
+		AllowOrigins: "https://example.com",
+		AllowMethods: "GET,POST",
+		AllowHeaders: "Content-Type,Authorization",
+	}))
+
+	r.Handle("OPTIONS", "/api", func(c *fursy.Context) error {
+		return c.NoContent(204)
+	})
+	r.Handle("POST", "/api", func(c *fursy.Context) error {
+		return c.String(200, "OK")
+	})
+
+	req := httptest.NewRequest("OPTIONS", "/api", http.NoBody)
+	req.Header.Set("Origin", "https://example.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "Content-Type, X-Evil-Header")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	got := w.Header().Get("Access-Control-Allow-Headers")
+
+	// Must contain only allowed headers, NOT X-Evil-Header.
+	if strings.Contains(got, "X-Evil-Header") {
+		t.Errorf("preflight echoed disallowed header: got %q, want only allowed headers", got)
+	}
+
+	// Content-Type should still be present (it IS allowed).
+	if !strings.Contains(got, "Content-Type") {
+		t.Errorf("preflight missing allowed header Content-Type: got %q", got)
+	}
+}
+
 // --- F4 audit fix: CORS preflight unreachable + Vary: Origin ---
 
 // TestCORS_PreflightWithoutRoute verifies that an OPTIONS preflight request

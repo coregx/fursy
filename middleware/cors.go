@@ -222,7 +222,7 @@ func (cfg *CORSConfig) setPreflightHeaders(origin, method, reqHeaders string, he
 	}
 
 	if allowedHeaders != "" {
-		headers.Set(headerAllowHeaders, reqHeaders)
+		headers.Set(headerAllowHeaders, allowedHeaders)
 	}
 }
 
