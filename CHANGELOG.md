@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
 - Radix tree edge cases (root path + param routes) — tracked by differential fuzz
 
+## [0.5.4] - 2026-09-10
+
+### Changed
+- **JWT: expiration required by default** — tokens without `exp` claim now return 401. Opt-out via `RequireExpiration: &false` in JWTConfig
+- **HEAD→GET fallback** — HEAD requests automatically serve GET handler when no explicit HEAD route (RFC 9110). Body suppressed by net/http
+- **Global middleware on 404/405** — middleware chain now executes for ALL responses including 404/405/OPTIONS. Logger, RateLimit, Secure see all traffic
+- **OPTIONS without middleware** — returns 204+Allow even when no middleware registered (was 405)
+- **Empty params forbidden** — `/a//b` on route `/a/:id/b` now returns 404 (was 200 with empty param)
+- **RateLimit: proper LRU** — `container/list` replaces `insertOrd` slice, `Stop()` for cleanup goroutine, `sync.Mutex` (not `RWMutex`)
+
+### Fixed
+- **Radix R1: percent-encoded wildcard markers** — `findChild` no longer descends into wildcard nodes for literal `:` or `*` characters. `/users/%3Aid` → param=`:id` (was empty)
+- **Radix R3: conflict messages** — "param/catch-all conflict" instead of misleading "route already exists"
+- **Plugin go.mod** — updated to Go 1.27, removed external `replace` path
+
+### Added
+- CI: matrix jobs for all plugin modules, example builds, govulncheck
+- `RateLimit.Stop()` for cleanup goroutine lifecycle management
+- 14 TDD tests covering all changes
+
 ## [0.5.2] - 2026-09-10
 
 ### Security

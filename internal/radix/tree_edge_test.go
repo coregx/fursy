@@ -20,7 +20,7 @@ func TestLookup_EmptyParamSegment(t *testing.T) {
 		wantID    string
 	}{
 		{"normal", "/a/123/b", true, "123"},
-		{"empty segment", "/a//b", true, ""},
+		{"empty segment not allowed", "/a//b", false, ""},
 	}
 
 	for _, tt := range tests {

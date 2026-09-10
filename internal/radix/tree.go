@@ -478,7 +478,12 @@ func (t *Tree) lookupWildcard(path string, n *node, params []Param) (interface{}
 		end++
 	}
 
-	// Extract param name if it contains '/'
+	// Empty parameters are not allowed (e.g., /a//b → 404).
+	if end == 0 {
+		return nil, params, false
+	}
+
+	// Extract param name if it contains '/'.
 	if idx := strings.IndexByte(paramName, '/'); idx != -1 {
 		paramName = paramName[:idx]
 	}
