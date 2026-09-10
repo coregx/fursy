@@ -1,9 +1,9 @@
 module github.com/coregx/fursy/plugins/validator
 
-go 1.25.0
+go 1.27
 
 require (
-	github.com/coregx/fursy v0.1.0
+	github.com/coregx/fursy v0.5.3
 	github.com/go-playground/validator/v10 v10.24.0
 )
 

@@ -29,19 +29,19 @@ func TestRateLimit_InsertOrdMemoryLeak(t *testing.T) {
 	store.Cleanup(1 * time.Hour)
 
 	// Phase 3: Verify map is empty.
-	store.mu.RLock()
+	store.mu.Lock()
 	mapLen := len(store.limiters)
-	store.mu.RUnlock()
+	store.mu.Unlock()
 
 	if mapLen != 0 {
 		t.Fatalf("expected 0 limiters after cleanup, got %d", mapLen)
 	}
 
 	// Phase 4: LRU list should also be cleaned up, not 1000 stale entries.
-	store.mu.RLock()
+	store.mu.Lock()
 	lruLen := store.lruList.Len()
 	indexLen := len(store.lruIndex)
-	store.mu.RUnlock()
+	store.mu.Unlock()
 
 	if lruLen > 100 {
 		t.Errorf("REGRESSION: lruList has %d stale entries after cleanup (should be 0)", lruLen)
@@ -75,9 +75,9 @@ func TestRateLimit_DuplicateInsertOrd(t *testing.T) {
 	// Add "D" — triggers eviction. Should evict "B" (oldest active), not "A".
 	store.GetLimiter("D", rate.Limit(10), 20)
 
-	store.mu.RLock()
+	store.mu.Lock()
 	_, aExists := store.limiters["A"]
-	store.mu.RUnlock()
+	store.mu.Unlock()
 
 	if !aExists {
 		t.Error("REGRESSION: re-added key 'A' was evicted due to stale insertOrd duplicate")

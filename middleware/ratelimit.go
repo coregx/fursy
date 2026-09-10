@@ -96,31 +96,47 @@ type inMemoryStore struct {
 	limiters    map[string]*limiterEntry
 	lruList     *list.List               // doubly-linked list for LRU order
 	lruIndex    map[string]*list.Element // key → list element for O(1) lookup
-	mu          sync.RWMutex
+	mu          sync.Mutex
 	maxKeys     int
 	cleanupOnce sync.Once
+	done        chan struct{} // closed to stop the cleanup goroutine
 }
 
 // limiterEntry stores a rate limiter with its last access time.
 type limiterEntry struct {
-	key        string
 	limiter    *rate.Limiter
 	lastAccess time.Time
 }
 
 // startCleanup launches a single cleanup goroutine for this store.
 // Calling it multiple times is safe — sync.Once ensures only one goroutine runs.
+// The goroutine stops when Stop() is called.
 func (s *inMemoryStore) startCleanup(interval, expireAfter time.Duration) {
 	s.cleanupOnce.Do(func() {
 		go func() {
 			ticker := time.NewTicker(interval)
 			defer ticker.Stop()
 
-			for range ticker.C {
-				s.Cleanup(expireAfter)
+			for {
+				select {
+				case <-ticker.C:
+					s.Cleanup(expireAfter)
+				case <-s.done:
+					return
+				}
 			}
 		}()
 	})
+}
+
+// Stop stops the cleanup goroutine. Safe to call multiple times.
+func (s *inMemoryStore) Stop() {
+	select {
+	case <-s.done:
+		// Already closed.
+	default:
+		close(s.done)
+	}
 }
 
 // newInMemoryStore creates a new in-memory rate limiter store.
@@ -134,6 +150,7 @@ func newInMemoryStore(maxKeys int) *inMemoryStore {
 		lruList:  list.New(),
 		lruIndex: make(map[string]*list.Element),
 		maxKeys:  maxKeys,
+		done:     make(chan struct{}),
 	}
 }
 
@@ -159,7 +176,6 @@ func (s *inMemoryStore) GetLimiter(key string, r rate.Limit, burst int) *rate.Li
 	// Create new limiter.
 	limiter := rate.NewLimiter(r, burst)
 	entry := &limiterEntry{
-		key:        key,
 		limiter:    limiter,
 		lastAccess: time.Now(),
 	}

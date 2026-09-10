@@ -1,13 +1,13 @@
 module example.com/validation
 
-go 1.25.0
+go 1.27
 
 replace github.com/coregx/fursy => ../../..
 
 replace github.com/coregx/fursy/plugins/validator => ../../../plugins/validator
 
 require (
-	github.com/coregx/fursy v0.1.0
+	github.com/coregx/fursy v0.5.3
 	github.com/coregx/fursy/plugins/validator v0.0.0
 	github.com/go-playground/validator/v10 v10.24.0
 )
@@ -22,5 +22,5 @@ require (
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
+	golang.org/x/time v0.16.0 // indirect
 )

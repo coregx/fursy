@@ -2,6 +2,7 @@ package radix
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -435,5 +436,40 @@ func TestTree_LargeRouteSet(t *testing.T) {
 		if len(params) != 1 || params[0].Value != "123" {
 			t.Errorf("Wrong params for %s: %v", testPath, params)
 		}
+	}
+}
+
+// TestTree_ParamCatchAllConflict tests that inserting a catch-all after a param
+// at the same position produces a clear "param/catch-all conflict" error.
+func TestTree_ParamCatchAllConflict(t *testing.T) {
+	tree := New()
+
+	err := tree.Insert("/users/:id", "handler1")
+	if err != nil {
+		t.Fatalf("Insert /users/:id failed: %v", err)
+	}
+
+	err = tree.Insert("/users/*id", "handler2")
+	if err == nil {
+		t.Fatal("expected error for param/catch-all conflict, got nil")
+	}
+
+	// The error message should mention "param/catch-all conflict", not "route already exists".
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "param/catch-all conflict") {
+		t.Errorf("expected 'param/catch-all conflict' in error, got: %s", errMsg)
+	}
+}
+
+// TestTree_DuplicateRouteMessage tests that duplicate route errors include the path.
+func TestTree_DuplicateRouteMessage(t *testing.T) {
+	tree := New()
+	_ = tree.Insert("/users/:id", "handler1")
+	err := tree.Insert("/users/:id", "handler2")
+	if err == nil {
+		t.Fatal("expected error for duplicate route")
+	}
+	if !strings.Contains(err.Error(), "route already exists") {
+		t.Errorf("expected 'route already exists' in error, got: %s", err.Error())
 	}
 }

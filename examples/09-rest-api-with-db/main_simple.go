@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net/http"
 
 	"github.com/coregx/fursy"
 	"github.com/coregx/fursy/plugins/database"
@@ -121,5 +122,5 @@ func main() {
 	log.Println("Try:")
 	log.Println("  curl -X POST http://localhost:8080/users -H 'Content-Type: application/json' -d '{\"name\":\"Alice\"}'")
 	log.Println("  curl http://localhost:8080/users/1")
-	log.Fatal(router.Run(":8080"))
+	log.Fatal(http.ListenAndServe(":8080", router))
 }

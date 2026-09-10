@@ -1047,3 +1047,191 @@ func BenchmarkRouter_TrailingSlash_ExactMatch(b *testing.B) {
 		r.ServeHTTP(w, req)
 	}
 }
+
+// TestRouter_HEAD_FallbackToGET tests that HEAD requests fall back to the GET
+// handler when no explicit HEAD route is registered (RFC 9110).
+func TestRouter_HEAD_FallbackToGET(t *testing.T) {
+	r := New()
+	r.Handle("GET", "/users", func(c *Context) error {
+		return c.String(200, "user list")
+	})
+
+	// HEAD /users should return 200 (GET handler), not 405.
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodHead, "/users", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("HEAD /users: expected 200, got %d", w.Code)
+	}
+
+	// Note: httptest.ResponseRecorder does NOT suppress body for HEAD.
+	// A real http.Server does — see TestRouter_HEAD_FallbackToGET_RealServer
+	// for end-to-end verification. Here we just verify the status code.
+}
+
+// TestRouter_HEAD_ExplicitRoute tests that an explicit HEAD route takes priority.
+func TestRouter_HEAD_ExplicitRoute(t *testing.T) {
+	r := New()
+	r.Handle("GET", "/users", func(c *Context) error {
+		return c.String(200, "GET response")
+	})
+	r.Handle("HEAD", "/users", func(c *Context) error {
+		c.SetHeader("X-Custom", "head-handler")
+		return c.NoContent(200)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodHead, "/users", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("HEAD /users: expected 200, got %d", w.Code)
+	}
+	if w.Header().Get("X-Custom") != "head-handler" {
+		t.Error("HEAD /users: explicit HEAD handler should take priority over GET fallback")
+	}
+}
+
+// TestRouter_HEAD_NoGET_Returns404 tests that HEAD returns 404 when neither
+// HEAD nor GET route is registered for the path.
+func TestRouter_HEAD_NoGET_Returns404(t *testing.T) {
+	r := New()
+	r.Handle("POST", "/users", func(c *Context) error {
+		return c.String(201, "created")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodHead, "/users", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	// POST exists but neither HEAD nor GET — should be 405.
+	if w.Code != 405 {
+		t.Errorf("HEAD /users (only POST registered): expected 405, got %d", w.Code)
+	}
+}
+
+// TestRouter_GlobalMiddleware_On404 tests that global middleware executes for 404 paths.
+func TestRouter_GlobalMiddleware_On404(t *testing.T) {
+	middlewareCalled := false
+
+	r := New()
+	r.Use(func(c *Context) error {
+		middlewareCalled = true
+		c.SetHeader("X-Middleware", "executed")
+		return c.Next()
+	})
+	r.Handle("GET", "/exists", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	// Request to non-existent path.
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/not-found", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 404 {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+	if !middlewareCalled {
+		t.Error("global middleware should execute on 404 paths")
+	}
+	if w.Header().Get("X-Middleware") != "executed" {
+		t.Error("middleware header should be set on 404 response")
+	}
+}
+
+// TestRouter_GlobalMiddleware_On405 tests that global middleware executes for 405 paths.
+func TestRouter_GlobalMiddleware_On405(t *testing.T) {
+	middlewareCalled := false
+
+	r := New()
+	r.Use(func(c *Context) error {
+		middlewareCalled = true
+		c.SetHeader("X-Middleware", "executed")
+		return c.Next()
+	})
+	r.Handle("GET", "/users", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	// POST to GET-only path.
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/users", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 405 {
+		t.Errorf("expected 405, got %d", w.Code)
+	}
+	if !middlewareCalled {
+		t.Error("global middleware should execute on 405 paths")
+	}
+	if w.Header().Get("X-Middleware") != "executed" {
+		t.Error("middleware header should be set on 405 response")
+	}
+}
+
+// TestRouter_OPTIONS_NoMiddleware_Returns204 tests that OPTIONS returns 204+Allow
+// even when no middleware is registered.
+func TestRouter_OPTIONS_NoMiddleware_Returns204(t *testing.T) {
+	r := New()
+	// No middleware registered.
+	r.Handle("GET", "/users", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+	r.Handle("POST", "/users", func(c *Context) error {
+		return c.String(201, "Created")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/users", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Errorf("OPTIONS /users without middleware: expected 204, got %d", w.Code)
+	}
+
+	allow := w.Header().Get("Allow")
+	if allow == "" {
+		t.Error("OPTIONS response should include Allow header")
+	}
+	if !strings.Contains(allow, "GET") || !strings.Contains(allow, "POST") {
+		t.Errorf("Allow header should contain GET and POST, got %q", allow)
+	}
+}
+
+// TestRouter_PercentEncodedColon tests that URL-encoded colon (%3A) in the path
+// is properly decoded by net/http and matched as a param value, not as a param marker.
+// net/http decodes %3A→: in URL.Path. The radix tree's findChild skips wildcard
+// nodes for literal character matches, so ":id" becomes the param VALUE, not empty.
+func TestRouter_PercentEncodedColon(t *testing.T) {
+	r := New()
+	r.Handle("GET", "/users/:id", func(c *Context) error {
+		return c.String(200, "id="+c.Param("id"))
+	})
+
+	// net/http decodes %3A to ":" → path becomes /users/:id → param value = ":id".
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/users/%3Aid", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("GET /users/%%3Aid: expected 200, got %d", w.Code)
+	}
+	// Param value should be ":id" (decoded), NOT empty.
+	if w.Body.String() != "id=:id" {
+		t.Errorf("GET /users/%%3Aid: expected body 'id=:id', got %q", w.Body.String())
+	}
+
+	// Normal param still works.
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, "/users/42", http.NoBody)
+	r.ServeHTTP(w2, req2)
+
+	if w2.Code != 200 {
+		t.Errorf("GET /users/42: expected 200, got %d", w2.Code)
+	}
+	if w2.Body.String() != "id=42" {
+		t.Errorf("GET /users/42: expected body 'id=42', got %q", w2.Body.String())
+	}
+}

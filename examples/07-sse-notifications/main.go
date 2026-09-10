@@ -115,7 +115,7 @@ func handleNotify(c *fursy.Context) error {
 
 	// Parse notification from request body.
 	var notification Notification
-	if err := json.UnmarshalRead(c.Request.Body, &notification); err != nil {
+	if err := json.NewDecoder(c.Request.Body).Decode(&notification); err != nil {
 		return c.Problem(fursy.BadRequest("Invalid request body: " + err.Error()))
 	}
 

@@ -70,13 +70,16 @@ func (n *node) addChild(child *node) {
 	}
 }
 
-// findChild finds a child node by the first character of its path.
-// Returns the child node, or nil if not found.
+// findChild finds a STATIC child node by the first character of its path.
+// Skips wildcard children (param/catchAll) — those are matched via getWildChild.
 func (n *node) findChild(c byte) *node {
-	// Fast path: check indices string
 	for i := 0; i < len(n.indices); i++ {
 		if n.indices[i] == c {
-			return n.children[i]
+			child := n.children[i]
+			if child.nType == param || child.nType == catchAll {
+				continue
+			}
+			return child
 		}
 	}
 	return nil
