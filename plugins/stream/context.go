@@ -14,14 +14,13 @@ import (
 
 // SSEUpgrade upgrades HTTP connection to Server-Sent Events.
 //
-// This is the actual implementation for fursy.Context.SSE() method.
 // It performs the SSE upgrade and calls the user's handler with the connection.
 //
 // The connection is automatically closed when the handler returns.
 //
-// Example (internal use by Context.SSE):
+// Example:
 //
-//	return SSEUpgrade(c, func(conn *sse.Conn) error {
+//	return stream.SSEUpgrade(c, func(conn *sse.Conn) error {
 //	    hub.Register(conn)
 //	    defer hub.Unregister(conn)
 //	    <-conn.Done()
@@ -41,14 +40,13 @@ func SSEUpgrade(c *fursy.Context, handler func(conn *sse.Conn) error) error {
 
 // WebSocketUpgrade upgrades HTTP connection to WebSocket.
 //
-// This is the actual implementation for fursy.Context.WebSocket() method.
 // It performs the WebSocket upgrade and calls the user's handler with the connection.
 //
 // The connection is automatically closed when the handler returns.
 //
-// Example (internal use by Context.WebSocket):
+// Example:
 //
-//	return WebSocketUpgrade(c, func(conn *websocket.Conn) error {
+//	return stream.WebSocketUpgrade(c, func(conn *websocket.Conn) error {
 //	    hub.Register(conn)
 //	    defer hub.Unregister(conn)
 //	    // ... read/write loop
@@ -66,28 +64,10 @@ func WebSocketUpgrade(c *fursy.Context, handler func(conn *websocket.Conn) error
 	return handler(conn)
 }
 
-// init registers the stream implementations with fursy Context.
-// This allows c.SSE() and c.WebSocket() to work when plugins/stream is imported.
+// init is kept for potential future registration hooks.
 //
-// Usage in user code:
-//
-//	import _ "github.com/coregx/fursy/plugins/stream"
-//
-// The underscore import triggers this init() function, which registers
-// the actual SSE and WebSocket implementations.
+// Users should call plugins/stream helpers directly:
+//   - return stream.SSEUpgrade(c, handler)
+//   - return stream.WebSocketUpgrade(c, handler, opts)
 func init() {
-	// Note: We cannot directly modify c.SSE and c.WebSocket methods
-	// because Go doesn't support method overriding.
-	//
-	// Instead, users must explicitly call SSEUpgrade and WebSocketUpgrade
-	// or use wrapper helpers. This is a limitation of Go's type system.
-	//
-	// Alternative API (more explicit):
-	//   - stream.HandleSSE(c, handler)
-	//   - stream.HandleWebSocket(c, handler, opts)
-	//
-	// For now, we document that c.SSE() and c.WebSocket() are stubs,
-	// and users should call plugins/stream helpers directly:
-	//   - return stream.SSEUpgrade(c, handler)
-	//   - return stream.WebSocketUpgrade(c, handler, opts)
 }

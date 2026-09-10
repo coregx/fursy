@@ -29,6 +29,16 @@ const (
 	mimeFormData       = "multipart/form-data"
 )
 
+// DecodeError wraps errors from JSON/XML decoders so the error handler
+// can distinguish genuine decode failures from unrelated errors whose
+// message happens to contain "json:" or "xml:".
+type DecodeError struct {
+	Err error
+}
+
+func (e *DecodeError) Error() string { return e.Err.Error() }
+func (e *DecodeError) Unwrap() error { return e.Err }
+
 // Common binding errors.
 var (
 	// ErrUnsupportedMediaType is returned when Content-Type is not supported.
@@ -60,7 +70,10 @@ func (jsonBinder) Bind(req *http.Request, obj any) error {
 		if errors.Is(err, io.EOF) {
 			return ErrEmptyRequestBody
 		}
-		return fmt.Errorf("json decode error: %w", err)
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			return &DecodeError{Err: err}
+		}
+		return &DecodeError{Err: err}
 	}
 
 	return nil
@@ -79,7 +92,10 @@ func (xmlBinder) Bind(req *http.Request, obj any) error {
 		if errors.Is(err, io.EOF) {
 			return ErrEmptyRequestBody
 		}
-		return fmt.Errorf("xml decode error: %w", err)
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			return &DecodeError{Err: err}
+		}
+		return &DecodeError{Err: err}
 	}
 
 	return nil

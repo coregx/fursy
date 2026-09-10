@@ -650,3 +650,60 @@ func TestRateLimit_DefaultBurst(t *testing.T) {
 		t.Errorf("expected 429 after default burst, got %d", rec.Code)
 	}
 }
+
+func TestRateLimit_LowRate_AllowsRequests(t *testing.T) {
+	// ISSUE 3: Rate=0.3 → int(0.3*2) = int(0.6) = 0 → Burst=0 → all requests rejected.
+	// After fix, Burst must be >= 1 so the first request is always allowed.
+	router := fursy.New()
+	router.Use(RateLimitWithConfig(RateLimitConfig{
+		Rate: 0.3, // Very low rate; int(0.3*2) == 0 without fix.
+	}))
+
+	router.Handle("GET", "/", func(c *fursy.Context) error {
+		return c.String(200, "OK")
+	})
+
+	req := httptest.NewRequest("GET", "/", http.NoBody)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Errorf("low rate (0.3): first request must be allowed, got status %d", rec.Code)
+	}
+}
+
+func TestRateLimit_EvictionWorks(t *testing.T) {
+	// ISSUE 1: evictOldest does O(n) scan. After fix it uses insertion-order list → O(1).
+	// Verify eviction actually removes the oldest key when MaxKeys is exceeded.
+	store := newInMemoryStore(2)
+
+	// Insert two keys.
+	store.GetLimiter("first", 10, 20)
+	store.GetLimiter("second", 10, 20)
+
+	// Insert third key — should evict "first".
+	store.GetLimiter("third", 10, 20)
+
+	store.mu.RLock()
+	_, hasFirst := store.limiters["first"]
+	_, hasSecond := store.limiters["second"]
+	_, hasThird := store.limiters["third"]
+	count := len(store.limiters)
+	store.mu.RUnlock()
+
+	if count != 2 {
+		t.Errorf("expected 2 entries after eviction, got %d", count)
+	}
+
+	if hasFirst {
+		t.Error("expected oldest key 'first' to be evicted")
+	}
+
+	if !hasSecond {
+		t.Error("expected key 'second' to remain")
+	}
+
+	if !hasThird {
+		t.Error("expected key 'third' to remain")
+	}
+}

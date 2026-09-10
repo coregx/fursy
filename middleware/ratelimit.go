@@ -91,15 +91,32 @@ type RateLimitStore interface {
 
 // inMemoryStore is the default in-memory store for rate limiters.
 type inMemoryStore struct {
-	limiters map[string]*limiterEntry
-	mu       sync.RWMutex
-	maxKeys  int
+	limiters    map[string]*limiterEntry
+	mu          sync.RWMutex
+	maxKeys     int
+	insertOrd   []string  // insertion-order list for O(1) eviction
+	cleanupOnce sync.Once // ensures at most one cleanup goroutine
 }
 
 // limiterEntry stores a rate limiter with its last access time.
 type limiterEntry struct {
 	limiter    *rate.Limiter
 	lastAccess time.Time
+}
+
+// startCleanup launches a single cleanup goroutine for this store.
+// Calling it multiple times is safe — sync.Once ensures only one goroutine runs.
+func (s *inMemoryStore) startCleanup(interval, expireAfter time.Duration) {
+	s.cleanupOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				s.Cleanup(expireAfter)
+			}
+		}()
+	})
 }
 
 // newInMemoryStore creates a new in-memory rate limiter store.
@@ -125,8 +142,8 @@ func (s *inMemoryStore) GetLimiter(key string, r rate.Limit, burst int) *rate.Li
 		return entry.limiter
 	}
 
-	// Check if we need to evict (LRU).
-	if s.maxKeys > 0 && len(s.limiters) >= s.maxKeys {
+	// Evict oldest entries until under maxKeys (O(1) amortized via insertion-order list).
+	for s.maxKeys > 0 && len(s.limiters) >= s.maxKeys {
 		s.evictOldest()
 	}
 
@@ -136,26 +153,23 @@ func (s *inMemoryStore) GetLimiter(key string, r rate.Limit, burst int) *rate.Li
 		limiter:    limiter,
 		lastAccess: time.Now(),
 	}
+	s.insertOrd = append(s.insertOrd, key)
 
 	return limiter
 }
 
-// evictOldest removes the oldest limiter (LRU eviction).
+// evictOldest removes the oldest entry by insertion order.
+// O(1) amortized: pops from front of insertOrd, skipping already-deleted keys.
 func (s *inMemoryStore) evictOldest() {
-	var oldestKey string
-	var oldestTime time.Time
+	for len(s.insertOrd) > 0 {
+		key := s.insertOrd[0]
+		s.insertOrd = s.insertOrd[1:]
 
-	// Find oldest entry.
-	for key, entry := range s.limiters {
-		if oldestKey == "" || entry.lastAccess.Before(oldestTime) {
-			oldestKey = key
-			oldestTime = entry.lastAccess
+		if _, ok := s.limiters[key]; ok {
+			delete(s.limiters, key)
+			return
 		}
-	}
-
-	// Remove oldest.
-	if oldestKey != "" {
-		delete(s.limiters, oldestKey)
+		// Key was already removed by Cleanup; skip and try next.
 	}
 }
 
@@ -245,7 +259,7 @@ func RateLimitWithConfig(config RateLimitConfig) fursy.HandlerFunc {
 	}
 
 	if config.Burst == 0 {
-		config.Burst = int(config.Rate * 2) // Allow 2x burst
+		config.Burst = max(1, int(config.Rate*2)) // Allow 2x burst, minimum 1
 	}
 
 	if config.KeyFunc == nil {
@@ -279,15 +293,12 @@ func RateLimitWithConfig(config RateLimitConfig) fursy.HandlerFunc {
 		config.ExpireAfter = 3 * time.Minute
 	}
 
-	// Start cleanup goroutine.
-	go func() {
-		ticker := time.NewTicker(config.CleanupInterval)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			config.Store.Cleanup(config.ExpireAfter)
-		}
-	}()
+	// Start cleanup goroutine (at most one per store instance).
+	// The goroutine lifetime matches the in-memory store and the router that owns it.
+	// External RateLimitStore implementations manage their own cleanup.
+	if ms, ok := config.Store.(*inMemoryStore); ok {
+		ms.startCleanup(config.CleanupInterval, config.ExpireAfter)
+	}
 
 	// Create rate limit from config.
 	rateLimit := rate.Limit(config.Rate)

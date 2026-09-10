@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
+- Radix tree edge cases (root path + param routes) — tracked by differential fuzz
+
+## [0.5.2] - 2026-09-10
+
+### Security
+- **CORS wildcard+credentials panic** — `CORSWithConfig` panics if `AllowOrigins="*"` + `AllowCredentials=true` (browser security bypass prevention)
+- **BasicAuth timing-safe comparison** — `BasicAuthAccounts` uses `subtle.ConstantTimeCompare`
+- **JWT: no detail leak** — error handler returns generic "Unauthorized", not internal error details
+- **JWT: case-insensitive bearer** — `strings.EqualFold` for auth scheme (RFC 6750)
+- **Recovery: re-panic ErrAbortHandler** — Go net/http expects this to propagate
+
+### Fixed
+- **Typed decode errors** — `binding.DecodeError` replaces `strings.Contains` anti-pattern. Truncated JSON now returns 400 (was 500)
+- **ResponseWriter wrapper** — `written` flag covers ALL write paths (XML, Blob, NoContent, direct Write), not just String/JSON/Problem
+- **RateLimit: Burst fix** — `max(1, int(Rate*2))` prevents Burst=0 at low rates
+- **RateLimit: O(1) eviction** — insertion-order tracking replaces O(n) map scan
+- **RateLimit: cleanup goroutine** — guarded by `sync.Once`, no duplicate goroutines
+- **Allow header sorted** — deterministic order (was random from map iteration)
+- **Vary: Add not Set** — CORS `Vary: Origin` no longer overwrites existing Vary values
+- **CORS preflight documented** — must be global (`router.Use()`), not per-group
+
+### Removed
+- All remaining `c.DB()`/`c.SSE()` references from docs and godoc
+
+### Added
+- `binding.DecodeError` type for typed error classification
+- Differential fuzz test for radix tree (Fable 5.1 contribution)
+- Radix edge case tests (empty params, trailing slash, Contains)
+- Middleware `Next()` requirement documented in HandlerFunc godoc
 
 ## [0.5.1] - 2026-09-10
 

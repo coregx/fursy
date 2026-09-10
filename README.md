@@ -227,6 +227,8 @@ router.Use(middleware.RecoveryWithConfig(middleware.RecoveryConfig{
 
 Cross-Origin Resource Sharing (RFC-compliant, OWASP recommended).
 
+> **Note**: CORS middleware **must** be registered globally via `router.Use()`, not on a `RouteGroup`. Preflight OPTIONS requests are handled before route matching, so group-level middleware is never reached for preflight. This is consistent with Gin, Echo, and Chi.
+
 ```go
 router.Use(middleware.CORS())
 
@@ -594,7 +596,10 @@ router.Use(database.Middleware(db))
 
 // Access database in handlers
 router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
-    db := c.DB().(*database.DB)  // Type assertion
+    db, ok := database.GetDB(c)
+    if !ok {
+        return c.Problem(fursy.InternalServerError("Database not configured"))
+    }
 
     var user User
     err := db.QueryRow(c.Request.Context(),
@@ -605,19 +610,6 @@ router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
         return c.Problem(fursy.NotFound("User not found"))
     }
     return c.JSON(200, user)
-})
-```
-
-**Type-safe helper** (recommended):
-
-```go
-router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
-    db, ok := database.GetDB(c)  // Type-safe retrieval
-    if !ok {
-        return c.Problem(fursy.InternalServerError("Database not configured"))
-    }
-
-    // Use db...
 })
 ```
 

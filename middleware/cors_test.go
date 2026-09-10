@@ -7,6 +7,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -178,31 +179,23 @@ func TestCORS_AllowCredentials(t *testing.T) {
 	}
 }
 
-// TestCORS_AllowCredentialsWithWildcard tests that credentials forces specific origin.
+// TestCORS_AllowCredentialsWithWildcard tests that wildcard+credentials panics.
 func TestCORS_AllowCredentialsWithWildcard(t *testing.T) {
-	r := fursy.New()
-	r.Use(CORSWithConfig(CORSConfig{
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for AllowOrigins=* with AllowCredentials=true")
+		}
+		msg, ok := r.(string)
+		if !ok || !strings.Contains(msg, "security bypass") {
+			t.Errorf("unexpected panic message: %v", r)
+		}
+	}()
+
+	CORSWithConfig(CORSConfig{
 		AllowOrigins:     "*",
 		AllowCredentials: true,
-	}))
-
-	r.Handle("GET", "/test", func(c *fursy.Context) error {
-		return c.String(200, "OK")
 	})
-
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
-	req.Header.Set("Origin", "https://example.com")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	// Even with AllowOrigins="*", when credentials=true, should use specific origin.
-	if w.Header().Get("Access-Control-Allow-Origin") != "https://example.com" {
-		t.Errorf("with credentials, should use specific origin even with wildcard")
-	}
-
-	if w.Header().Get("Access-Control-Allow-Credentials") != "true" {
-		t.Errorf("expected Allow-Credentials true")
-	}
 }
 
 // TestCORS_ExposeHeaders tests ExposeHeaders configuration.
@@ -612,6 +605,105 @@ func TestCORS_VaryHeader(t *testing.T) {
 		// No Origin header = not a CORS request, no Vary needed.
 		if w.Header().Get("Vary") != "" {
 			t.Errorf("non-CORS request should not have Vary header, got %q", w.Header().Get("Vary"))
+		}
+	})
+}
+
+// TestCORS_GroupLevel_NotSupported documents that CORS middleware registered on
+// a RouteGroup (not globally via router.Use) does NOT handle OPTIONS preflight
+// requests for paths within that group. The router's handleNotFound only runs
+// router-level middleware for automatic OPTIONS handling; group middleware is
+// embedded inside route handler wrappers and is unreachable when no OPTIONS
+// route is registered.
+//
+// This is consistent with how Gin, Echo, and Chi handle CORS: all recommend
+// registering CORS middleware globally. To fix CORS preflight for group routes,
+// move CORS to router.Use() instead of group.Use().
+func TestCORS_GroupLevel_NotSupported(t *testing.T) {
+	r := fursy.New()
+
+	// Register CORS on a group, NOT globally.
+	api := r.Group("/api")
+	api.Use(CORSWithConfig(CORSConfig{
+		AllowOrigins: "https://example.com",
+		AllowMethods: "GET,POST,PUT,DELETE",
+		AllowHeaders: "Content-Type,Authorization",
+	}))
+
+	api.Handle("GET", "/users", func(c *fursy.Context) error {
+		return c.String(200, "users")
+	})
+
+	t.Run("actual request works with group CORS", func(t *testing.T) {
+		// Actual (non-preflight) requests work fine because the group
+		// middleware chain executes when the GET route matches.
+		req := httptest.NewRequest("GET", "/api/users", http.NoBody)
+		req.Header.Set("Origin", "https://example.com")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("actual GET request: want 200, got %d", w.Code)
+		}
+		if w.Header().Get("Access-Control-Allow-Origin") != "https://example.com" {
+			t.Errorf("actual GET: want Allow-Origin https://example.com, got %q",
+				w.Header().Get("Access-Control-Allow-Origin"))
+		}
+	})
+
+	t.Run("preflight returns 405 with group CORS", func(t *testing.T) {
+		// OPTIONS preflight returns 405 because:
+		// 1. No OPTIONS route is registered for /api/users.
+		// 2. handleNotFound only runs router.middleware (empty here).
+		// 3. Group middleware is inside the route handler wrapper,
+		//    unreachable when route lookup fails.
+		//
+		// Workaround: register CORS globally via router.Use().
+		req := httptest.NewRequest("OPTIONS", "/api/users", http.NoBody)
+		req.Header.Set("Origin", "https://example.com")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "Content-Type")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		// Group-level CORS does NOT intercept OPTIONS preflight.
+		if w.Code != http.StatusMethodNotAllowed {
+			t.Errorf("OPTIONS preflight with group CORS: want 405, got %d", w.Code)
+		}
+		if w.Header().Get("Access-Control-Allow-Origin") != "" {
+			t.Errorf("OPTIONS preflight with group CORS: want no Allow-Origin, got %q",
+				w.Header().Get("Access-Control-Allow-Origin"))
+		}
+	})
+
+	t.Run("global CORS fixes preflight", func(t *testing.T) {
+		// Verify the recommended workaround: move CORS to router.Use().
+		r2 := fursy.New()
+		r2.Use(CORSWithConfig(CORSConfig{
+			AllowOrigins: "https://example.com",
+			AllowMethods: "GET,POST,PUT,DELETE",
+			AllowHeaders: "Content-Type,Authorization",
+		}))
+
+		api2 := r2.Group("/api")
+		api2.Handle("GET", "/users", func(c *fursy.Context) error {
+			return c.String(200, "users")
+		})
+
+		req := httptest.NewRequest("OPTIONS", "/api/users", http.NoBody)
+		req.Header.Set("Origin", "https://example.com")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "Content-Type")
+		w := httptest.NewRecorder()
+		r2.ServeHTTP(w, req)
+
+		// Global CORS correctly handles preflight.
+		if w.Code != http.StatusNoContent {
+			t.Errorf("global CORS preflight: want 204, got %d", w.Code)
+		}
+		if w.Header().Get("Access-Control-Allow-Origin") != "https://example.com" {
+			t.Errorf("global CORS preflight: want Allow-Origin https://example.com, got %q",
+				w.Header().Get("Access-Control-Allow-Origin"))
 		}
 	})
 }

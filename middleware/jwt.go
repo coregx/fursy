@@ -326,11 +326,12 @@ func extractToken(c *fursy.Context, source, param, authScheme string) string {
 
 		// If Authorization header and authScheme is set, extract token from scheme.
 		if param == "Authorization" && authScheme != "" {
-			prefix := authScheme + " "
-			if !strings.HasPrefix(auth, prefix) {
+			// RFC 6750: auth scheme is case-insensitive.
+			if len(auth) <= len(authScheme) || auth[len(authScheme)] != ' ' ||
+				!strings.EqualFold(auth[:len(authScheme)], authScheme) {
 				return ""
 			}
-			return auth[len(prefix):]
+			return auth[len(authScheme)+1:]
 		}
 
 		return auth
@@ -402,9 +403,9 @@ func validateClaim(claims jwt.Claims, key, expected string) bool {
 }
 
 // defaultJWTErrorHandler is the default error handler for JWT validation failures.
-func defaultJWTErrorHandler(c *fursy.Context, err error) error {
-	// Return 401 Unauthorized for all JWT errors.
-	return c.String(http.StatusUnauthorized, "Unauthorized: "+err.Error())
+// Does not expose error details to prevent information leakage.
+func defaultJWTErrorHandler(c *fursy.Context, _ error) error {
+	return c.String(http.StatusUnauthorized, "Unauthorized")
 }
 
 // JWTHelper provides helper functions for working with JWT tokens.

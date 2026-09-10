@@ -77,6 +77,12 @@ var AllowAll = CORSConfig{
 
 // CORS returns a middleware that handles Cross-Origin Resource Sharing (CORS).
 //
+// IMPORTANT: CORS middleware MUST be registered globally via router.Use(),
+// not on a RouteGroup. Preflight OPTIONS requests are handled by the router
+// before route matching, so group-level middleware is never reached for
+// preflight. This is consistent with Gin, Echo, and Chi which all require
+// global CORS registration.
+//
 // The middleware handles:
 //   - Preflight OPTIONS requests with appropriate CORS headers
 //   - Actual requests by adding CORS headers to responses
@@ -85,7 +91,7 @@ var AllowAll = CORSConfig{
 // Example:
 //
 //	router := fursy.New()
-//	router.Use(middleware.CORS())
+//	router.Use(middleware.CORS())  // Must be global, not on a group!
 //
 // With custom config:
 //
@@ -123,6 +129,13 @@ func CORSWithConfig(config CORSConfig) fursy.HandlerFunc {
 		config.AllowMethods = "GET,HEAD,PUT,POST,DELETE,PATCH"
 	}
 
+	// Reject insecure combination: wildcard origin + credentials.
+	if config.AllowOrigins == "*" && config.AllowCredentials {
+		panic("fursy/middleware: CORS: AllowOrigins=\"*\" with AllowCredentials=true " +
+			"reflects any origin with credentials — browser security bypass. " +
+			"Use specific origins or set AllowCredentials=false")
+	}
+
 	// Initialize lookup maps.
 	config.init()
 
@@ -136,7 +149,7 @@ func CORSWithConfig(config CORSConfig) fursy.HandlerFunc {
 		// Vary: Origin prevents cache poisoning — a shared cache must not
 		// serve a CORS response (with Allow-Origin for origin A) to a
 		// request from origin B.
-		c.Response.Header().Set("Vary", "Origin")
+		c.Response.Header().Add("Vary", "Origin")
 
 		// Check if this is a preflight request.
 		if c.Request.Method == http.MethodOptions {
