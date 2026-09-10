@@ -2,6 +2,7 @@ package fursy
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -287,9 +288,56 @@ func TestRouter_ServeHTTP_NotFound(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Status code = %d, want %d", w.Code, http.StatusNotFound)
 	}
-	body, _ := io.ReadAll(w.Body)
-	if string(body) != "Not Found" {
-		t.Errorf("Body = %q, want %q", body, "Not Found")
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "application/problem+json") {
+		t.Errorf("Content-Type = %q, want application/problem+json", ct)
+	}
+}
+
+// TestRouter_ErrorResponses_ProblemJSON verifies that all auto-generated error
+// responses use RFC 9457 Problem Details (application/problem+json).
+func TestRouter_ErrorResponses_ProblemJSON(t *testing.T) {
+	r := New()
+	r.Handle("GET", "/users", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		status int
+	}{
+		{"404 Not Found", "GET", "/notfound", 404},
+		{"405 Method Not Allowed", "POST", "/users", 405},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.status {
+				t.Fatalf("status = %d, want %d", w.Code, tt.status)
+			}
+
+			ct := w.Header().Get("Content-Type")
+			if !strings.Contains(ct, "application/problem+json") {
+				t.Errorf("Content-Type = %q, want application/problem+json", ct)
+			}
+
+			var p Problem
+			if err := json.NewDecoder(w.Body).Decode(&p); err != nil {
+				t.Fatalf("failed to decode Problem JSON: %v", err)
+			}
+			if p.Status != tt.status {
+				t.Errorf("Problem.Status = %d, want %d", p.Status, tt.status)
+			}
+			if p.Title == "" {
+				t.Error("Problem.Title should not be empty")
+			}
+		})
 	}
 }
 
@@ -308,9 +356,9 @@ func TestRouter_ServeHTTP_MethodNotAllowed(t *testing.T) {
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Errorf("Status code = %d, want %d", w.Code, http.StatusMethodNotAllowed)
 	}
-	body, _ := io.ReadAll(w.Body)
-	if string(body) != "Method Not Allowed" {
-		t.Errorf("Body = %q, want %q", body, "Method Not Allowed")
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "application/problem+json") {
+		t.Errorf("Content-Type = %q, want application/problem+json", ct)
 	}
 }
 
@@ -376,9 +424,9 @@ func TestRouter_ServeHTTP_HandlerError(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Status code = %d, want %d", w.Code, http.StatusInternalServerError)
 	}
-	body, _ := io.ReadAll(w.Body)
-	if string(body) != "Internal Server Error" {
-		t.Errorf("Body = %q, want %q", body, "Internal Server Error")
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "application/problem+json") {
+		t.Errorf("Content-Type = %q, want application/problem+json", ct)
 	}
 }
 
@@ -546,9 +594,9 @@ func TestRouter_StripTrailingSlash(t *testing.T) {
 		{"strip trailing slash", "/users/", 200, "users"},
 		{"param exact", "/users/42/posts", 200, "posts:42"},
 		{"param strip slash", "/users/42/posts/", 200, "posts:42"},
-		{"unregistered path", "/notfound", 404, "Not Found"},
-		{"unregistered with slash", "/notfound/", 404, "Not Found"},
-		{"root path", "/", 404, "Not Found"},
+		{"unregistered path", "/notfound", 404, ""},
+		{"unregistered with slash", "/notfound/", 404, ""},
+		{"root path", "/", 404, ""},
 	}
 
 	for _, tt := range tests {
@@ -560,9 +608,11 @@ func TestRouter_StripTrailingSlash(t *testing.T) {
 			if w.Code != tt.wantCode {
 				t.Errorf("GET %s: status = %d, want %d", tt.path, w.Code, tt.wantCode)
 			}
-			body, _ := io.ReadAll(w.Body)
-			if string(body) != tt.wantBody {
-				t.Errorf("GET %s: body = %q, want %q", tt.path, body, tt.wantBody)
+			if tt.wantBody != "" {
+				body, _ := io.ReadAll(w.Body)
+				if string(body) != tt.wantBody {
+					t.Errorf("GET %s: body = %q, want %q", tt.path, body, tt.wantBody)
+				}
 			}
 		})
 	}

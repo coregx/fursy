@@ -450,5 +450,5 @@ func defaultRateLimitErrorHandler(c *fursy.Context, retryAfter time.Duration) er
 	c.SetHeader("X-RateLimit-Remaining", "0")
 
 	// Return 429 Too Many Requests.
-	return c.String(http.StatusTooManyRequests, "Rate limit exceeded. Please try again later.")
+	return c.Problem(fursy.NewProblem(http.StatusTooManyRequests, "Too Many Requests", "Rate limit exceeded. Please try again later."))
 }

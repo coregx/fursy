@@ -114,8 +114,7 @@ func handlePanic(r interface{}, c *fursy.Context, logger *slog.Logger, config Re
 	// Print stack to stderr for visibility.
 	printStackToStderr(panicErr, stack, config)
 
-	// Send 500 response.
-	return c.String(http.StatusInternalServerError, "Internal Server Error")
+	return c.Problem(fursy.NewProblem(http.StatusInternalServerError, "Internal Server Error", ""))
 }
 
 // getStackTrace gets the current stack trace if not disabled.
@@ -183,7 +182,7 @@ func PanicHandler() fursy.HandlerFunc {
 					err = fmt.Errorf("%v", r)
 				}
 
-				_ = c.String(http.StatusInternalServerError, "Internal Server Error")
+				_ = c.Problem(fursy.NewProblem(http.StatusInternalServerError, "Internal Server Error", ""))
 			}
 		}()
 

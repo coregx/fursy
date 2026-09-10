@@ -512,7 +512,7 @@ func (cb *circuitBreaker) GetCounts() Counts {
 
 // defaultCircuitBreakerErrorHandler is the default error handler for open circuit.
 func defaultCircuitBreakerErrorHandler(c *fursy.Context) error {
-	return c.String(http.StatusServiceUnavailable, "Service temporarily unavailable (circuit breaker open)")
+	return c.Problem(fursy.NewProblem(http.StatusServiceUnavailable, "Service Unavailable", "circuit breaker open"))
 }
 
 // Reset manually resets the circuit breaker to Closed state (for testing).

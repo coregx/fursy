@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/coregx/fursy"
@@ -72,8 +73,9 @@ func TestBasicAuth_NoAuth(t *testing.T) {
 		t.Errorf("expected WWW-Authenticate header, got %s", wwwAuth)
 	}
 
-	if w.Body.String() != "Unauthorized" {
-		t.Errorf("expected 'Unauthorized', got %s", w.Body.String())
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "application/problem+json") {
+		t.Errorf("expected application/problem+json, got %s", ct)
 	}
 }
 
