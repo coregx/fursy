@@ -273,6 +273,11 @@ func (t *Tree) insertWildcard(path string, handler interface{}, n *node, fullPat
 
 	// Check if wildcard already exists
 	if existingWild := n.getWildChild(); existingWild != nil {
+		// Conflict: different wildcard type (param vs catch-all) at same position.
+		if existingWild.nType != wildcardType {
+			return fmt.Errorf("param/catch-all conflict: %s and %s at %s", existingWild.path, path[:end], fullPath)
+		}
+
 		// Extract existing wildcard name from path
 		existingName := existingWild.path[1:]
 		if idx := strings.IndexByte(existingName, '/'); idx != -1 {
@@ -289,7 +294,7 @@ func (t *Tree) insertWildcard(path string, handler interface{}, n *node, fullPat
 		}
 
 		if existingWild.handler != nil {
-			return fmt.Errorf("route already exists")
+			return fmt.Errorf("route already exists: %s", fullPath)
 		}
 
 		existingWild.handler = handler

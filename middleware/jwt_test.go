@@ -1062,3 +1062,63 @@ func TestJWTHelper_GenerateToken_ECDSA_Methods(t *testing.T) {
 		})
 	}
 }
+
+func TestJWT_RequireExpiration_Default(t *testing.T) {
+	secret := []byte(testSecret)
+
+	// Generate token WITHOUT exp claim.
+	claims := jwt.MapClaims{
+		"sub": testSubject,
+		"iat": time.Now().Unix(),
+	}
+	token := generateTestToken(claims, secret, jwtAlgoHS256)
+
+	router := fursy.New()
+	router.Use(JWT(secret))
+
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
+		return c.String(200, "OK")
+	})
+
+	req := httptest.NewRequest("GET", "/protected", http.NoBody)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != 401 {
+		t.Errorf("expected status 401 for token without exp (required by default), got %d", rec.Code)
+	}
+}
+
+func TestJWT_RequireExpiration_Disabled(t *testing.T) {
+	secret := []byte(testSecret)
+
+	// Generate token WITHOUT exp claim.
+	claims := jwt.MapClaims{
+		"sub": testSubject,
+		"iat": time.Now().Unix(),
+	}
+	token := generateTestToken(claims, secret, jwtAlgoHS256)
+
+	requireExp := false
+	router := fursy.New()
+	router.Use(JWTWithConfig(JWTConfig{
+		SigningKey:        secret,
+		RequireExpiration: &requireExp,
+	}))
+
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
+		return c.String(200, "OK")
+	})
+
+	req := httptest.NewRequest("GET", "/protected", http.NoBody)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Errorf("expected status 200 when RequireExpiration=false, got %d", rec.Code)
+	}
+}

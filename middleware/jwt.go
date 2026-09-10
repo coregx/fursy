@@ -47,12 +47,13 @@ const (
 
 // Common JWT errors.
 var (
-	ErrJWTMissing     = errors.New("missing or malformed jwt")
-	ErrJWTInvalid     = errors.New("invalid or expired jwt")
-	ErrJWTAlgorithm   = errors.New("invalid jwt signing algorithm")
-	ErrJWTNoneAlgo    = errors.New("jwt 'none' algorithm is forbidden")
-	ErrJWTExpired     = errors.New("jwt token has expired")
-	ErrJWTNotValidYet = errors.New("jwt token not valid yet")
+	ErrJWTMissing      = errors.New("missing or malformed jwt")
+	ErrJWTInvalid      = errors.New("invalid or expired jwt")
+	ErrJWTAlgorithm    = errors.New("invalid jwt signing algorithm")
+	ErrJWTNoneAlgo     = errors.New("jwt 'none' algorithm is forbidden")
+	ErrJWTExpired      = errors.New("jwt token has expired")
+	ErrJWTNotValidYet  = errors.New("jwt token not valid yet")
+	ErrJWTNoExpiration = errors.New("jwt token missing required exp claim")
 )
 
 // JWTConfig defines the configuration for the JWT middleware.
@@ -116,6 +117,11 @@ type JWTConfig struct {
 	// This provides defense-in-depth against algorithm confusion attacks.
 	// Default: nil (use SigningMethod only)
 	AllowedAlgorithms []string
+
+	// RequireExpiration controls whether the "exp" claim is required.
+	// When true, tokens without an expiration claim are rejected.
+	// Default: true (secure by default — tokens must expire)
+	RequireExpiration *bool
 }
 
 // JWT returns a middleware that provides JWT authentication.
@@ -256,6 +262,13 @@ func JWTWithConfig(config JWTConfig) fursy.HandlerFunc {
 
 		// Parse and validate token.
 		claims := config.Claims()
+
+		// Build parser options.
+		var parserOpts []jwt.ParserOption
+		if config.RequireExpiration == nil || *config.RequireExpiration {
+			parserOpts = append(parserOpts, jwt.WithExpirationRequired())
+		}
+
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 			// Security: Prevent "none" algorithm attack.
 			if token.Method.Alg() == jwtAlgoNone {
@@ -269,7 +282,7 @@ func JWTWithConfig(config JWTConfig) fursy.HandlerFunc {
 			}
 
 			return config.SigningKey, nil
-		})
+		}, parserOpts...)
 
 		if err != nil {
 			// Check for specific errors.
@@ -278,6 +291,9 @@ func JWTWithConfig(config JWTConfig) fursy.HandlerFunc {
 			}
 			if errors.Is(err, jwt.ErrTokenNotValidYet) {
 				return config.ErrorHandler(c, ErrJWTNotValidYet)
+			}
+			if errors.Is(err, jwt.ErrTokenRequiredClaimMissing) {
+				return config.ErrorHandler(c, ErrJWTNoExpiration)
 			}
 			return config.ErrorHandler(c, err)
 		}

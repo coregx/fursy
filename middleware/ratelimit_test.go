@@ -522,7 +522,7 @@ func TestRateLimit_Cleanup(t *testing.T) {
 	store.Cleanup(5 * time.Minute)
 
 	// Check that old limiters were removed.
-	store.mu.RLock()
+	store.mu.Lock()
 	count := len(store.limiters)
 	hasOld1 := false
 	hasOld2 := false
@@ -538,7 +538,7 @@ func TestRateLimit_Cleanup(t *testing.T) {
 			hasRecent = true
 		}
 	}
-	store.mu.RUnlock()
+	store.mu.Unlock()
 
 	if count != 1 {
 		t.Errorf("expected 1 limiter after cleanup, got %d", count)
@@ -684,12 +684,12 @@ func TestRateLimit_EvictionWorks(t *testing.T) {
 	// Insert third key — should evict "first".
 	store.GetLimiter("third", 10, 20)
 
-	store.mu.RLock()
+	store.mu.Lock()
 	_, hasFirst := store.limiters["first"]
 	_, hasSecond := store.limiters["second"]
 	_, hasThird := store.limiters["third"]
 	count := len(store.limiters)
-	store.mu.RUnlock()
+	store.mu.Unlock()
 
 	if count != 2 {
 		t.Errorf("expected 2 entries after eviction, got %d", count)
@@ -706,4 +706,51 @@ func TestRateLimit_EvictionWorks(t *testing.T) {
 	if !hasThird {
 		t.Error("expected key 'third' to remain")
 	}
+}
+
+func TestRateLimit_CleanupGoroutineStops(t *testing.T) {
+	store := newInMemoryStore(100)
+	store.startCleanup(10*time.Millisecond, 50*time.Millisecond)
+
+	// Add a key so the goroutine has work to do.
+	store.GetLimiter("test", rate.Limit(10), 20)
+
+	// Let the cleanup goroutine run at least once.
+	time.Sleep(30 * time.Millisecond)
+
+	// Stop the cleanup goroutine.
+	store.Stop()
+
+	// Wait for the goroutine to observe the done channel and exit.
+	time.Sleep(30 * time.Millisecond)
+
+	// Add a new key and expire it. If goroutine is stopped, it won't be cleaned.
+	store.GetLimiter("after-stop", rate.Limit(10), 20)
+	store.mu.Lock()
+	if entry, ok := store.limiters["after-stop"]; ok {
+		entry.lastAccess = time.Now().Add(-2 * time.Hour)
+	}
+	store.mu.Unlock()
+
+	// Wait long enough for the cleanup ticker to have fired if still running.
+	time.Sleep(50 * time.Millisecond)
+
+	// The expired key should still exist because the goroutine is stopped.
+	store.mu.Lock()
+	_, exists := store.limiters["after-stop"]
+	store.mu.Unlock()
+
+	if !exists {
+		t.Error("cleanup goroutine ran after Stop() — should have been stopped")
+	}
+}
+
+func TestRateLimit_StopIdempotent(_ *testing.T) {
+	store := newInMemoryStore(100)
+	store.startCleanup(10*time.Millisecond, 50*time.Millisecond)
+
+	// Stop multiple times should not panic.
+	store.Stop()
+	store.Stop()
+	store.Stop()
 }

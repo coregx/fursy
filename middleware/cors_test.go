@@ -528,7 +528,8 @@ func TestCORS_PreflightWithoutRoute(t *testing.T) {
 }
 
 // TestCORS_PreflightWithoutRoute_NoMiddleware verifies that OPTIONS without
-// CORS middleware still returns 405 (no implicit CORS).
+// CORS middleware returns 204 with Allow header (RFC 9110 compliance).
+// The router handles OPTIONS automatically when the path exists for other methods.
 func TestCORS_PreflightWithoutRoute_NoMiddleware(t *testing.T) {
 	r := fursy.New()
 
@@ -540,9 +541,14 @@ func TestCORS_PreflightWithoutRoute_NoMiddleware(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	// Without CORS middleware, OPTIONS to a GET-only route should be 405.
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Errorf("OPTIONS without middleware: want 405, got %d", w.Code)
+	// OPTIONS to a path that exists for other methods returns 204 + Allow.
+	if w.Code != http.StatusNoContent {
+		t.Errorf("OPTIONS without middleware: want 204, got %d", w.Code)
+	}
+
+	allow := w.Header().Get("Allow")
+	if allow == "" {
+		t.Error("OPTIONS response should include Allow header")
 	}
 }
 
@@ -651,14 +657,13 @@ func TestCORS_GroupLevel_NotSupported(t *testing.T) {
 		}
 	})
 
-	t.Run("preflight returns 405 with group CORS", func(t *testing.T) {
-		// OPTIONS preflight returns 405 because:
-		// 1. No OPTIONS route is registered for /api/users.
-		// 2. handleNotFound only runs router.middleware (empty here).
-		// 3. Group middleware is inside the route handler wrapper,
-		//    unreachable when route lookup fails.
+	t.Run("preflight returns 204 with group CORS", func(t *testing.T) {
+		// OPTIONS preflight returns 204 + Allow because the router now
+		// handles OPTIONS automatically when the path exists for other methods.
+		// However, group-level CORS middleware does NOT execute here —
+		// only router.middleware runs (empty in this test). So no CORS headers.
 		//
-		// Workaround: register CORS globally via router.Use().
+		// Workaround for CORS headers: register CORS globally via router.Use().
 		req := httptest.NewRequest("OPTIONS", "/api/users", http.NoBody)
 		req.Header.Set("Origin", "https://example.com")
 		req.Header.Set("Access-Control-Request-Method", "POST")
@@ -666,10 +671,11 @@ func TestCORS_GroupLevel_NotSupported(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		// Group-level CORS does NOT intercept OPTIONS preflight.
-		if w.Code != http.StatusMethodNotAllowed {
-			t.Errorf("OPTIONS preflight with group CORS: want 405, got %d", w.Code)
+		// Router now returns 204 for OPTIONS when path exists.
+		if w.Code != http.StatusNoContent {
+			t.Errorf("OPTIONS preflight with group CORS: want 204, got %d", w.Code)
 		}
+		// Group-level CORS does NOT intercept OPTIONS preflight — no CORS headers.
 		if w.Header().Get("Access-Control-Allow-Origin") != "" {
 			t.Errorf("OPTIONS preflight with group CORS: want no Allow-Origin, got %q",
 				w.Header().Get("Access-Control-Allow-Origin"))

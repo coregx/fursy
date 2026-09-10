@@ -647,26 +647,26 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.pool.Put(c)
 	}()
 
-	path := req.URL.Path
+	// Use RawPath when available to preserve percent-encoded characters.
+	// net/http decodes %3A to ":" in URL.Path, which would incorrectly match
+	// param markers (e.g., /users/%3Aid → /users/:id). RawPath preserves the
+	// original encoding so literal %3A stays as %3A and doesn't trigger param matching.
+	path := req.URL.RawPath
+	if path == "" {
+		path = req.URL.Path
+	}
 
-	// Get tree for this HTTP method.
-	tree := r.trees[req.Method]
-	if tree == nil {
-		r.handleNotFound(c, w, req, path)
+	// Lookup route in the method-specific tree.
+	handler, radixParams, found, redirected := r.lookupRoute(c, w, req, path, req.Method)
+	if redirected {
 		return
 	}
 
-	// Lookup route in radix tree (zero-alloc: reuse pooled buffer).
-	handler, radixParams, found := tree.Lookup(path, c.radixBuf[:0])
-
-	// If not found, try the trailing slash alternate path.
-	if !found && r.trailingSlash != IgnoreTrailingSlash {
-		altHandler, altParams, altFound, redirected := r.tryTrailingSlashLookup(tree, w, req, path)
+	// HEAD→GET fallback: RFC 9110 — HEAD is identical to GET except no body.
+	if !found && req.Method == http.MethodHead {
+		handler, radixParams, found, redirected = r.lookupRoute(c, w, req, path, http.MethodGet)
 		if redirected {
 			return
-		}
-		if altFound {
-			handler, radixParams, found = altHandler, altParams, altFound
 		}
 	}
 
@@ -756,40 +756,77 @@ func defaultErrorHandler(c *Context, err error) {
 }
 
 // handleNotFound sends a 404 or 405 response depending on configuration.
+// Global middleware is always executed so that logger, rate-limit, security
+// headers, etc. see all traffic including error paths.
 func (r *Router) handleNotFound(c *Context, w http.ResponseWriter, req *http.Request, path string) {
-	// F4 fix: if OPTIONS and handleOPTIONS enabled and the path exists for
-	// other methods, run middleware chain with an empty handler so CORS
-	// middleware can respond to the preflight. Without this, OPTIONS
-	// requests to paths without an explicit OPTIONS route get 405 and
-	// middleware never executes.
-	if req.Method == http.MethodOptions && r.handleOPTIONS &&
-		len(r.middleware) > 0 && r.pathExistsInOtherMethods(path, req.Method) {
-		c.init(w, req, r, nil)
-		c.handlers = c.handlers[:0]
-		c.handlers = append(c.handlers, r.middleware...)
-		// Terminal no-op handler: if no middleware writes a response,
-		// return 204 (successful OPTIONS with no body).
-		c.handlers = append(c.handlers, func(ctx *Context) error {
-			return ctx.NoContent(http.StatusNoContent)
-		})
-		c.index = -1
-		c.aborted = false
-		if err := c.Next(); err != nil {
-			r.handleError(c, err)
+	c.init(w, req, r, nil)
+
+	// Determine the terminal handler (404, 405, or OPTIONS 204).
+	var terminalHandler HandlerFunc
+
+	// OPTIONS: if the path exists for other methods, respond 204 + Allow.
+	// Works with or without middleware (removed len(r.middleware) > 0 guard).
+	if req.Method == http.MethodOptions && r.handleOPTIONS {
+		if allowed := r.allowedMethods(path, req.Method); allowed != "" {
+			terminalHandler = func(ctx *Context) error {
+				ctx.SetHeader("Allow", allowed)
+				return ctx.NoContent(http.StatusNoContent)
+			}
 		}
-		return
 	}
 
-	if r.handleMethodNotAllowed {
+	// 405 Method Not Allowed: path exists for other methods.
+	if terminalHandler == nil && r.handleMethodNotAllowed {
 		if allowed := r.allowedMethods(path, req.Method); allowed != "" {
-			c.init(w, req, r, nil)
-			c.SetHeader("Allow", allowed)
-			_ = c.String(http.StatusMethodNotAllowed, "Method Not Allowed")
-			return
+			terminalHandler = func(ctx *Context) error {
+				ctx.SetHeader("Allow", allowed)
+				return ctx.String(http.StatusMethodNotAllowed, "Method Not Allowed")
+			}
 		}
 	}
-	c.init(w, req, r, nil)
-	_ = c.String(http.StatusNotFound, "Not Found")
+
+	// 404 Not Found: default.
+	if terminalHandler == nil {
+		terminalHandler = func(ctx *Context) error {
+			return ctx.String(http.StatusNotFound, "Not Found")
+		}
+	}
+
+	// Run global middleware chain with the terminal handler so that
+	// logger, rate-limit, secure headers, etc. see error traffic too.
+	c.handlers = c.handlers[:0]
+	c.handlers = append(c.handlers, r.middleware...)
+	c.handlers = append(c.handlers, terminalHandler)
+	c.index = -1
+	c.aborted = false
+	if err := c.Next(); err != nil {
+		r.handleError(c, err)
+	}
+}
+
+// lookupRoute searches for a handler in the tree for the given method.
+// Returns (handler, params, found, redirected). If redirected is true,
+// a trailing-slash redirect was sent and the caller should return immediately.
+func (r *Router) lookupRoute(
+	c *Context, w http.ResponseWriter, req *http.Request, path, method string,
+) (interface{}, []radix.Param, bool, bool) {
+	tree := r.trees[method]
+	if tree == nil {
+		return nil, nil, false, false
+	}
+
+	handler, params, found := tree.Lookup(path, c.radixBuf[:0])
+	if !found && r.trailingSlash != IgnoreTrailingSlash {
+		altHandler, altParams, altFound, redirected := r.tryTrailingSlashLookup(tree, w, req, path)
+		if redirected {
+			return nil, nil, false, true
+		}
+		if altFound {
+			return altHandler, altParams, true, false
+		}
+	}
+
+	return handler, params, found, false
 }
 
 // tryTrailingSlashLookup attempts to find a handler by toggling the trailing slash.
