@@ -18,7 +18,7 @@ func TestCORS(t *testing.T) {
 	r := fursy.New()
 	r.Use(CORS())
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -43,7 +43,7 @@ func TestCORS_NoOrigin(t *testing.T) {
 	r := fursy.New()
 	r.Use(CORS())
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -71,12 +71,12 @@ func TestCORS_Preflight(t *testing.T) {
 		MaxAge:       12 * time.Hour,
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
 	// Register OPTIONS handler for preflight (CORS middleware will handle it).
-	r.OPTIONS("/test", func(c *fursy.Context) error {
+	r.Handle("OPTIONS", "/test", func(c *fursy.Context) error {
 		return c.NoContent(204)
 	})
 
@@ -116,12 +116,12 @@ func TestCORS_PreflightWildcard(t *testing.T) {
 	r := fursy.New()
 	r.Use(CORSWithConfig(AllowAll))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
 	// Register OPTIONS handler for preflight (CORS middleware will handle it).
-	r.OPTIONS("/test", func(c *fursy.Context) error {
+	r.Handle("OPTIONS", "/test", func(c *fursy.Context) error {
 		return c.NoContent(204)
 	})
 
@@ -160,7 +160,7 @@ func TestCORS_AllowCredentials(t *testing.T) {
 		AllowCredentials: true,
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -186,7 +186,7 @@ func TestCORS_AllowCredentialsWithWildcard(t *testing.T) {
 		AllowCredentials: true,
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -213,7 +213,7 @@ func TestCORS_ExposeHeaders(t *testing.T) {
 		ExposeHeaders: "X-Request-ID,X-Response-Time",
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -234,7 +234,7 @@ func TestCORS_DisallowedOrigin(t *testing.T) {
 		AllowOrigins: "https://example.com,https://foo.com",
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -257,7 +257,7 @@ func TestCORS_DisallowedMethod(t *testing.T) {
 		AllowMethods: "GET,POST",
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -282,7 +282,7 @@ func TestCORS_DisallowedHeaders(t *testing.T) {
 		AllowHeaders: "Content-Type",
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -306,7 +306,7 @@ func TestCORS_NullOrigin(t *testing.T) {
 		AllowOrigins: corsOriginNull,
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -327,7 +327,7 @@ func TestCORS_OPTIONSWithoutRequestMethod(t *testing.T) {
 	r.Use(CORS())
 
 	handlerCalled := false
-	r.OPTIONS("/test", func(c *fursy.Context) error {
+	r.Handle("OPTIONS", "/test", func(c *fursy.Context) error {
 		handlerCalled = true
 		return c.String(200, "OK")
 	})
@@ -352,7 +352,7 @@ func TestCORS_WithRouteGroups(t *testing.T) {
 	}))
 
 	api := r.Group("/api")
-	api.GET("/users", func(c *fursy.Context) error {
+	api.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "users")
 	})
 

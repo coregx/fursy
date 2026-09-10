@@ -82,7 +82,7 @@ func TestMiddleware_ExecutionOrder(t *testing.T) {
 	})
 
 	// Handler: runs last
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		executionOrder = append(executionOrder, "handler")
 		return c.String(200, "OK")
 	})
@@ -115,7 +115,7 @@ func TestMiddleware_Next(t *testing.T) {
 			return c.Next()
 		})
 
-		r.GET("/test", func(c *Context) error {
+		r.Handle("GET", "/test", func(c *Context) error {
 			handlerCalled = true
 			return c.String(200, "OK")
 		})
@@ -136,7 +136,7 @@ func TestMiddleware_Next(t *testing.T) {
 			return c.Next()
 		})
 
-		r.GET("/test", func(c *Context) error {
+		r.Handle("GET", "/test", func(c *Context) error {
 			return c.String(200, "test-response")
 		})
 
@@ -185,7 +185,7 @@ func TestMiddleware_Abort(t *testing.T) {
 		})
 
 		// This handler should NOT be called
-		r.GET("/test", func(c *Context) error {
+		r.Handle("GET", "/test", func(c *Context) error {
 			handlerCalled = true
 			return c.String(200, "OK")
 		})
@@ -231,7 +231,7 @@ func TestMiddleware_Abort(t *testing.T) {
 		})
 
 		// Handler: should NOT execute
-		r.GET("/test", func(c *Context) error {
+		r.Handle("GET", "/test", func(c *Context) error {
 			executed = append(executed, "handler")
 			return c.String(200, "OK")
 		})
@@ -291,7 +291,7 @@ func TestMiddleware_ErrorPropagation(t *testing.T) {
 			return err
 		})
 
-		r.GET("/test", func(_ *Context) error {
+		r.Handle("GET", "/test", func(_ *Context) error {
 			return handlerErr
 		})
 
@@ -318,7 +318,7 @@ func TestMiddleware_ErrorPropagation(t *testing.T) {
 			return middlewareErr
 		})
 
-		r.GET("/test", func(c *Context) error {
+		r.Handle("GET", "/test", func(c *Context) error {
 			handlerCalled = true
 			return c.String(200, "OK")
 		})
@@ -352,7 +352,7 @@ func TestMiddleware_ErrorPropagation(t *testing.T) {
 			return nil
 		})
 
-		r.GET("/test", func(_ *Context) error {
+		r.Handle("GET", "/test", func(_ *Context) error {
 			return handlerErr
 		})
 
@@ -384,7 +384,7 @@ func TestMiddleware_ErrorPropagation(t *testing.T) {
 			return nil
 		})
 
-		r.GET("/test", func(_ *Context) error {
+		r.Handle("GET", "/test", func(_ *Context) error {
 			return errors.New("some error")
 		})
 
@@ -430,7 +430,7 @@ func TestMiddleware_DataPassing(t *testing.T) {
 	})
 
 	// Handler: uses the data
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		userID := c.GetString("userID")
 		return c.String(200, "User: "+userID)
 	})
@@ -468,7 +468,7 @@ func TestMiddleware_RealWorldScenarios(t *testing.T) {
 			return err
 		})
 
-		r.GET("/users/123", func(c *Context) error {
+		r.Handle("GET", "/users/123", func(c *Context) error {
 			return c.String(200, "OK")
 		})
 
@@ -503,7 +503,7 @@ func TestMiddleware_RealWorldScenarios(t *testing.T) {
 			return c.Next()
 		})
 
-		r.GET("/protected", func(c *Context) error {
+		r.Handle("GET", "/protected", func(c *Context) error {
 			userID := c.GetString("userID")
 			return c.String(200, "Hello "+userID)
 		})
@@ -559,12 +559,12 @@ func TestMiddleware_RealWorldScenarios(t *testing.T) {
 			return c.Next()
 		})
 
-		r.GET("/api/data", func(c *Context) error {
+		r.Handle("GET", "/api/data", func(c *Context) error {
 			return c.String(200, "data")
 		})
 
 		// Register OPTIONS handler for preflight
-		r.OPTIONS("/api/data", func(c *Context) error {
+		r.Handle("OPTIONS", "/api/data", func(c *Context) error {
 			// Middleware will handle the response
 			return c.NoContent(204)
 		})
@@ -614,7 +614,7 @@ func TestMiddleware_RealWorldScenarios(t *testing.T) {
 			return c.Next()
 		})
 
-		r.GET("/panic", func(_ *Context) error {
+		r.Handle("GET", "/panic", func(_ *Context) error {
 			panic("something went wrong")
 		})
 
@@ -642,7 +642,7 @@ func TestMiddleware_ContextReset(t *testing.T) {
 		return c.Next()
 	})
 
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		val := c.GetString("request-specific")
 		return c.String(200, val)
 	})
@@ -681,7 +681,7 @@ func BenchmarkMiddleware_Chain(b *testing.B) {
 		return c.Next()
 	})
 
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -707,7 +707,7 @@ func BenchmarkMiddleware_DataPassing(b *testing.B) {
 		return c.Next()
 	})
 
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		_ = c.GetString("key1")
 		_ = c.GetInt("key2")
 		_ = c.GetBool("key3")
@@ -739,7 +739,7 @@ func BenchmarkMiddleware_Abort(b *testing.B) {
 		return c.Next()
 	})
 
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		// Should not execute
 		return c.String(200, "OK")
 	})

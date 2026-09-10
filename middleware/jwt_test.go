@@ -76,7 +76,7 @@ func TestJWT_BasicAuth_HS256(t *testing.T) {
 	router := fursy.New()
 	router.Use(JWT(secret))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		claims := c.Get(JWTContextKey).(jwt.MapClaims)
 		sub := claims["sub"].(string)
 		return c.String(200, "Hello, "+sub)
@@ -102,7 +102,7 @@ func TestJWT_MissingToken(t *testing.T) {
 	router := fursy.New()
 	router.Use(JWT([]byte(testSecret)))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -120,7 +120,7 @@ func TestJWT_MalformedToken(t *testing.T) {
 	router := fursy.New()
 	router.Use(JWT([]byte(testSecret)))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -142,7 +142,7 @@ func TestJWT_ExpiredToken(t *testing.T) {
 	router := fursy.New()
 	router.Use(JWT(secret))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -164,7 +164,7 @@ func TestJWT_NotYetValidToken(t *testing.T) {
 	router := fursy.New()
 	router.Use(JWT(secret))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -187,7 +187,7 @@ func TestJWT_WrongSigningKey(t *testing.T) {
 	router := fursy.New()
 	router.Use(JWT([]byte("key2")))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -233,7 +233,7 @@ func TestJWT_AlgorithmConfusion_Prevention(t *testing.T) {
 		SigningMethod: jwtAlgoRS256,
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -269,7 +269,7 @@ func TestJWT_RS256(t *testing.T) {
 		SigningMethod: jwtAlgoRS256,
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		claims := c.Get(JWTContextKey).(jwt.MapClaims)
 		sub := claims["sub"].(string)
 		return c.String(200, "Hello, "+sub)
@@ -307,7 +307,7 @@ func TestJWT_ES256(t *testing.T) {
 		SigningMethod: jwtAlgoES256,
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -340,7 +340,7 @@ func TestJWT_ValidateIssuer(t *testing.T) {
 		ValidateIssuer: testIssuer,
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -373,7 +373,7 @@ func TestJWT_ValidateIssuer_Invalid(t *testing.T) {
 		ValidateIssuer: testIssuer,
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -406,7 +406,7 @@ func TestJWT_ValidateAudience(t *testing.T) {
 		ValidateAudience: testAudience,
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -439,7 +439,7 @@ func TestJWT_ValidateAudience_Array(t *testing.T) {
 		ValidateAudience: testAudience,
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -464,11 +464,11 @@ func TestJWT_Skipper(t *testing.T) {
 		},
 	}))
 
-	router.GET("/health", func(c *fursy.Context) error {
+	router.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "Protected")
 	})
 
@@ -501,7 +501,7 @@ func TestJWT_TokenFromQuery(t *testing.T) {
 		TokenLookup: "query:token",
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -525,7 +525,7 @@ func TestJWT_TokenFromCookie(t *testing.T) {
 		TokenLookup: "cookie:jwt",
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -570,7 +570,7 @@ func TestJWT_CustomClaims(t *testing.T) {
 		},
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		claims := c.Get(JWTContextKey).(*CustomClaims)
 		return c.String(200, "Role: "+claims.Role)
 	})
@@ -602,7 +602,7 @@ func TestJWT_CustomErrorHandler(t *testing.T) {
 		},
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -638,7 +638,7 @@ func TestJWT_SuccessHandler(t *testing.T) {
 		},
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		user := c.GetString(UserContextKey)
 		return c.String(200, "User: "+user)
 	})
@@ -675,7 +675,7 @@ func TestJWT_SuccessHandler_ReturnsError(t *testing.T) {
 		},
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -702,7 +702,7 @@ func TestJWT_AllowedAlgorithms(t *testing.T) {
 		AllowedAlgorithms: []string{jwtAlgoHS256, jwtAlgoHS384},
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -851,7 +851,7 @@ func TestJWT_TokenStorage(t *testing.T) {
 	router := fursy.New()
 	router.Use(JWT(secret))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		// Check that both token and claims are stored.
 		storedToken := c.GetString(JWTTokenContextKey)
 		if storedToken != token {
@@ -888,7 +888,7 @@ func TestJWT_TokenFromHeader_WithoutBearer(t *testing.T) {
 		AuthScheme:  "",
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -934,7 +934,7 @@ func TestJWT_ValidateClaim_WithRegisteredClaims(t *testing.T) {
 		},
 	}))
 
-	router.GET("/protected", func(c *fursy.Context) error {
+	router.Handle("GET", "/protected", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 

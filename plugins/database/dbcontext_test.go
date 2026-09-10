@@ -24,7 +24,7 @@ func TestMustGetDB_Success(t *testing.T) {
 	router := fursy.New()
 	router.Use(database.Middleware(db))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		retrievedDB := database.MustGetDB(c) // Should not panic.
 		if retrievedDB != db {
 			t.Error("MustGetDB returned wrong database")
@@ -46,7 +46,7 @@ func TestMustGetDB_Panic(t *testing.T) {
 	router := fursy.New()
 	// NO database middleware!
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Error("MustGetDB should panic when DB not configured")
@@ -70,7 +70,7 @@ func TestGetDBOrError_Success(t *testing.T) {
 	router := fursy.New()
 	router.Use(database.Middleware(db))
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		retrievedDB, err := database.GetDBOrError(c)
 		if err != nil {
 			return err
@@ -95,7 +95,7 @@ func TestGetDBOrError_Error(t *testing.T) {
 	router := fursy.New()
 	// NO database middleware!
 
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		db, err := database.GetDBOrError(c)
 		if err == nil {
 			t.Error("GetDBOrError should return error when DB not configured")
@@ -137,7 +137,7 @@ func TestMustGetTx_Success(t *testing.T) {
 	router.Use(database.Middleware(db))
 	router.Use(database.TxMiddleware(db))
 
-	router.POST("/insert", func(c *fursy.Context) error {
+	router.Handle("POST", "/insert", func(c *fursy.Context) error {
 		tx := database.MustGetTx(c) // Should not panic.
 		_, err := tx.Exec(c.Request.Context(), "INSERT INTO test (name) VALUES (?)", "Helen")
 		if err != nil {
@@ -172,7 +172,7 @@ func TestMustGetTx_Panic(t *testing.T) {
 	router.Use(database.Middleware(db))
 	// NO TxMiddleware!
 
-	router.POST("/insert", func(c *fursy.Context) error {
+	router.Handle("POST", "/insert", func(c *fursy.Context) error {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Error("MustGetTx should panic when TxMiddleware not configured")
@@ -204,7 +204,7 @@ func TestGetTxOrError_Success(t *testing.T) {
 	router.Use(database.Middleware(db))
 	router.Use(database.TxMiddleware(db))
 
-	router.POST("/insert", func(c *fursy.Context) error {
+	router.Handle("POST", "/insert", func(c *fursy.Context) error {
 		tx, err := database.GetTxOrError(c)
 		if err != nil {
 			return err
@@ -242,7 +242,7 @@ func TestGetTxOrError_Error(t *testing.T) {
 	router.Use(database.Middleware(db))
 	// NO TxMiddleware!
 
-	router.POST("/insert", func(c *fursy.Context) error {
+	router.Handle("POST", "/insert", func(c *fursy.Context) error {
 		tx, err := database.GetTxOrError(c)
 		if err == nil {
 			t.Error("GetTxOrError should return error when TxMiddleware not configured")

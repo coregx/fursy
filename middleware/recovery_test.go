@@ -26,7 +26,7 @@ func TestRecovery(t *testing.T) {
 		DisablePrintStack: true, // Disable stderr output in tests
 	}))
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic("test panic")
 	})
 
@@ -69,7 +69,7 @@ func TestRecovery_ErrorPanic(t *testing.T) {
 	}))
 
 	testErr := errors.New("test error")
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic(testErr)
 	})
 
@@ -98,7 +98,7 @@ func TestRecovery_IntPanic(t *testing.T) {
 		DisablePrintStack: true,
 	}))
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic(42)
 	})
 
@@ -128,7 +128,7 @@ func TestRecovery_NoStackTrace(t *testing.T) {
 		DisablePrintStack: true,
 	}))
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic("test panic")
 	})
 
@@ -160,7 +160,7 @@ func TestRecovery_NoPanic(t *testing.T) {
 		DisablePrintStack: true,
 	}))
 
-	r.GET("/normal", func(c *fursy.Context) error {
+	r.Handle("GET", "/normal", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -193,7 +193,7 @@ func TestRecovery_JSONFormat(t *testing.T) {
 		DisablePrintStack: true,
 	}))
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic("json panic")
 	})
 
@@ -230,7 +230,7 @@ func TestRecovery_StackTraceSize(t *testing.T) {
 		DisablePrintStack: true,
 	}))
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic("stack test")
 	})
 
@@ -254,7 +254,7 @@ func TestPanicHandler(t *testing.T) {
 	r := fursy.New()
 	r.Use(PanicHandler())
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic("simple panic")
 	})
 
@@ -276,7 +276,7 @@ func TestPanicHandler_NoPanic(t *testing.T) {
 	r := fursy.New()
 	r.Use(PanicHandler())
 
-	r.GET("/normal", func(c *fursy.Context) error {
+	r.Handle("GET", "/normal", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -305,7 +305,7 @@ func TestRecovery_WithRouteGroups(t *testing.T) {
 	}))
 
 	api := r.Group("/api")
-	api.GET("/users", func(_ *fursy.Context) error {
+	api.Handle("GET", "/users", func(_ *fursy.Context) error {
 		panic("group panic")
 	})
 
@@ -349,7 +349,7 @@ func TestRecovery_MiddlewareChain(t *testing.T) {
 		DisablePrintStack: true,
 	}))
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		executed = append(executed, "handler")
 		panic("chain panic")
 	})
@@ -382,11 +382,11 @@ func TestRecovery_DefaultConstructor(t *testing.T) {
 	r := fursy.New()
 	r.Use(Recovery())
 
-	r.GET("/boom", func(_ *fursy.Context) error {
+	r.Handle("GET", "/boom", func(_ *fursy.Context) error {
 		panic("default recovery test")
 	})
 
-	r.GET("/ok", func(c *fursy.Context) error {
+	r.Handle("GET", "/ok", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "fine")
 	})
 
@@ -429,7 +429,7 @@ func TestRecovery_CustomType(t *testing.T) {
 		message string
 	}
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic(customError{code: 999, message: "custom error"})
 	})
 
@@ -459,11 +459,11 @@ func TestRecovery_MultipleRequests(t *testing.T) {
 		DisablePrintStack: true,
 	}))
 
-	r.GET("/panic", func(_ *fursy.Context) error {
+	r.Handle("GET", "/panic", func(_ *fursy.Context) error {
 		panic("panic request")
 	})
 
-	r.GET("/normal", func(c *fursy.Context) error {
+	r.Handle("GET", "/normal", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 

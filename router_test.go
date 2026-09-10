@@ -31,7 +31,7 @@ func TestRouter_GET(t *testing.T) {
 		return c.String(200, "OK")
 	}
 
-	r.GET("/test", handler)
+	r.Handle("GET", "/test", handler)
 
 	if r.trees[http.MethodGet] == nil {
 		t.Fatal("GET tree not created")
@@ -60,7 +60,7 @@ func TestRouter_POST(t *testing.T) {
 		return c.String(201, "Created")
 	}
 
-	r.POST("/users", handler)
+	r.Handle("POST", "/users", handler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/users", http.NoBody)
@@ -84,7 +84,7 @@ func TestRouter_PUT(t *testing.T) {
 		return c.NoContent(204)
 	}
 
-	r.PUT("/users/1", handler)
+	r.Handle("PUT", "/users/1", handler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/users/1", http.NoBody)
@@ -108,7 +108,7 @@ func TestRouter_DELETE(t *testing.T) {
 		return c.NoContent(204)
 	}
 
-	r.DELETE("/users/1", handler)
+	r.Handle("DELETE", "/users/1", handler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodDelete, "/users/1", http.NoBody)
@@ -132,7 +132,7 @@ func TestRouter_PATCH(t *testing.T) {
 		return c.JSON(200, map[string]string{"status": "updated"})
 	}
 
-	r.PATCH("/users/1", handler)
+	r.Handle("PATCH", "/users/1", handler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPatch, "/users/1", http.NoBody)
@@ -157,7 +157,7 @@ func TestRouter_HEAD(t *testing.T) {
 		return c.NoContent(200)
 	}
 
-	r.HEAD("/users/1", handler)
+	r.Handle("HEAD", "/users/1", handler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodHead, "/users/1", http.NoBody)
@@ -185,7 +185,7 @@ func TestRouter_OPTIONS(t *testing.T) {
 		return c.NoContent(200)
 	}
 
-	r.OPTIONS("/users", handler)
+	r.Handle("OPTIONS", "/users", handler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/users", http.NoBody)
@@ -273,7 +273,7 @@ func TestRouter_Handle_Panics(t *testing.T) {
 // TestRouter_ServeHTTP_NotFound tests 404 response.
 func TestRouter_ServeHTTP_NotFound(t *testing.T) {
 	r := New()
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -294,7 +294,7 @@ func TestRouter_ServeHTTP_NotFound(t *testing.T) {
 // TestRouter_ServeHTTP_MethodNotAllowed tests 405 response.
 func TestRouter_ServeHTTP_MethodNotAllowed(t *testing.T) {
 	r := New()
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -315,7 +315,7 @@ func TestRouter_ServeHTTP_MethodNotAllowed(t *testing.T) {
 // TestRouter_ServeHTTP_Parameters tests URL parameter extraction.
 func TestRouter_ServeHTTP_Parameters(t *testing.T) {
 	r := New()
-	r.GET("/users/:id/posts/:postID", func(c *Context) error {
+	r.Handle("GET", "/users/:id/posts/:postID", func(c *Context) error {
 		id := c.Param("id")
 		postID := c.Param("postID")
 		return c.String(200, "User: "+id+", Post: "+postID)
@@ -339,7 +339,7 @@ func TestRouter_ServeHTTP_Parameters(t *testing.T) {
 // TestRouter_ServeHTTP_Wildcard tests wildcard route.
 func TestRouter_ServeHTTP_Wildcard(t *testing.T) {
 	r := New()
-	r.GET("/files/*filepath", func(c *Context) error {
+	r.Handle("GET", "/files/*filepath", func(c *Context) error {
 		filepath := c.Param("filepath")
 		return c.String(200, "File: "+filepath)
 	})
@@ -362,7 +362,7 @@ func TestRouter_ServeHTTP_Wildcard(t *testing.T) {
 // TestRouter_ServeHTTP_HandlerError tests handler error handling.
 func TestRouter_ServeHTTP_HandlerError(t *testing.T) {
 	r := New()
-	r.GET("/error", func(_ *Context) error {
+	r.Handle("GET", "/error", func(_ *Context) error {
 		return ErrInvalidRedirectCode // Return an error without writing response.
 	})
 
@@ -385,12 +385,12 @@ func TestRouter_ServeHTTP_ContextPooling(t *testing.T) {
 	r := New()
 	var firstCtx, secondCtx *Context
 
-	r.GET("/first", func(c *Context) error {
+	r.Handle("GET", "/first", func(c *Context) error {
 		firstCtx = c
 		return c.String(200, "First")
 	})
 
-	r.GET("/second", func(c *Context) error {
+	r.Handle("GET", "/second", func(c *Context) error {
 		secondCtx = c
 		return c.String(200, "Second")
 	})
@@ -417,12 +417,12 @@ func TestRouter_MultipleMethods(t *testing.T) {
 	getCalled := false
 	postCalled := false
 
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		getCalled = true
 		return c.String(200, "GET")
 	})
 
-	r.POST("/users", func(c *Context) error {
+	r.Handle("POST", "/users", func(c *Context) error {
 		postCalled = true
 		return c.String(201, "POST")
 	})
@@ -455,10 +455,10 @@ func TestRouter_MultipleMethods(t *testing.T) {
 // TestRouter_pathExistsInOtherMethods tests the helper function.
 func TestRouter_pathExistsInOtherMethods(t *testing.T) {
 	r := New()
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "OK")
 	})
-	r.POST("/users", func(c *Context) error {
+	r.Handle("POST", "/users", func(c *Context) error {
 		return c.String(201, "Created")
 	})
 
@@ -478,7 +478,7 @@ func TestRouter_MethodNotAllowed_Disabled(t *testing.T) {
 	r := New()
 	r.handleMethodNotAllowed = false
 
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -496,7 +496,7 @@ func TestRouter_MethodNotAllowed_Disabled(t *testing.T) {
 // TestRouter_TrailingSlash_Default tests that trailing slash is strict by default.
 func TestRouter_TrailingSlash_Default(t *testing.T) {
 	r := New()
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -527,10 +527,10 @@ func TestRouter_StripTrailingSlash(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(StripTrailingSlash)
 
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "users")
 	})
-	r.GET("/users/:id/posts", func(c *Context) error {
+	r.Handle("GET", "/users/:id/posts", func(c *Context) error {
 		return c.String(200, "posts:"+c.Param("id"))
 	})
 
@@ -572,7 +572,7 @@ func TestRouter_StripTrailingSlash_Bidirectional(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(StripTrailingSlash)
 
-	r.GET("/files/", func(c *Context) error {
+	r.Handle("GET", "/files/", func(c *Context) error {
 		return c.String(200, "files")
 	})
 
@@ -603,10 +603,10 @@ func TestRouter_RedirectTrailingSlash(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(RedirectTrailingSlash)
 
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "users")
 	})
-	r.POST("/users", func(c *Context) error {
+	r.Handle("POST", "/users", func(c *Context) error {
 		return c.String(201, "created")
 	})
 
@@ -653,13 +653,13 @@ func TestRouter_RedirectTrailingSlash_NonGETMethods(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(RedirectTrailingSlash)
 
-	r.PUT("/items/:id", func(c *Context) error {
+	r.Handle("PUT", "/items/:id", func(c *Context) error {
 		return c.String(200, "updated")
 	})
-	r.DELETE("/items/:id", func(c *Context) error {
+	r.Handle("DELETE", "/items/:id", func(c *Context) error {
 		return c.String(200, "deleted")
 	})
-	r.PATCH("/items/:id", func(c *Context) error {
+	r.Handle("PATCH", "/items/:id", func(c *Context) error {
 		return c.String(200, "patched")
 	})
 
@@ -685,7 +685,7 @@ func TestRouter_RedirectTrailingSlash_Bidirectional(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(RedirectTrailingSlash)
 
-	r.GET("/files/", func(c *Context) error {
+	r.Handle("GET", "/files/", func(c *Context) error {
 		return c.String(200, "files")
 	})
 
@@ -708,7 +708,7 @@ func TestRouter_RedirectTrailingSlash_PreservesQuery(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(RedirectTrailingSlash)
 
-	r.GET("/search", func(c *Context) error {
+	r.Handle("GET", "/search", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -731,7 +731,7 @@ func TestRouter_TrailingSlash_RootPath(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(StripTrailingSlash)
 
-	r.GET("/", func(c *Context) error {
+	r.Handle("GET", "/", func(c *Context) error {
 		return c.String(200, "root")
 	})
 
@@ -753,7 +753,7 @@ func TestRouter_TrailingSlash_MethodNotAllowed(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(StripTrailingSlash)
 
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -772,7 +772,7 @@ func TestRouter_TrailingSlash_Wildcard(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(StripTrailingSlash)
 
-	r.GET("/files/*filepath", func(c *Context) error {
+	r.Handle("GET", "/files/*filepath", func(c *Context) error {
 		return c.String(200, c.Param("filepath"))
 	})
 
@@ -815,7 +815,7 @@ func TestRouter_TrailingSlash_WithMiddleware(t *testing.T) {
 		return c.Next()
 	})
 
-	r.GET("/api/data", func(c *Context) error {
+	r.Handle("GET", "/api/data", func(c *Context) error {
 		return c.String(200, "data")
 	})
 
@@ -874,7 +874,7 @@ func TestRouter_RedirectTrailingSlash_NoRedirectLoop(t *testing.T) {
 	r := New()
 	r.WithTrailingSlash(RedirectTrailingSlash)
 
-	r.GET("/users", func(c *Context) error {
+	r.Handle("GET", "/users", func(c *Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -891,7 +891,7 @@ func TestRouter_RedirectTrailingSlash_NoRedirectLoop(t *testing.T) {
 func BenchmarkRouter_TrailingSlash_Strip(b *testing.B) {
 	r := New()
 	r.WithTrailingSlash(StripTrailingSlash)
-	r.GET("/api/v1/users", func(c *Context) error {
+	r.Handle("GET", "/api/v1/users", func(c *Context) error {
 		return c.NoContent(http.StatusOK)
 	})
 
@@ -911,7 +911,7 @@ func BenchmarkRouter_TrailingSlash_Strip(b *testing.B) {
 func BenchmarkRouter_TrailingSlash_ExactMatch(b *testing.B) {
 	r := New()
 	r.WithTrailingSlash(StripTrailingSlash)
-	r.GET("/api/v1/users", func(c *Context) error {
+	r.Handle("GET", "/api/v1/users", func(c *Context) error {
 		return c.NoContent(http.StatusOK)
 	})
 

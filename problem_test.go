@@ -338,7 +338,7 @@ func TestValidationProblem_Empty(t *testing.T) {
 func TestContext_Problem(t *testing.T) {
 	r := New()
 
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		return c.Problem(NotFound("Resource not found"))
 	})
 
@@ -379,7 +379,7 @@ func TestContext_Problem(t *testing.T) {
 func TestContext_Problem_WithExtensions(t *testing.T) {
 	r := New()
 
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		return c.Problem(
 			Forbidden("Insufficient balance").
 				WithExtension("balance", 30).
@@ -409,7 +409,7 @@ func TestContext_Problem_WithExtensions(t *testing.T) {
 func TestContext_Problem_ValidationErrors(t *testing.T) {
 	r := New()
 
-	r.GET("/test", func(c *Context) error {
+	r.Handle("GET", "/test", func(c *Context) error {
 		errs := ValidationErrors{
 			{Field: "email", Tag: "email", Message: "must be a valid email"},
 			{Field: "age", Tag: "min", Message: "must be at least 18"},
@@ -449,7 +449,7 @@ func TestContext_Problem_ValidationErrors(t *testing.T) {
 func TestProblem_Integration(t *testing.T) {
 	r := New()
 
-	r.GET("/users/:id", func(c *Context) error {
+	r.Handle("GET", "/users/:id", func(c *Context) error {
 		id := c.Param("id")
 		if id != "123" {
 			return c.Problem(

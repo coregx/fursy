@@ -51,7 +51,7 @@ func TestIntegration_CRUD(t *testing.T) {
 	router.Use(database.Middleware(db))
 
 	// CREATE endpoint.
-	router.POST("/users", func(c *fursy.Context) error {
+	router.Handle("POST", "/users", func(c *fursy.Context) error {
 		retrievedDB, ok := database.GetDB(c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("DB not configured"))
@@ -74,7 +74,7 @@ func TestIntegration_CRUD(t *testing.T) {
 	})
 
 	// READ endpoint.
-	router.GET("/users/:id", func(c *fursy.Context) error {
+	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 		retrievedDB, ok := database.GetDB(c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("DB not configured"))
@@ -96,7 +96,7 @@ func TestIntegration_CRUD(t *testing.T) {
 	})
 
 	// LIST endpoint.
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		retrievedDB, ok := database.GetDB(c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("DB not configured"))
@@ -121,7 +121,7 @@ func TestIntegration_CRUD(t *testing.T) {
 	})
 
 	// DELETE endpoint.
-	router.DELETE("/users/:id", func(c *fursy.Context) error {
+	router.Handle("DELETE", "/users/:id", func(c *fursy.Context) error {
 		retrievedDB, ok := database.GetDB(c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("DB not configured"))

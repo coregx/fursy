@@ -17,7 +17,7 @@ import (
 
 func TestContext_NegotiateFormat_NoAcceptHeader(t *testing.T) {
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		format := c.NegotiateFormat(MIMEApplicationJSON, MIMEApplicationXML, MIMETextHTML)
 
 		// No Accept header - should return first offered.
@@ -75,7 +75,7 @@ func TestContext_NegotiateFormat_WithAcceptHeader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := New()
-			router.GET("/test", func(c *Context) error {
+			router.Handle("GET", "/test", func(c *Context) error {
 				format := c.NegotiateFormat(tt.offered...)
 
 				if format != tt.expected {
@@ -102,7 +102,7 @@ func TestContext_NegotiateFormat_WithAcceptHeader(t *testing.T) {
 
 func TestContext_Negotiate_JSON(t *testing.T) {
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		data := map[string]string{"message": "hello"}
 		return c.Negotiate(200, data)
 	})
@@ -138,7 +138,7 @@ func TestContext_Negotiate_XML(t *testing.T) {
 	}
 
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		data := TestData{Message: "hello"}
 		return c.Negotiate(200, data)
 	})
@@ -161,7 +161,7 @@ func TestContext_Negotiate_XML(t *testing.T) {
 
 func TestContext_Negotiate_PlainText(t *testing.T) {
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		data := "Hello, World!"
 		return c.Negotiate(200, data)
 	})
@@ -184,7 +184,7 @@ func TestContext_Negotiate_PlainText(t *testing.T) {
 
 func TestContext_Negotiate_NoAcceptableFormat(t *testing.T) {
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		data := map[string]string{"message": "hello"}
 		return c.Negotiate(200, data)
 	})
@@ -211,7 +211,7 @@ func TestContext_Negotiate_QWeightingSelection(t *testing.T) {
 	}
 
 	router := New()
-	router.GET("/test", func(c *Context) error {
+	router.Handle("GET", "/test", func(c *Context) error {
 		data := TestData{Message: "hello"}
 		return c.Negotiate(200, data)
 	})

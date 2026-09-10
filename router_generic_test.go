@@ -14,7 +14,7 @@ import (
 func TestGenericHEAD(t *testing.T) {
 	r := New()
 
-	HEAD[Empty, Empty](r, "/resources/:id", func(c *Box[Empty, Empty]) error {
+	r.HEAD("/resources/:id", func(c *Box[Empty, Empty]) error {
 		c.SetHeader("X-Resource-ID", c.Param("id"))
 		return c.NoContent(http.StatusOK)
 	})
@@ -41,7 +41,7 @@ func TestGenericHEAD(t *testing.T) {
 func TestGenericHEAD_NotFound(t *testing.T) {
 	r := New()
 
-	HEAD[Empty, Empty](r, "/items/:id", func(c *Box[Empty, Empty]) error {
+	r.HEAD("/items/:id", func(c *Box[Empty, Empty]) error {
 		id := c.Param("id")
 		if id == "0" {
 			return c.NoContent(http.StatusNotFound)
@@ -62,7 +62,7 @@ func TestGenericHEAD_NotFound(t *testing.T) {
 func TestGenericOPTIONS(t *testing.T) {
 	r := New()
 
-	OPTIONS[Empty, Empty](r, "/users", func(c *Box[Empty, Empty]) error {
+	r.OPTIONS("/users", func(c *Box[Empty, Empty]) error {
 		c.SetHeader("Allow", "GET, POST, PUT, DELETE, OPTIONS")
 		c.SetHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 		c.SetHeader("Access-Control-Allow-Origin", "*")
@@ -92,7 +92,7 @@ func TestGenericOPTIONS(t *testing.T) {
 func TestGenericOPTIONS_WithParam(t *testing.T) {
 	r := New()
 
-	OPTIONS[Empty, Empty](r, "/users/:id", func(c *Box[Empty, Empty]) error {
+	r.OPTIONS("/users/:id", func(c *Box[Empty, Empty]) error {
 		c.SetHeader("Allow", "GET, PUT, DELETE, OPTIONS")
 		return c.NoContent(http.StatusNoContent)
 	})

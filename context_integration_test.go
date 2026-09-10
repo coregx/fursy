@@ -17,7 +17,7 @@ import (
 // when plugins/stream is not imported.
 func TestContext_SSE_NotImported(t *testing.T) {
 	router := fursy.New()
-	router.GET("/sse", func(c *fursy.Context) error {
+	router.Handle("GET", "/sse", func(c *fursy.Context) error {
 		err := c.SSE(func(_ any) error {
 			return nil
 		})
@@ -41,7 +41,7 @@ func TestContext_SSE_NotImported(t *testing.T) {
 // when plugins/stream is not imported.
 func TestContext_WebSocket_NotImported(t *testing.T) {
 	router := fursy.New()
-	router.GET("/ws", func(c *fursy.Context) error {
+	router.Handle("GET", "/ws", func(c *fursy.Context) error {
 		err := c.WebSocket(func(_ any) error {
 			return nil
 		}, nil)
@@ -65,7 +65,7 @@ func TestContext_WebSocket_NotImported(t *testing.T) {
 // when database middleware is not configured.
 func TestContext_DB_NotConfigured(t *testing.T) {
 	router := fursy.New()
-	router.GET("/test", func(c *fursy.Context) error {
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
 		db := c.DB()
 		if db != nil {
 			t.Error("expected nil, got DB")
@@ -114,7 +114,7 @@ func TestContext_ErrorMessages(t *testing.T) {
 		tt := tt // capture range variable
 		t.Run(tt.name, func(_ *testing.T) {
 			router := fursy.New()
-			router.GET("/test", tt.handler)
+			router.Handle("GET", "/test", tt.handler)
 
 			req := httptest.NewRequest("GET", "/test", http.NoBody)
 			w := httptest.NewRecorder()

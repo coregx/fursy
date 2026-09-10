@@ -20,7 +20,7 @@ func TestRateLimit_BasicLimiting(t *testing.T) {
 	router := fursy.New()
 	router.Use(RateLimit(5, 10)) // 5 req/s, burst 10
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -58,7 +58,7 @@ func TestRateLimit_Headers(t *testing.T) {
 		Headers: true,
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -102,7 +102,7 @@ func TestRateLimit_PerIP(t *testing.T) {
 		},
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -150,7 +150,7 @@ func TestRateLimit_PerUser(t *testing.T) {
 		},
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -196,7 +196,7 @@ func TestRateLimit_GlobalLimiter(t *testing.T) {
 		Limiter: limiter,
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -234,11 +234,11 @@ func TestRateLimit_Skipper(t *testing.T) {
 		},
 	}))
 
-	router.GET("/health", func(c *fursy.Context) error {
+	router.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
-	router.GET("/api", func(c *fursy.Context) error {
+	router.Handle("GET", "/api", func(c *fursy.Context) error {
 		return c.String(200, "API")
 	})
 
@@ -284,7 +284,7 @@ func TestRateLimit_CustomErrorHandler(t *testing.T) {
 		},
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -326,7 +326,7 @@ func TestRateLimit_SuccessHandler(t *testing.T) {
 		},
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -354,7 +354,7 @@ func TestRateLimit_SuccessHandler_ReturnsError(t *testing.T) {
 		},
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -371,7 +371,7 @@ func TestRateLimit_TokenRefill(t *testing.T) {
 	router := fursy.New()
 	router.Use(RateLimit(10, 2)) // 10 tokens/second, burst 2
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -414,7 +414,7 @@ func TestRateLimit_ConcurrentRequests(t *testing.T) {
 	router := fursy.New()
 	router.Use(RateLimit(100, 200)) // High limits
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -459,7 +459,7 @@ func TestRateLimit_MaxKeys_LRU(t *testing.T) {
 		},
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -564,7 +564,7 @@ func TestRateLimit_RemainingDecreases(t *testing.T) {
 		Headers: true,
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -599,7 +599,7 @@ func TestRateLimit_DefaultRate(t *testing.T) {
 		// No Rate specified - should use default (10).
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -626,7 +626,7 @@ func TestRateLimit_DefaultBurst(t *testing.T) {
 		// No Burst specified - should use default (2x rate = 10).
 	}))
 
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 

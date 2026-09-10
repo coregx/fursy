@@ -25,7 +25,7 @@ func TestLogger(t *testing.T) {
 		Logger: logger,
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -66,7 +66,7 @@ func TestLogger_JSONFormat(t *testing.T) {
 		Logger: logger,
 	}))
 
-	r.GET("/api/users", func(c *fursy.Context) error {
+	r.Handle("GET", "/api/users", func(c *fursy.Context) error {
 		return c.JSON(200, map[string]string{"status": "ok"})
 	})
 
@@ -102,11 +102,11 @@ func TestLogger_SkipPaths(t *testing.T) {
 		SkipPaths: []string{"/health", "/metrics"},
 	}))
 
-	r.GET("/health", func(c *fursy.Context) error {
+	r.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
-	r.GET("/api/users", func(c *fursy.Context) error {
+	r.Handle("GET", "/api/users", func(c *fursy.Context) error {
 		return c.String(200, "users")
 	})
 
@@ -146,7 +146,7 @@ func TestLogger_SkipFunc(t *testing.T) {
 		},
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -216,7 +216,7 @@ func TestLogger_StatusCodes(t *testing.T) {
 				Logger: logger,
 			}))
 
-			r.GET("/test", tt.handler)
+			r.Handle("GET", "/test", tt.handler)
 
 			req := httptest.NewRequest("GET", "/test", http.NoBody)
 			w := httptest.NewRecorder()
@@ -246,7 +246,7 @@ func TestLogger_ErrorLogging(t *testing.T) {
 	}))
 
 	testErr := errors.New("test error")
-	r.GET("/error", func(_ *fursy.Context) error {
+	r.Handle("GET", "/error", func(_ *fursy.Context) error {
 		return testErr
 	})
 
@@ -276,7 +276,7 @@ func TestLogger_BytesWritten(t *testing.T) {
 	}))
 
 	responseBody := "This is a test response body with some content"
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		return c.String(200, responseBody)
 	})
 
@@ -308,7 +308,7 @@ func TestLogger_Latency(t *testing.T) {
 		Logger: logger,
 	}))
 
-	r.GET("/test", func(c *fursy.Context) error {
+	r.Handle("GET", "/test", func(c *fursy.Context) error {
 		// Simulate some processing time
 		// (In real tests, avoid time.Sleep)
 		return c.String(200, "OK")
@@ -472,7 +472,7 @@ func TestLogger_DefaultConstructor(t *testing.T) {
 	r := fursy.New()
 	r.Use(Logger())
 
-	r.GET("/health", func(c *fursy.Context) error {
+	r.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -501,7 +501,7 @@ func TestLogger_IntegrationWithGroups(t *testing.T) {
 
 	api := r.Group("/api")
 	v1 := api.Group("/v1")
-	v1.GET("/users", func(c *fursy.Context) error {
+	v1.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "users")
 	})
 

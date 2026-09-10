@@ -40,7 +40,7 @@ func TestMiddleware_BasicTracing(t *testing.T) {
 	router := fursy.New()
 	router.Use(Middleware("test-service"))
 
-	router.GET("/users/:id", func(c *fursy.Context) error {
+	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 		return c.String(200, "User 123")
 	})
 
@@ -115,7 +115,7 @@ func TestMiddleware_ErrorRecording(t *testing.T) {
 
 	testErr := errors.New("database connection failed")
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return testErr
 	})
 
@@ -164,7 +164,7 @@ func TestMiddleware_ContextPropagation(t *testing.T) {
 
 	var extractedSpanContext trace.SpanContext
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		// Extract span context from request context.
 		extractedSpanContext = trace.SpanContextFromContext(c.Request.Context())
 		return c.String(200, "OK")
@@ -228,11 +228,11 @@ func TestMiddleware_Skipper(t *testing.T) {
 		},
 	}))
 
-	router.GET("/health", func(c *fursy.Context) error {
+	router.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "Users")
 	})
 
@@ -267,7 +267,7 @@ func TestMiddleware_CustomSpanNameFormatter(t *testing.T) {
 		},
 	}))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -296,7 +296,7 @@ func TestMiddleware_HTTPAttributes(t *testing.T) {
 		WithUserAgent: true,
 	}))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -352,7 +352,7 @@ func TestMiddleware_RequestHeaders(t *testing.T) {
 		WithRequestHeaders: []string{"X-Request-ID", "X-Correlation-ID"},
 	}))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(200, "OK")
 	})
 
@@ -400,7 +400,7 @@ func TestMiddleware_ResponseHeaders(t *testing.T) {
 		WithResponseHeaders: []string{"X-Response-ID", "X-Rate-Limit"},
 	}))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		c.SetHeader("X-Response-ID", "resp-789")
 		c.SetHeader("X-Rate-Limit", "100")
 		return c.String(200, "OK")
@@ -444,7 +444,7 @@ func TestMiddleware_4xxStatus(t *testing.T) {
 	router := fursy.New()
 	router.Use(Middleware("test-service"))
 
-	router.GET("/users/:id", func(c *fursy.Context) error {
+	router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
 		return c.String(404, "Not Found")
 	})
 
@@ -488,7 +488,7 @@ func TestMiddleware_5xxStatus(t *testing.T) {
 	router := fursy.New()
 	router.Use(Middleware("test-service"))
 
-	router.GET("/users", func(c *fursy.Context) error {
+	router.Handle("GET", "/users", func(c *fursy.Context) error {
 		return c.String(500, "Internal Server Error")
 	})
 

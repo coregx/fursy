@@ -363,7 +363,8 @@ func (t *Tree) Lookup(path string) (handler interface{}, params []Param, found b
 		return nil, nil, false
 	}
 
-	params = make([]Param, 0, 8) // Pre-allocate for common case
+	var buf [8]Param
+	params = buf[:0]
 	return t.lookupNode(path, t.root, params)
 }
 

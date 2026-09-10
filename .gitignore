@@ -1,5 +1,8 @@
 # FURSY .gitignore
 
+# MCP config (local paths)
+.mcp.json
+
 # Binaries
 *.exe
 *.dll

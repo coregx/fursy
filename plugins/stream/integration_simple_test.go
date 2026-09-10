@@ -33,7 +33,7 @@ func TestSSE_Integration_WithHub(t *testing.T) {
 	router.Use(stream.SSEHub(hub))
 
 	// SSE endpoint.
-	router.GET("/events", func(c *fursy.Context) error {
+	router.Handle("GET", "/events", func(c *fursy.Context) error {
 		hub, ok := stream.GetSSEHub[string](c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("Hub not configured"))
@@ -104,7 +104,7 @@ func TestSSE_Integration_JSON(t *testing.T) {
 	router := fursy.New()
 	router.Use(stream.SSEHub(hub))
 
-	router.GET("/events", func(c *fursy.Context) error {
+	router.Handle("GET", "/events", func(c *fursy.Context) error {
 		hub, ok := stream.GetSSEHub[Notification](c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("Hub not configured"))
@@ -166,7 +166,7 @@ func TestWebSocket_Integration_HubAvailability(t *testing.T) {
 	router.Use(stream.WebSocketHub(hub))
 
 	// Simple health endpoint that checks hub availability.
-	router.GET("/health", func(c *fursy.Context) error {
+	router.Handle("GET", "/health", func(c *fursy.Context) error {
 		hub, ok := stream.GetWebSocketHub(c)
 		if !ok {
 			return c.Problem(fursy.InternalServerError("Hub not configured"))
