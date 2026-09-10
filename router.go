@@ -586,6 +586,12 @@ func (r *Router) handleWithGroupMiddleware(method, path string, groupHandlers []
 	if err := tree.Insert(path, wrapper); err != nil {
 		panic("fursy: " + err.Error())
 	}
+
+	// Store route metadata for OpenAPI generation.
+	r.routes = append(r.routes, RouteInfo{
+		Method: method,
+		Path:   path,
+	})
 }
 
 // createGroupHandlerWrapper creates a handler that executes group middleware + handler.
@@ -774,10 +780,13 @@ func (r *Router) handleNotFound(c *Context, w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	if r.handleMethodNotAllowed && r.pathExistsInOtherMethods(path, req.Method) {
-		c.init(w, req, r, nil)
-		_ = c.String(http.StatusMethodNotAllowed, "Method Not Allowed")
-		return
+	if r.handleMethodNotAllowed {
+		if allowed := r.allowedMethods(path, req.Method); allowed != "" {
+			c.init(w, req, r, nil)
+			c.SetHeader("Allow", allowed)
+			_ = c.String(http.StatusMethodNotAllowed, "Method Not Allowed")
+			return
+		}
 	}
 	c.init(w, req, r, nil)
 	_ = c.String(http.StatusNotFound, "Not Found")
@@ -812,6 +821,26 @@ func (r *Router) tryTrailingSlashLookup(
 
 // pathExistsInOtherMethods checks if a path exists in other HTTP methods.
 // When trailing slash handling is enabled, also checks the alternate path.
+// allowedMethods returns a comma-separated list of HTTP methods allowed for
+// the path (excluding the given method), or empty string if none.
+func (r *Router) allowedMethods(path, excludeMethod string) string {
+	altPath := ""
+	if r.trailingSlash != IgnoreTrailingSlash {
+		altPath = trailingSlashAlternate(path)
+	}
+
+	var methods []string
+	for m, tree := range r.trees {
+		if m == excludeMethod {
+			continue
+		}
+		if r.existsInTree(tree, path, altPath) {
+			methods = append(methods, m)
+		}
+	}
+	return strings.Join(methods, ", ")
+}
+
 func (r *Router) pathExistsInOtherMethods(path, method string) bool {
 	altPath := ""
 	if r.trailingSlash != IgnoreTrailingSlash {
