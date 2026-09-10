@@ -972,6 +972,8 @@ router.Use(middleware.Recovery())
 **Dependencies**: Zero
 **Coverage**: High
 
+**IMPORTANT**: CORS middleware **must** be registered globally via `router.Use()`, not on a `RouteGroup`. Preflight OPTIONS requests are handled before route matching, so group-level middleware is never reached for preflight. This is consistent with Gin, Echo, and Chi.
+
 **Usage**:
 ```go
 router.Use(middleware.CORS(middleware.CORSConfig{
@@ -1484,6 +1486,26 @@ router.Use(middleware.JWT(secret)) // Panic after JWT = no logging!
 router.Use(middleware.Logger())
 router.Use(middleware.Recovery())
 ```
+
+### 13. CORS must be global, not per-group
+
+```go
+// ❌ WRONG: CORS on a group — preflight OPTIONS returns 405!
+api := router.Group("/api")
+api.Use(middleware.CORS())          // Group middleware is unreachable for preflight
+api.Handle("GET", "/users", handler)
+// OPTIONS /api/users → 405 Method Not Allowed
+
+// ✅ CORRECT: CORS on the router — preflight handled automatically
+router.Use(middleware.CORS())       // Global middleware runs for all OPTIONS
+api := router.Group("/api")
+api.Handle("GET", "/users", handler)
+// OPTIONS /api/users → 204 No Content (with CORS headers)
+```
+
+**Why**: Preflight OPTIONS requests hit a path with no registered OPTIONS route.
+The router's fallback only runs router-level middleware, not group middleware
+(which is embedded inside route handler wrappers). This matches Gin, Echo, Chi.
 
 ---
 

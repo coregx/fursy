@@ -77,6 +77,12 @@ var AllowAll = CORSConfig{
 
 // CORS returns a middleware that handles Cross-Origin Resource Sharing (CORS).
 //
+// IMPORTANT: CORS middleware MUST be registered globally via router.Use(),
+// not on a RouteGroup. Preflight OPTIONS requests are handled by the router
+// before route matching, so group-level middleware is never reached for
+// preflight. This is consistent with Gin, Echo, and Chi which all require
+// global CORS registration.
+//
 // The middleware handles:
 //   - Preflight OPTIONS requests with appropriate CORS headers
 //   - Actual requests by adding CORS headers to responses
@@ -85,7 +91,7 @@ var AllowAll = CORSConfig{
 // Example:
 //
 //	router := fursy.New()
-//	router.Use(middleware.CORS())
+//	router.Use(middleware.CORS())  // Must be global, not on a group!
 //
 // With custom config:
 //

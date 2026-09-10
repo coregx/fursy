@@ -25,6 +25,10 @@ package fursy
 //	    }
 //	}
 //
+// IMPORTANT: Middleware MUST call c.Next() to pass control to the next handler.
+// Forgetting c.Next() silently skips the rest of the chain — the route handler
+// never executes and the client receives an empty 200 response.
+//
 // For type-safe generic handlers with automatic request/response binding,
 // use Handler[Req, Res] instead, which receives Box[Req, Res].
 type HandlerFunc func(*Context) error
