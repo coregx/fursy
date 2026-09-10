@@ -1,6 +1,6 @@
 module github.com/coregx/fursy/plugins/stream
 
-go 1.25.0
+go 1.27
 
 require (
 	github.com/coregx/fursy v0.2.0
@@ -10,4 +10,3 @@ require (
 // Local development - replace with actual module paths.
 replace github.com/coregx/fursy => ../..
 
-replace github.com/coregx/stream => ../../../stream

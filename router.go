@@ -647,14 +647,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.pool.Put(c)
 	}()
 
-	// Use RawPath when available to preserve percent-encoded characters.
-	// net/http decodes %3A to ":" in URL.Path, which would incorrectly match
-	// param markers (e.g., /users/%3Aid → /users/:id). RawPath preserves the
-	// original encoding so literal %3A stays as %3A and doesn't trigger param matching.
-	path := req.URL.RawPath
-	if path == "" {
-		path = req.URL.Path
-	}
+	path := req.URL.Path
 
 	// Lookup route in the method-specific tree.
 	handler, radixParams, found, redirected := r.lookupRoute(c, w, req, path, req.Method)

@@ -1201,17 +1201,16 @@ func TestRouter_OPTIONS_NoMiddleware_Returns204(t *testing.T) {
 }
 
 // TestRouter_PercentEncodedColon tests that URL-encoded colon (%3A) in the path
-// does not produce empty params. Before the RawPath fix, net/http decoded %3A to ":"
-// in URL.Path, which matched the param marker and produced an empty value.
-// With RawPath, the percent-encoded form is preserved, so ":id" param gets "%3Aid"
-// as its raw value (which can be url.PathUnescaped by the handler if needed).
+// is properly decoded by net/http and matched as a param value, not as a param marker.
+// net/http decodes %3A→: in URL.Path. The radix tree's findChild skips wildcard
+// nodes for literal character matches, so ":id" becomes the param VALUE, not empty.
 func TestRouter_PercentEncodedColon(t *testing.T) {
 	r := New()
 	r.Handle("GET", "/users/:id", func(c *Context) error {
 		return c.String(200, "id="+c.Param("id"))
 	})
 
-	// Request with %3A — RawPath preserves it as literal "%3Aid" param value.
+	// net/http decodes %3A to ":" → path becomes /users/:id → param value = ":id".
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/users/%3Aid", http.NoBody)
 	r.ServeHTTP(w, req)
@@ -1219,9 +1218,9 @@ func TestRouter_PercentEncodedColon(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("GET /users/%%3Aid: expected 200, got %d", w.Code)
 	}
-	// The param value should be the raw percent-encoded string, NOT empty.
-	if w.Body.String() != "id=%3Aid" {
-		t.Errorf("GET /users/%%3Aid: expected body 'id=%%3Aid', got %q", w.Body.String())
+	// Param value should be ":id" (decoded), NOT empty.
+	if w.Body.String() != "id=:id" {
+		t.Errorf("GET /users/%%3Aid: expected body 'id=:id', got %q", w.Body.String())
 	}
 
 	// Normal param still works.
