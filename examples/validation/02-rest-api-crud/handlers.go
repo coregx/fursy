@@ -19,10 +19,7 @@ func NewHandlers(db *Database) *Handlers {
 
 // CreateUser handles POST /users - create a new user.
 func (h *Handlers) CreateUser(c *fursy.Box[CreateUserRequest, UserResponse]) error {
-	// Bind and validate request body automatically.
-	if err := c.Bind(); err != nil {
-		return err
-	}
+	// ReqBody is automatically bound and validated.
 
 	// Create user in database.
 	user, err := h.db.Create(c.ReqBody)
@@ -109,10 +106,7 @@ func (h *Handlers) UpdateUser(c *fursy.Box[UpdateUserRequest, UserResponse]) err
 		return c.Problem(fursy.BadRequest("Invalid user ID"))
 	}
 
-	// Bind and validate request body automatically.
-	if err := c.Bind(); err != nil {
-		return err
-	}
+	// ReqBody is automatically bound and validated.
 
 	// Update user in database.
 	user, err := h.db.Update(id, c.ReqBody)

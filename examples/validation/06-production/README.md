@@ -268,10 +268,8 @@ JWTSecret: getEnv("JWT_SECRET", "default-secret"),
 ### 6. Error Handling
 
 ```go
-// Validation errors (automatic)
-if err := c.Bind(); err != nil {
-    return err  // 422 with validation details
-}
+// Validation errors are handled automatically before the handler runs.
+// If validation fails, a 422 response with RFC 9457 details is returned.
 
 // Business logic errors
 if user == nil {

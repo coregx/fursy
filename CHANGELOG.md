@@ -8,7 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Future features and enhancements (Phase 4: Ecosystem)
+- Go 1.27 upgrade with generic methods on Router (v0.5.0)
+- Zero-allocation static route lookup (v0.5.0)
+
+## [0.4.1] - 2026-09-10
+
+### Fixed
+- **Idempotent Bind()** — `Box.Bind()` is now idempotent; calling it after the automatic bind (in `adaptGenericHandler`) no longer returns `ErrEmptyRequestBody` for JSON/XML bodies
+- **Double-bind in all examples** — removed manual `Bind()` from 11 example handlers across 7 files that would fail on JSON POST requests
+- **Documentation consistency** — fixed 32 places across README, llms.md, plugin READMEs, example READMEs, and godoc comments that incorrectly showed manual `Bind()` inside handlers
+
+### Changed
+- **GitHub Flow** — switched from Git-Flow to GitHub Flow; `develop` branch removed, all PRs target `main`
+- **CONTRIBUTING.md rewritten** — fixed 12 factual errors (wrong directory paths, non-existent packages, outdated API signatures, stale metrics)
+- **Dependency bump** — golang-jwt/jwt/v5 v5.3.0 → v5.3.1, golang.org/x/time v0.14.0 → v0.15.0 ([#10](https://github.com/coregx/fursy/pull/10), thanks @hashi-divyansh)
+
+### Removed
+- `RELEASE_GUIDE.md` — internal release process, replaced by automated tooling
+- `scripts/pre-release-check.sh` — replaced by automated tooling
+
+### Tests
+- Added 4 contract tests for `Bind()` idempotency (JSON double-bind, form double-bind, multi-call, auto-bind direct access)
 
 ## [0.4.0] - 2026-07-16
 

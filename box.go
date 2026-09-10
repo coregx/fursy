@@ -216,32 +216,28 @@ func (c *Box[Req, Res]) UpdatedNoContent() error {
 // are returned as ValidationErrors.
 //
 // This method is automatically called by the generic handler adapter,
-// so you typically don't need to call it manually.
+// so you typically don't need to call it manually. It is idempotent:
+// subsequent calls return nil without re-reading the request body.
 //
 // Returns error if binding or validation fails.
-//
-// Example:
-//
-//	// Manual binding (usually automatic)
-//	if err := c.Bind(); err != nil {
-//	    return c.BadRequest(ErrorResponse{Message: err.Error()})
-//	}
 func (c *Box[Req, Res]) Bind() error {
-	// Check if Req is Empty type - if so, skip binding
+	// Idempotent: if already bound, return immediately.
+	if c.ReqBody != nil {
+		return nil
+	}
+
+	// Check if Req is Empty type - if so, skip binding.
 	var zeroReq Req
 	if _, ok := any(zeroReq).(Empty); ok {
 		return nil
 	}
 
-	// Allocate request body
 	req := new(Req)
 
-	// Bind using the binding system
 	if err := binding.Bind(c.Request, req); err != nil {
 		return err
 	}
 
-	// Validate if validator is set
 	if c.router != nil && c.router.validator != nil {
 		if err := c.router.validator.Validate(req); err != nil {
 			return err

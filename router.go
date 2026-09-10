@@ -205,9 +205,9 @@ func (r *Router) Use(middleware ...HandlerFunc) *Router {
 
 // SetValidator sets the validator for automatic request validation.
 //
-// When a validator is set, Box.Bind() will automatically validate
-// request bodies after binding. If validation fails, Bind() returns
-// a ValidationErrors error.
+// When a validator is set, request bodies are automatically validated
+// during binding (which happens before the handler runs).
+// If validation fails, the handler receives a ValidationErrors error.
 //
 // Validator is optional. If not set, binding works without validation.
 //

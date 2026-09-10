@@ -7,7 +7,7 @@ A minimal example demonstrating basic validation with fursy validator plugin.
 - Setting up validator plugin with `router.SetValidator()`
 - Using validation struct tags (`required`, `email`, `min`, `max`, `gte`, `lte`)
 - Type-safe handlers with `Box[Req, Res]`
-- Automatic validation via `c.Bind()`
+- Automatic binding and validation
 - RFC 9457 compliant error responses
 
 ## How to Run
@@ -161,16 +161,12 @@ func createUser(c *fursy.Box[CreateUserRequest, UserResponse]) error {
 }
 ```
 
-### 3. Automatic Validation
+### 3. Automatic Binding and Validation
 
-Validation happens when you call `c.Bind()`:
+Binding and validation happen automatically before your handler runs:
 
 ```go
-if err := c.Bind(); err != nil {
-    return err // Returns RFC 9457 validation errors
-}
-
-// ReqBody is validated - safe to use!
+// No manual Bind() needed — c.ReqBody is already parsed and validated!
 req := c.ReqBody
 ```
 
@@ -218,8 +214,7 @@ See complete list in [validator plugin README](../../../plugins/validator/README
 
 Make sure you:
 1. Set validator: `router.SetValidator(validator.New())`
-2. Call `c.Bind()` in handler
-3. Use correct tag name: `validate:` (not `valid:`)
+2. Use correct tag name: `validate:` (not `valid:`)
 
 ### Want Custom Error Messages?
 

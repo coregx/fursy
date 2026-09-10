@@ -76,11 +76,7 @@ func main() {
 }
 
 func handleSignup(c *fursy.Box[SignupRequest, SignupResponse]) error {
-	// Bind and validate with custom validators.
-	if err := c.Bind(); err != nil {
-		return err
-	}
-
+	// ReqBody is automatically bound and validated.
 	req := c.ReqBody
 
 	// Simulate user creation.

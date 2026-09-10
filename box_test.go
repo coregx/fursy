@@ -499,3 +499,119 @@ func TestBox_Forbidden(t *testing.T) {
 		t.Errorf("expected body %q, got %q", expectedBody, w.Body.String())
 	}
 }
+
+// TestBind_Idempotent_JSON verifies that calling Bind() twice with a JSON body
+// does not fail. The first call (auto-bind in adaptGenericHandler) consumes the
+// body; the second call (manual, as old examples showed) must be a no-op.
+func TestBind_Idempotent_JSON(t *testing.T) {
+	r := New()
+
+	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+		// Simulate old example pattern: manual Bind() after auto-bind.
+		if err := c.Bind(); err != nil {
+			t.Fatalf("second Bind() should not fail, got: %v", err)
+		}
+
+		if c.ReqBody == nil {
+			t.Fatal("ReqBody should not be nil after double bind")
+		}
+		if c.ReqBody.Name != "Alice" {
+			t.Errorf("expected Name=Alice, got %q", c.ReqBody.Name)
+		}
+		if c.ReqBody.Email != "alice@example.com" {
+			t.Errorf("expected Email=alice@example.com, got %q", c.ReqBody.Email)
+		}
+		return c.OK(TestResponse{ID: 1, Message: "ok"})
+	})
+
+	body := `{"name":"Alice","email":"alice@example.com"}`
+	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBind_Idempotent_Form verifies idempotent Bind() with form-urlencoded.
+func TestBind_Idempotent_Form(t *testing.T) {
+	r := New()
+
+	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+		if err := c.Bind(); err != nil {
+			t.Fatalf("second Bind() should not fail for form data, got: %v", err)
+		}
+		if c.ReqBody == nil {
+			t.Fatal("ReqBody should not be nil")
+		}
+		if c.ReqBody.Name != "Bob" {
+			t.Errorf("expected Name=Bob, got %q", c.ReqBody.Name)
+		}
+		return c.OK(TestResponse{ID: 2, Message: "ok"})
+	})
+
+	body := "Name=Bob&Email=bob@example.com"
+	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBind_Idempotent_MultipleCalls verifies Bind() can be called many times.
+func TestBind_Idempotent_MultipleCalls(t *testing.T) {
+	r := New()
+
+	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+		for i := 0; i < 5; i++ {
+			if err := c.Bind(); err != nil {
+				t.Fatalf("Bind() call %d should not fail, got: %v", i+2, err)
+			}
+		}
+		if c.ReqBody.Name != "Eve" {
+			t.Errorf("expected Name=Eve, got %q", c.ReqBody.Name)
+		}
+		return c.OK(TestResponse{ID: 3, Message: "ok"})
+	})
+
+	body := `{"name":"Eve","email":"eve@example.com"}`
+	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBind_AutoBind_DirectAccess verifies the recommended pattern:
+// no manual Bind(), just use c.ReqBody directly.
+func TestBind_AutoBind_DirectAccess(t *testing.T) {
+	r := New()
+
+	POST[TestRequest, TestResponse](r, "/test", func(c *Box[TestRequest, TestResponse]) error {
+		if c.ReqBody == nil {
+			t.Fatal("ReqBody should be auto-bound")
+		}
+		if c.ReqBody.Name != "Carol" {
+			t.Errorf("expected Name=Carol, got %q", c.ReqBody.Name)
+		}
+		return c.OK(TestResponse{ID: 4, Message: "ok"})
+	})
+
+	body := `{"name":"Carol","email":"carol@example.com"}`
+	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d; body: %s", w.Code, w.Body.String())
+	}
+}

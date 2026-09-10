@@ -206,9 +206,9 @@ func (h *Handlers) CreateUser(c *fursy.Box[CreateUserRequest, UserResponse]) err
 
 ### Automatic Request Binding
 
-The `c.Bind()` method automatically:
+Binding happens automatically before your handler runs:
 - Parses JSON/XML/Form based on `Content-Type`
-- Binds to the typed `ReqBody` field
+- Populates the typed `ReqBody` field
 - Returns RFC 9457 error on failure
 
 ### Thread-Safe Database
