@@ -1,4 +1,5 @@
-github.com/coregx/stream v0.1.0/go.mod h1:wLW8WGkPt9ucgI2rQuspFWHCqGVO4GSbTvUlhfoeR8I=
+github.com/coregx/stream v0.1.1 h1:ovtg5AwfyMyTf7HlqcJ9NeS3SS4OuXXtkt3gCFqgpvk=
+github.com/coregx/stream v0.1.1/go.mod h1:Nv8tdDu8yQ8jK7ctayRkXdmk3TMX1sS8En2qg0Izz7A=
 github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
 github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 golang.org/x/time v0.16.0 h1:vMb6ptszcQMkcwiRTAuNNU50gom6++Q/6gY2hDM6VDE=
