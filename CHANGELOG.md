@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Radix R1: percent-encoded wildcard markers** — `findChild` no longer descends into wildcard nodes for literal `:` or `*` characters. `/users/%3Aid` → param=`:id` (was empty)
 - **Radix R3: conflict messages** — "param/catch-all conflict" instead of misleading "route already exists"
 - **Plugin go.mod** — updated to Go 1.27, removed external `replace` path
+- **stream v0.1.4** — Hub lifecycle fix + security: same-origin default (CheckOrigin), MaxMessageSize 4MB, WriteTimeout 10s
 
 ### Added
 - CI: matrix jobs for all plugin modules, example builds, govulncheck
