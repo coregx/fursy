@@ -113,16 +113,16 @@ func setupTestRouter(api *API) *fursy.Router {
 	}
 
 	// Register only public and basic protected routes (skip admin routes due to route conflicts)
-	router.POST("/api/auth/register", api.register)
-	router.POST("/api/auth/login", api.login)
+	router.Handle("POST", "/api/auth/register", api.register)
+	router.Handle("POST", "/api/auth/login", api.login)
 
 	// Protected routes
 	protected := router.Group("/api")
 	protected.Use(authMiddleware)
 	{
-		protected.GET("/users/me", api.getProfile)
-		protected.PUT("/users/me", api.updateProfile)
-		protected.POST("/users/me/password", api.changePassword)
+		protected.Handle("GET", "/users/me", api.getProfile)
+		protected.Handle("PUT", "/users/me", api.updateProfile)
+		protected.Handle("POST", "/users/me/password", api.changePassword)
 	}
 
 	return router

@@ -40,18 +40,18 @@ func main() {
 
 	// 1. Documentation endpoint - markdown/JSON support
 	// Demonstrates: Accepts() for simple format checking
-	router.GET("/docs", handleDocs)
+	router.Handle("GET", "/docs", handleDocs)
 
 	// 2. User list endpoint - markdown/HTML/JSON support
 	// Demonstrates: AcceptsAny() for multiple formats with q-value priority
-	router.GET("/api/users", handleUsers)
+	router.Handle("GET", "/api/users", handleUsers)
 
 	// 3. Automatic negotiation - JSON/XML/plain text
 	// Demonstrates: Negotiate() for automatic format selection
-	router.GET("/api/data", handleData)
+	router.Handle("GET", "/api/data", handleData)
 
 	// 4. Health check - simple JSON response
-	router.GET("/health", handleHealth)
+	router.Handle("GET", "/health", handleHealth)
 
 	// Start server.
 	port := ":8080"

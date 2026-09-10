@@ -27,8 +27,8 @@ func (api *API) RegisterRoutes(r *fursy.Router, authMiddleware fursy.HandlerFunc
 	protected := r.Group("/api")
 	protected.Use(authMiddleware)
 	{
-		protected.GET("/notifications/stream", api.stream)
-		protected.POST("/notifications/broadcast", api.broadcast)
+		protected.Handle("GET", "/notifications/stream", api.stream)
+		protected.Handle("POST", "/notifications/broadcast", api.broadcast)
 	}
 }
 

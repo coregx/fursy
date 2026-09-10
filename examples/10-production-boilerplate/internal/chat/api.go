@@ -27,7 +27,7 @@ func (api *API) RegisterRoutes(r *fursy.Router, authMiddleware fursy.HandlerFunc
 	protected := r.Group("/api")
 	protected.Use(authMiddleware)
 	{
-		protected.GET("/chat/ws", api.websocket)
+		protected.Handle("GET", "/chat/ws", api.websocket)
 	}
 }
 

@@ -14,7 +14,7 @@ func main() {
 	router := fursy.New()
 
 	// Define a simple GET endpoint.
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.OK(map[string]string{
 			"message": "Hello, World!",
 			"status":  "success",

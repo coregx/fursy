@@ -41,10 +41,10 @@ func main() {
 	router.Use(stream.WebSocketHub(hub))
 
 	// WebSocket endpoint - clients connect here for chat.
-	router.GET("/ws", handleWebSocket)
+	router.Handle("GET", "/ws", handleWebSocket)
 
 	// Health check endpoint.
-	router.GET("/health", handleHealth)
+	router.Handle("GET", "/health", handleHealth)
 
 	slog.Info("WebSocket chat server starting",
 		"port", 8080,

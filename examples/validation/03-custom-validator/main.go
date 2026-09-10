@@ -60,7 +60,7 @@ func main() {
 	router.Use(middleware.Recovery())
 
 	// Setup routes.
-	fursy.POST[SignupRequest, SignupResponse](router, "/signup", handleSignup)
+	router.POST("/signup", handleSignup)
 
 	// Start server.
 	slog.Info("Server starting", "port", 8080)

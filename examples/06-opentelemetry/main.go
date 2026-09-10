@@ -98,13 +98,13 @@ func main() {
 	}))
 
 	// Define routes.
-	router.GET("/", homeHandler)
-	router.GET("/health", healthHandler)
-	router.GET("/users/:id", getUserHandler)
-	router.GET("/users/:id/orders", getUserOrdersHandler)
-	router.POST("/users", createUserHandler)
-	router.GET("/error", errorHandler)
-	router.GET("/slow", slowHandler)
+	router.Handle("GET", "/", homeHandler)
+	router.Handle("GET", "/health", healthHandler)
+	router.Handle("GET", "/users/:id", getUserHandler)
+	router.Handle("GET", "/users/:id/orders", getUserOrdersHandler)
+	router.Handle("POST", "/users", createUserHandler)
+	router.Handle("GET", "/error", errorHandler)
+	router.Handle("GET", "/slow", slowHandler)
 
 	// Start server.
 	port := getEnv("PORT", "8080")

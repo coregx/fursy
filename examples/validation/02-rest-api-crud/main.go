@@ -46,9 +46,9 @@ func main() {
 
 func setupRoutes(router *fursy.Router, h *Handlers) {
 	// User routes.
-	fursy.POST[CreateUserRequest, UserResponse](router, "/users", h.CreateUser)
-	fursy.GET[fursy.Empty, UserListResponse](router, "/users", h.ListUsers)
-	fursy.GET[fursy.Empty, UserResponse](router, "/users/:id", h.GetUser)
-	fursy.PUT[UpdateUserRequest, UserResponse](router, "/users/:id", h.UpdateUser)
-	fursy.DELETE[fursy.Empty, EmptyResponse](router, "/users/:id", h.DeleteUser)
+	router.POST("/users", h.CreateUser)
+	router.GET("/users", h.ListUsers)
+	router.GET("/users/:id", h.GetUser)
+	router.PUT("/users/:id", h.UpdateUser)
+	router.DELETE("/users/:id", h.DeleteUser)
 }

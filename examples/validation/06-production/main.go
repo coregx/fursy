@@ -121,19 +121,19 @@ func setupValidator() *validator.Validator {
 
 func setupRoutes(router *fursy.Router, cfg *Config) {
 	// Public routes.
-	fursy.POST[LoginRequest, LoginResponse](router, "/api/login", HandleLogin(cfg))
+	router.POST("/api/login", HandleLogin(cfg))
 
 	// Protected routes (require authentication).
 	router.Use(AuthMiddleware(cfg.JWTSecret))
 	{
-		fursy.GET[fursy.Empty, UserResponse](router, "/api/profile", HandleGetProfile)
-		fursy.PUT[UpdateProfileRequest, UserResponse](router, "/api/profile", HandleUpdateProfile)
+		router.GET("/api/profile", HandleGetProfile)
+		router.PUT("/api/profile", HandleUpdateProfile)
 
 		// Admin-only routes.
 		router.Use(RequireRole("admin"))
 		{
-			fursy.POST[CreateUserRequest, UserResponse](router, "/api/users", HandleCreateUser)
-			fursy.GET[fursy.Empty, UserListResponse](router, "/api/users", HandleListUsers)
+			router.POST("/api/users", HandleCreateUser)
+			router.GET("/api/users", HandleListUsers)
 		}
 	}
 }

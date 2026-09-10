@@ -87,7 +87,7 @@ func main() {
 	router.Use(middleware.CORS())
 
 	// Health check endpoint
-	router.GET("/health", func(c *fursy.Context) error {
+	router.Handle("GET", "/health", func(c *fursy.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{
 			"status": "ok",
 			"env":    cfg.Env,
@@ -95,7 +95,7 @@ func main() {
 	})
 
 	// API documentation endpoint
-	router.GET("/", func(c *fursy.Context) error {
+	router.Handle("GET", "/", func(c *fursy.Context) error {
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"name":    "Production Boilerplate API",
 			"version": "1.0.0",
