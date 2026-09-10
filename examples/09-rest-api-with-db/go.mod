@@ -3,7 +3,7 @@ module rest-api-with-db
 go 1.25.0
 
 require (
-	github.com/coregx/fursy v0.2.0
+	github.com/coregx/fursy v0.5.3
 	github.com/coregx/fursy/plugins/database v0.0.0
 	modernc.org/sqlite v1.40.1
 )

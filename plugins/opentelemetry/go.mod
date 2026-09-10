@@ -3,7 +3,7 @@ module github.com/coregx/fursy/plugins/opentelemetry
 go 1.27
 
 require (
-	github.com/coregx/fursy v0.1.0
+	github.com/coregx/fursy v0.5.3
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/metric v1.38.0
 	go.opentelemetry.io/otel/sdk v1.38.0

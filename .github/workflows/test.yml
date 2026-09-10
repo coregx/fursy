@@ -112,13 +112,13 @@ jobs:
         for dir in examples/*/; do
           if [ -f "$dir/go.mod" ]; then
             echo "Building $dir..."
-            (cd "$dir" && go build ./...) || exit 1
+            (cd "$dir" && go mod tidy && go build ./...) || exit 1
           fi
         done
         for dir in examples/validation/*/; do
           if [ -f "$dir/go.mod" ]; then
             echo "Building $dir..."
-            (cd "$dir" && go build ./...) || exit 1
+            (cd "$dir" && go mod tidy && go build ./...) || exit 1
           fi
         done
         echo "All examples built successfully."
