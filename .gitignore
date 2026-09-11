@@ -32,6 +32,10 @@ bin/
 dist/
 build/
 
+# Example binaries (built from example dirs)
+examples/**/rest-api-with-openapi
+examples/**/hello-world
+
 # IDE
 .vscode/
 .idea/
