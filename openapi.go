@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"unicode"
 )
 
 // OpenAPI schema type constants.
@@ -23,8 +24,12 @@ const (
 const (
 	openapiVersion             = "3.1.0"
 	mimeApplicationProblemJSON = "application/problem+json"
-	refProblemSchema           = "#/components/schemas/Problem"
+	schemaRefPrefix            = "#/components/schemas/"
+	refProblemSchema           = schemaRefPrefix + "Problem"
 	descSuccess                = "Success"
+	descCreated                = "Created"
+	descAccepted               = "Accepted"
+	descNoContent              = "No Content"
 	descBadRequest             = "Bad Request"
 	descInternalServerError    = "Internal Server Error"
 )
@@ -350,13 +355,116 @@ type Tag struct {
 	Description string `json:"description,omitempty"`
 }
 
-// generateSchema generates a JSON Schema from a Go type using reflection.
+// schemaRegistry builds JSON Schemas for a single OpenAPI document.
 //
-//nolint:gocognit,gocyclo,cyclop // Schema generation requires complex type introspection.
+// Named package types are registered once in components.schemas and referenced
+// with $ref, which removes duplication and lets recursive types terminate.
+// When defs is nil, components are disabled and every schema is inlined (used
+// by generateSchema for standalone introspection).
+type schemaRegistry struct {
+	// defs maps component name -> schema. Nil disables component generation.
+	defs map[string]*Schema
+	// nameByType caches the component name assigned to each type.
+	nameByType map[reflect.Type]string
+	// nameOwner tracks which type owns each component name, for disambiguation.
+	nameOwner map[string]reflect.Type
+	// seen tracks structs currently being inlined, to break inline cycles.
+	seen map[reflect.Type]bool
+}
+
+// newSchemaRegistry creates a registry that emits named component schemas.
+func newSchemaRegistry() *schemaRegistry {
+	reg := &schemaRegistry{
+		defs:       make(map[string]*Schema),
+		nameByType: make(map[reflect.Type]string),
+		nameOwner:  make(map[string]reflect.Type),
+		seen:       make(map[reflect.Type]bool),
+	}
+	// Reserve the built-in schema name so a user type named "Problem" is
+	// disambiguated rather than overwriting it.
+	reg.nameOwner["Problem"] = nil
+	return reg
+}
+
+// generateSchema generates an inline JSON Schema from a Go type using reflection.
+//
+// Named types are expanded inline (no components); use a schemaRegistry for
+// $ref-based generation.
 func generateSchema(t reflect.Type) *Schema {
-	// Handle pointer types.
+	return (&schemaRegistry{seen: make(map[reflect.Type]bool)}).schemaFor(t)
+}
+
+// schemaFor returns a schema for t. Named package types yield a $ref to a
+// component (registering the definition on first use); all other types are
+// expanded inline, recursing through schemaFor so nested named types become
+// refs as well.
+func (r *schemaRegistry) schemaFor(t reflect.Type) *Schema {
+	if t == nil {
+		return &Schema{Type: schemaTypeObject}
+	}
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
+	}
+
+	if r.isComponentType(t) {
+		name := r.nameFor(t)
+		if _, defined := r.defs[name]; !defined {
+			// Reserve the name before building so recursive references resolve
+			// to this component instead of recursing forever.
+			r.defs[name] = &Schema{Type: schemaTypeObject}
+			r.defs[name] = r.build(t)
+		}
+		return &Schema{Ref: schemaRefPrefix + name}
+	}
+
+	return r.build(t)
+}
+
+// isComponentType reports whether t should be emitted as a named component.
+//
+// Only user-defined (package-qualified) named types qualify: predeclared types
+// such as int or string (empty package path) and anonymous types (empty name)
+// are inlined.
+func (r *schemaRegistry) isComponentType(t reflect.Type) bool {
+	return r.defs != nil && t.Name() != "" && t.PkgPath() != ""
+}
+
+// nameFor returns the component name for t, disambiguating same-named types
+// from different packages with a package qualifier.
+func (r *schemaRegistry) nameFor(t reflect.Type) string {
+	if name, ok := r.nameByType[t]; ok {
+		return name
+	}
+
+	name := t.Name()
+	if owner, taken := r.nameOwner[name]; taken && owner != t {
+		pkg := t.PkgPath()
+		if i := strings.LastIndexByte(pkg, '/'); i >= 0 {
+			pkg = pkg[i+1:]
+		}
+		base := pkg + "." + t.Name()
+		name = base
+		for i := 2; ; i++ {
+			if owner, taken := r.nameOwner[name]; !taken || owner == t {
+				break
+			}
+			name = fmt.Sprintf("%s.%d", base, i)
+		}
+	}
+
+	r.nameOwner[name] = t
+	r.nameByType[t] = name
+	return name
+}
+
+// build constructs the schema body for t without applying a top-level $ref.
+//
+//nolint:gocognit,gocyclo,cyclop // Schema generation requires complex type introspection.
+func (r *schemaRegistry) build(t reflect.Type) *Schema {
+	// Inline cycle guard: if this type is already being expanded on the current
+	// path (possible when components are disabled), stop with a placeholder.
+	if r.seen[t] {
+		return &Schema{Type: schemaTypeObject}
 	}
 
 	schema := &Schema{}
@@ -375,14 +483,18 @@ func generateSchema(t reflect.Type) *Schema {
 		schema.Type = "boolean"
 	case reflect.Slice, reflect.Array:
 		schema.Type = "array"
-		schema.Items = generateSchema(t.Elem())
+		schema.Items = r.schemaFor(t.Elem())
 	case reflect.Map:
 		schema.Type = schemaTypeObject
-		schema.AdditionalProperties = generateSchema(t.Elem())
+		schema.AdditionalProperties = r.schemaFor(t.Elem())
 	case reflect.Struct:
 		schema.Type = schemaTypeObject
 		schema.Properties = make(map[string]*Schema)
 		required := []string{}
+
+		// Mark this struct as in-progress so self-referential fields terminate.
+		r.seen[t] = true
+		defer delete(r.seen, t)
 
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
@@ -413,13 +525,7 @@ func generateSchema(t reflect.Type) *Schema {
 				}
 			}
 
-			// Generate schema for field.
-			fieldSchema := generateSchema(field.Type)
-
-			// Add description from comment (if available).
-			// Note: We can't easily get comments via reflection.
-
-			schema.Properties[fieldName] = fieldSchema
+			schema.Properties[fieldName] = r.schemaFor(field.Type)
 
 			// Check if required.
 			if !omitempty && field.Type.Kind() != reflect.Pointer {
@@ -452,7 +558,7 @@ func generateSchema(t reflect.Type) *Schema {
 //	    Version: "1.0.0",
 //	})
 //
-//nolint:gocognit,gocyclo,cyclop,gocritic,funlen // OpenAPI generation requires complex route introspection.
+//nolint:gocognit,gocyclo,cyclop,gocritic,funlen,maintidx // OpenAPI generation requires complex route introspection.
 func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 	// Use router info if set, otherwise use parameter.
 	if r.info != nil {
@@ -516,6 +622,13 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 		Required: []string{fieldType, fieldTitle, fieldStatus},
 	}
 
+	// Schema registry collects named component schemas ($ref targets).
+	reg := newSchemaRegistry()
+
+	// usedOperationIDs tracks operationIds already assigned so generated ones
+	// stay globally unique within the document.
+	usedOperationIDs := make(map[string]bool)
+
 	// Process all registered routes.
 	for _, route := range r.routes {
 		// Convert FURSY path format to OpenAPI format.
@@ -538,24 +651,48 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 			Responses:   make(map[string]Response),
 		}
 
-		// Add parameters.
-		if len(route.Parameters) > 0 {
-			for _, param := range route.Parameters {
-				operation.Parameters = append(operation.Parameters, Parameter{
-					Name:        param.Name,
-					In:          param.In,
-					Description: param.Description,
-					Required:    param.Required,
-					Schema:      generateSchema(param.Type),
-				})
+		// Assign an operationId: use the explicit value if provided, otherwise
+		// derive a unique one from the method and path.
+		if operation.OperationID == "" {
+			operation.OperationID = uniqueOperationID(usedOperationIDs, route.Method, route.Path)
+		} else {
+			usedOperationIDs[operation.OperationID] = true
+		}
+
+		// Add parameters declared via RouteOptions.
+		declaredPathParams := make(map[string]bool)
+		for _, param := range route.Parameters {
+			operation.Parameters = append(operation.Parameters, Parameter{
+				Name:        param.Name,
+				In:          param.In,
+				Description: param.Description,
+				Required:    param.Required,
+				Schema:      reg.schemaFor(param.Type),
+			})
+			if param.In == "path" {
+				declaredPathParams[param.Name] = true
 			}
+		}
+
+		// Auto-declare path template parameters (e.g. /users/{id}) that were
+		// not explicitly provided, so the document is valid OpenAPI.
+		for _, name := range extractPathParams(openAPIPath) {
+			if declaredPathParams[name] {
+				continue
+			}
+			operation.Parameters = append(operation.Parameters, Parameter{
+				Name:     name,
+				In:       "path",
+				Required: true,
+				Schema:   &Schema{Type: schemaTypeString},
+			})
 		}
 
 		// Add request body if RequestType is set.
 		if route.RequestType != nil {
-			schema := generateSchema(route.RequestType)
+			schema := reg.schemaFor(route.RequestType)
 			operation.RequestBody = &RequestBody{
-				Required: true,
+				Required: !route.OptionalRequestBody,
 				Content: map[string]MediaType{
 					MIMEApplicationJSON: {
 						Schema: schema,
@@ -564,7 +701,8 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 			}
 		}
 
-		// Add responses.
+		// Add responses. Explicit RouteOptions.Responses take precedence over
+		// the inferred success response.
 		if len(route.Responses) > 0 {
 			for status, resp := range route.Responses {
 				statusStr := fmt.Sprintf("%d", status)
@@ -572,45 +710,50 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 					Description: resp.Description,
 					Content: map[string]MediaType{
 						resp.ContentType: {
-							Schema: generateSchema(resp.Type),
+							Schema: reg.schemaFor(resp.Type),
 						},
 					},
 				}
 			}
 		} else {
-			// Default responses.
-			if route.ResponseType != nil {
-				operation.Responses["200"] = Response{
-					Description: descSuccess,
-					Content: map[string]MediaType{
-						MIMEApplicationJSON: {
-							Schema: generateSchema(route.ResponseType),
-						},
+			// Default success response, using SuccessStatus (0 means 200).
+			status := route.SuccessStatus
+			if status == 0 {
+				status = http.StatusOK
+			}
+			statusStr := fmt.Sprintf("%d", status)
+
+			response := Response{Description: successDescription(status)}
+			if status != http.StatusNoContent && route.ResponseType != nil {
+				response.Content = map[string]MediaType{
+					MIMEApplicationJSON: {
+						Schema: reg.schemaFor(route.ResponseType),
 					},
 				}
-			} else {
-				operation.Responses["200"] = Response{
-					Description: descSuccess,
-				}
 			}
+			operation.Responses[statusStr] = response
 		}
 
-		// Add default error responses.
-		operation.Responses["400"] = Response{
-			Description: descBadRequest,
-			Content: map[string]MediaType{
-				mimeApplicationProblemJSON: {
-					Schema: &Schema{Ref: refProblemSchema},
+		// Add default error responses, unless the user already supplied them.
+		if _, exists := operation.Responses["400"]; !exists {
+			operation.Responses["400"] = Response{
+				Description: descBadRequest,
+				Content: map[string]MediaType{
+					mimeApplicationProblemJSON: {
+						Schema: &Schema{Ref: refProblemSchema},
+					},
 				},
-			},
+			}
 		}
-		operation.Responses["500"] = Response{
-			Description: descInternalServerError,
-			Content: map[string]MediaType{
-				mimeApplicationProblemJSON: {
-					Schema: &Schema{Ref: refProblemSchema},
+		if _, exists := operation.Responses["500"]; !exists {
+			operation.Responses["500"] = Response{
+				Description: descInternalServerError,
+				Content: map[string]MediaType{
+					mimeApplicationProblemJSON: {
+						Schema: &Schema{Ref: refProblemSchema},
+					},
 				},
-			},
+			}
 		}
 
 		// Assign operation to correct HTTP method.
@@ -634,7 +777,111 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 		doc.Paths[openAPIPath] = pathItem
 	}
 
+	// Register inferred component schemas collected while processing routes.
+	for name, schema := range reg.defs {
+		doc.Components.Schemas[name] = schema
+	}
+
 	return doc, nil
+}
+
+// successDescription returns the standard OpenAPI response description for a
+// success status code.
+func successDescription(status int) string {
+	switch status {
+	case http.StatusCreated:
+		return descCreated
+	case http.StatusAccepted:
+		return descAccepted
+	case http.StatusNoContent:
+		return descNoContent
+	default:
+		return descSuccess
+	}
+}
+
+// buildOperationID derives a deterministic operationId from the HTTP method
+// and route path, e.g. GET /users/:id -> getUsersById.
+func buildOperationID(method, path string) string {
+	var b strings.Builder
+	b.WriteString(strings.ToLower(method))
+
+	for _, seg := range strings.Split(path, "/") {
+		if seg == "" {
+			continue
+		}
+		switch seg[0] {
+		case ':', '*':
+			b.WriteString("By")
+			b.WriteString(exportableName(seg[1:]))
+		default:
+			b.WriteString(exportableName(seg))
+		}
+	}
+
+	if b.Len() == 0 {
+		return strings.ToLower(method)
+	}
+	return b.String()
+}
+
+// uniqueOperationID returns a unique operationId for the route, appending a
+// numeric suffix on collision and recording the result in used.
+func uniqueOperationID(used map[string]bool, method, path string) string {
+	base := buildOperationID(method, path)
+	id := base
+	for i := 2; used[id]; i++ {
+		id = fmt.Sprintf("%s_%d", base, i)
+	}
+	used[id] = true
+	return id
+}
+
+// exportableName converts a path segment into an exported-style identifier,
+// upper-casing the first letter and any letter following a separator.
+//
+// Examples: "users" -> "Users"; "user-names" -> "UserNames"; "id" -> "Id".
+func exportableName(s string) string {
+	var b strings.Builder
+	upperNext := true
+	for _, r := range s {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			if upperNext {
+				b.WriteRune(unicode.ToUpper(r))
+				upperNext = false
+			} else {
+				b.WriteRune(r)
+			}
+		default:
+			upperNext = true
+		}
+	}
+	return b.String()
+}
+
+// extractPathParams returns the names of path template parameters in an
+// OpenAPI path, in order of appearance.
+//
+// Example: "/users/{id}/posts/{postID}" -> ["id", "postID"].
+func extractPathParams(path string) []string {
+	var params []string
+	for {
+		start := strings.IndexByte(path, '{')
+		if start == -1 {
+			break
+		}
+		end := strings.IndexByte(path[start+1:], '}')
+		if end == -1 {
+			break
+		}
+		name := path[start+1 : start+1+end]
+		if name != "" {
+			params = append(params, name)
+		}
+		path = path[start+1+end+1:]
+	}
+	return params
 }
 
 // convertPathToOpenAPI converts FURSY path format to OpenAPI format.

@@ -257,12 +257,22 @@ type Problem struct {
 **Automatic generation** from code:
 
 ```go
-spec := router.OpenAPI(fursy.OpenAPIConfig{
+// Configure API metadata once.
+router.WithInfo(fursy.Info{
     Title:       "My API",
     Version:     "1.0.0",
     Description: "API description",
 })
-// Returns complete OpenAPI 3.1 spec
+
+// Document type-safe handlers inline; schemas are inferred from Box[Req, Res].
+router.POST("/users", createUser, &fursy.RouteOptions{
+    Summary:       "Create user",
+    Tags:          []string{"users"},
+    SuccessStatus: 201,
+})
+
+// Serve the generated spec at GET /openapi.json.
+router.ServeOpenAPI("/openapi.json")
 ```
 
 **How it works**:

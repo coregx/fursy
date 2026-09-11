@@ -19,6 +19,24 @@ type testUser struct {
 	Email string `json:"email,omitempty"`
 }
 
+// recursiveNode is a self-referential type used to test schema cycle detection.
+type recursiveNode struct {
+	Value    string          `json:"value"`
+	Children []recursiveNode `json:"children,omitempty"`
+	Parent   *recursiveNode  `json:"parent,omitempty"`
+}
+
+// mutualA and mutualB form a mutually-recursive type cycle.
+type mutualA struct {
+	Name string   `json:"name"`
+	B    *mutualB `json:"b,omitempty"`
+}
+
+type mutualB struct {
+	ID int      `json:"id"`
+	A  *mutualA `json:"a,omitempty"`
+}
+
 func TestOpenAPI_GenerateBasic(t *testing.T) {
 	router := New()
 
@@ -710,4 +728,519 @@ func TestRouter_ServeOpenAPI_DefaultInfo(t *testing.T) {
 	if doc.Info.Version != "1.0.0" {
 		t.Errorf("Expected default version '1.0.0', got %s", doc.Info.Version)
 	}
+}
+
+// TestOpenAPI_CycleDetection verifies that recursive types terminate during
+// schema generation instead of recursing infinitely.
+func TestOpenAPI_CycleDetection(t *testing.T) {
+	// Self-referential via slice and pointer.
+	schema := generateSchema(reflect.TypeOf(recursiveNode{}))
+	if schema.Type != "object" {
+		t.Fatalf("expected object schema, got %q", schema.Type)
+	}
+	if _, ok := schema.Properties["value"]; !ok {
+		t.Error("expected 'value' property")
+	}
+
+	children := schema.Properties["children"]
+	if children == nil || children.Type != "array" || children.Items == nil {
+		t.Fatalf("expected 'children' array with items, got %+v", children)
+	}
+	if children.Items.Type != "object" {
+		t.Errorf("expected cycle placeholder object for children items, got %q", children.Items.Type)
+	}
+
+	// Mutually-recursive types must also terminate.
+	mutual := generateSchema(reflect.TypeOf(mutualA{}))
+	if mutual.Type != "object" {
+		t.Fatalf("expected object schema, got %q", mutual.Type)
+	}
+	if _, ok := mutual.Properties["b"]; !ok {
+		t.Error("expected 'b' property")
+	}
+}
+
+// TestOpenAPI_AutoPathParameters verifies that :name path templates are
+// declared as required path parameters.
+func TestOpenAPI_AutoPathParameters(t *testing.T) {
+	router := New()
+	router.Handle("GET", "/users/:id", func(_ *Context) error { return nil })
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	op := doc.Paths["/users/{id}"].Get
+	if op == nil {
+		t.Fatal("GET /users/{id} not found")
+	}
+
+	id := findOpenAPIParameter(op.Parameters, "id", "path")
+	if id == nil {
+		t.Fatal("expected auto-declared 'id' path parameter")
+	}
+	if !id.Required {
+		t.Error("expected 'id' path parameter to be required")
+	}
+	if id.Schema == nil || id.Schema.Type != "string" {
+		t.Errorf("expected 'id' schema type 'string', got %+v", id.Schema)
+	}
+}
+
+// TestOpenAPI_PathParameterOverride verifies that explicitly declared path
+// parameters take precedence over auto-declaration.
+func TestOpenAPI_PathParameterOverride(t *testing.T) {
+	router := New()
+	router.HandleWithOptions("GET", "/users/:id", func(_ *Context) error { return nil }, &RouteOptions{
+		Parameters: []RouteParameter{
+			{Name: "id", In: "path", Required: true, Description: "User ID", Type: reflect.TypeOf(int64(0))},
+		},
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	op := doc.Paths["/users/{id}"].Get
+	count := 0
+	for _, p := range op.Parameters {
+		if p.Name == "id" && p.In == "path" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly one 'id' path parameter, got %d", count)
+	}
+
+	id := findOpenAPIParameter(op.Parameters, "id", "path")
+	if id.Description != "User ID" {
+		t.Errorf("expected user-supplied description, got %q", id.Description)
+	}
+	if id.Schema == nil || id.Schema.Type != "integer" {
+		t.Errorf("expected user-supplied integer schema, got %+v", id.Schema)
+	}
+}
+
+// TestOpenAPI_UserResponsesNotClobbered verifies that user-supplied error
+// responses survive generation and defaults are only added when absent.
+func TestOpenAPI_UserResponsesNotClobbered(t *testing.T) {
+	router := New()
+	router.HandleWithOptions("GET", "/users", func(_ *Context) error { return nil }, &RouteOptions{
+		Responses: map[int]RouteResponse{
+			400: {
+				Description: "Custom Bad Request",
+				ContentType: MIMEApplicationJSON,
+				Type:        reflect.TypeOf(testUser{}),
+			},
+		},
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	op := doc.Paths["/users"].Get
+	resp400, ok := op.Responses["400"]
+	if !ok {
+		t.Fatal("expected 400 response")
+	}
+	if resp400.Description != "Custom Bad Request" {
+		t.Errorf("user-supplied 400 was clobbered: got %q", resp400.Description)
+	}
+
+	if _, ok := op.Responses["500"]; !ok {
+		t.Error("expected default 500 response to still be added")
+	}
+}
+
+// findOpenAPIParameter returns the first parameter matching name and location.
+func findOpenAPIParameter(params []Parameter, name, in string) *Parameter {
+	for i := range params {
+		if params[i].Name == name && params[i].In == in {
+			return &params[i]
+		}
+	}
+	return nil
+}
+
+// TestGenericBodyType verifies Empty maps to nil and other types are preserved.
+func TestGenericBodyType(t *testing.T) {
+	if got := genericBodyType[Empty](); got != nil {
+		t.Errorf("genericBodyType[Empty]() = %v, want nil", got)
+	}
+	if got := genericBodyType[testUser](); got != reflect.TypeOf(testUser{}) {
+		t.Errorf("genericBodyType[testUser]() = %v, want %v", got, reflect.TypeOf(testUser{}))
+	}
+	if got := genericBodyType[*testUser](); got != reflect.TypeOf((*testUser)(nil)) {
+		t.Errorf("genericBodyType[*testUser]() = %v, want %v", got, reflect.TypeOf((*testUser)(nil)))
+	}
+	if got := genericBodyType[string](); got != reflect.TypeOf("") {
+		t.Errorf("genericBodyType[string]() = %v, want %v", got, reflect.TypeOf(""))
+	}
+	if got := genericBodyType[[]testUser](); got == nil {
+		t.Error("genericBodyType[[]testUser]() = nil, want non-nil")
+	}
+}
+
+// TestRegisterGeneric_RecordsTypes verifies that type-safe handlers record
+// their Req/Res body types as RouteInfo metadata.
+func TestRegisterGeneric_RecordsTypes(t *testing.T) {
+	router := New()
+	router.POST[testUser, testUser]("/users", func(c *Box[testUser, testUser]) error {
+		return c.Created("/users/1", *c.ReqBody)
+	})
+	router.GET[Empty, testUser]("/users/:id", func(_ *Box[Empty, testUser]) error {
+		return nil
+	})
+	router.DELETE[Empty, Empty]("/users/:id", func(_ *Box[Empty, Empty]) error {
+		return nil
+	})
+
+	if len(router.routes) != 3 {
+		t.Fatalf("expected 3 recorded routes, got %d", len(router.routes))
+	}
+
+	post := router.routes[0]
+	if post.RequestType != reflect.TypeOf(testUser{}) {
+		t.Errorf("POST RequestType = %v, want %v", post.RequestType, reflect.TypeOf(testUser{}))
+	}
+	if post.ResponseType != reflect.TypeOf(testUser{}) {
+		t.Errorf("POST ResponseType = %v, want %v", post.ResponseType, reflect.TypeOf(testUser{}))
+	}
+
+	get := router.routes[1]
+	if get.RequestType != nil {
+		t.Errorf("GET RequestType = %v, want nil (Empty)", get.RequestType)
+	}
+	if get.ResponseType != reflect.TypeOf(testUser{}) {
+		t.Errorf("GET ResponseType = %v, want %v", get.ResponseType, reflect.TypeOf(testUser{}))
+	}
+
+	del := router.routes[2]
+	if del.RequestType != nil || del.ResponseType != nil {
+		t.Errorf("DELETE types = (%v, %v), want (nil, nil)", del.RequestType, del.ResponseType)
+	}
+}
+
+// TestRegisterGeneric_WithOptions verifies that variadic RouteOptions are
+// recorded by type-safe handlers.
+func TestRegisterGeneric_WithOptions(t *testing.T) {
+	router := New()
+	router.GET[Empty, testUser]("/users/:id", func(_ *Box[Empty, testUser]) error { return nil },
+		&RouteOptions{Summary: "Get user", Tags: []string{"users"}})
+
+	if len(router.routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(router.routes))
+	}
+	if router.routes[0].Summary != "Get user" {
+		t.Errorf("Summary = %q, want %q", router.routes[0].Summary, "Get user")
+	}
+	if len(router.routes[0].Tags) != 1 || router.routes[0].Tags[0] != "users" {
+		t.Errorf("Tags = %v, want [users]", router.routes[0].Tags)
+	}
+}
+
+// TestOpenAPI_GenericHandlerSchemas verifies that type-safe handlers produce
+// request and response schemas in the generated document.
+func TestOpenAPI_GenericHandlerSchemas(t *testing.T) {
+	router := New()
+	router.POST[testUser, testUser]("/users", func(c *Box[testUser, testUser]) error {
+		return c.Created("/users/1", *c.ReqBody)
+	})
+	router.GET[Empty, []testUser]("/users", func(_ *Box[Empty, []testUser]) error {
+		return nil
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	post := doc.Paths["/users"].Post
+	if post == nil {
+		t.Fatal("POST /users not found")
+	}
+	if post.RequestBody == nil {
+		t.Fatal("expected POST request body schema")
+	}
+	reqMedia, ok := post.RequestBody.Content[MIMEApplicationJSON]
+	if !ok || reqMedia.Schema == nil {
+		t.Fatal("expected application/json request schema")
+	}
+	if reqMedia.Schema.Ref != "#/components/schemas/testUser" {
+		t.Errorf("request schema ref = %q, want %q", reqMedia.Schema.Ref, "#/components/schemas/testUser")
+	}
+
+	respMedia, ok := post.Responses["200"].Content[MIMEApplicationJSON]
+	if !ok || respMedia.Schema == nil {
+		t.Fatal("expected application/json response schema")
+	}
+	if respMedia.Schema.Ref != "#/components/schemas/testUser" {
+		t.Errorf("response schema ref = %q, want %q", respMedia.Schema.Ref, "#/components/schemas/testUser")
+	}
+
+	// The shared type is registered once as a named component.
+	userSchema, ok := doc.Components.Schemas["testUser"]
+	if !ok {
+		t.Fatal("expected testUser component schema")
+	}
+	if _, ok := userSchema.Properties["id"]; !ok {
+		t.Error("expected testUser schema to include 'id' property")
+	}
+	if _, ok := userSchema.Properties["name"]; !ok {
+		t.Error("expected testUser schema to include 'name' property")
+	}
+	if len(userSchema.Required) != 2 {
+		t.Errorf("expected 2 required properties (id, name), got %v", userSchema.Required)
+	}
+
+	// GET uses Empty request type: no request body should be generated.
+	get := doc.Paths["/users"].Get
+	if get == nil {
+		t.Fatal("GET /users not found")
+	}
+	if get.RequestBody != nil {
+		t.Error("expected no request body for Empty request type")
+	}
+
+	// Array response type should produce an array schema whose items $ref the
+	// named component.
+	getResp, ok := get.Responses["200"].Content[MIMEApplicationJSON]
+	if !ok || getResp.Schema == nil {
+		t.Fatal("expected GET response schema")
+	}
+	if getResp.Schema.Type != "array" {
+		t.Errorf("expected GET response schema type 'array', got %q", getResp.Schema.Type)
+	}
+	if getResp.Schema.Items == nil || getResp.Schema.Items.Ref != "#/components/schemas/testUser" {
+		t.Errorf("expected array items $ref to testUser, got %+v", getResp.Schema.Items)
+	}
+}
+
+// TestOpenAPI_SuccessStatus verifies that SuccessStatus controls the inferred
+// success response, including 204 with no content.
+func TestOpenAPI_SuccessStatus(t *testing.T) {
+	router := New()
+	router.POST[testUser, testUser]("/users", func(c *Box[testUser, testUser]) error {
+		return c.Created("/users/1", *c.ReqBody)
+	}, &RouteOptions{SuccessStatus: http.StatusCreated})
+	router.DELETE[Empty, Empty]("/users/:id", func(c *Box[Empty, Empty]) error {
+		return c.NoContentSuccess()
+	}, &RouteOptions{SuccessStatus: http.StatusNoContent})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	post := doc.Paths["/users"].Post
+	if _, ok := post.Responses["200"]; ok {
+		t.Error("did not expect a 200 response when SuccessStatus is 201")
+	}
+	created, ok := post.Responses["201"]
+	if !ok {
+		t.Fatal("expected 201 response")
+	}
+	if created.Description != descCreated {
+		t.Errorf("201 description = %q, want %q", created.Description, descCreated)
+	}
+	if media, ok := created.Content[MIMEApplicationJSON]; !ok || media.Schema == nil {
+		t.Error("expected 201 response content schema")
+	}
+
+	del := doc.Paths["/users/{id}"].Delete
+	noContent, ok := del.Responses["204"]
+	if !ok {
+		t.Fatal("expected 204 response")
+	}
+	if noContent.Description != descNoContent {
+		t.Errorf("204 description = %q, want %q", noContent.Description, descNoContent)
+	}
+	if len(noContent.Content) != 0 {
+		t.Errorf("204 response must not have content, got %d media types", len(noContent.Content))
+	}
+	if _, ok := del.Responses["400"]; !ok {
+		t.Error("expected default 400 response alongside 204")
+	}
+}
+
+// TestOpenAPI_OptionalRequestBody verifies OptionalRequestBody relaxes the
+// inferred request body's required flag.
+func TestOpenAPI_OptionalRequestBody(t *testing.T) {
+	router := New()
+	router.POST[testUser, testUser]("/users", func(_ *Box[testUser, testUser]) error {
+		return nil
+	}, &RouteOptions{OptionalRequestBody: true})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	post := doc.Paths["/users"].Post
+	if post.RequestBody == nil {
+		t.Fatal("expected request body")
+	}
+	if post.RequestBody.Required {
+		t.Error("expected optional (Required=false) request body")
+	}
+}
+
+// TestOpenAPI_ExplicitResponsesOverrideInference verifies that explicit
+// RouteOptions.Responses suppress the inferred success response.
+func TestOpenAPI_ExplicitResponsesOverrideInference(t *testing.T) {
+	router := New()
+	router.POST[testUser, testUser]("/users", func(_ *Box[testUser, testUser]) error {
+		return nil
+	}, &RouteOptions{
+		Responses: map[int]RouteResponse{
+			http.StatusCreated: {
+				Description: "Custom Created",
+				ContentType: MIMEApplicationJSON,
+				Type:        reflect.TypeOf(testUser{}),
+			},
+		},
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	post := doc.Paths["/users"].Post
+	if _, ok := post.Responses["200"]; ok {
+		t.Error("inference should not add 200 when explicit Responses are provided")
+	}
+	if _, ok := post.Responses["201"]; !ok {
+		t.Error("expected user-provided 201 response")
+	}
+}
+
+// TestOpenAPI_GroupGenericRoute verifies that group generic routes carry the
+// prefixed path, options, and Req/Res types.
+func TestOpenAPI_GroupGenericRoute(t *testing.T) {
+	router := New()
+	api := router.Group("/api")
+	api.GET[Empty, testUser]("/users/:id", func(_ *Box[Empty, testUser]) error {
+		return nil
+	}, &RouteOptions{Summary: "Get user", Tags: []string{"users"}})
+
+	if len(router.routes) != 1 {
+		t.Fatalf("expected 1 recorded route, got %d", len(router.routes))
+	}
+	if router.routes[0].ResponseType != reflect.TypeOf(testUser{}) {
+		t.Errorf("group ResponseType = %v, want %v", router.routes[0].ResponseType, reflect.TypeOf(testUser{}))
+	}
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	op := doc.Paths["/api/users/{id}"].Get
+	if op == nil {
+		t.Fatal("expected GET /api/users/{id} from group registration")
+	}
+	if op.Summary != "Get user" {
+		t.Errorf("Summary = %q, want %q", op.Summary, "Get user")
+	}
+	if len(op.Tags) != 1 || op.Tags[0] != "users" {
+		t.Errorf("Tags = %v, want [users]", op.Tags)
+	}
+	if findOpenAPIParameter(op.Parameters, "id", "path") == nil {
+		t.Error("expected auto-declared 'id' path parameter on group route")
+	}
+}
+
+// TestOpenAPI_AutoOperationID verifies deterministic operationId generation
+// from method + path, with global uniqueness across the document.
+func TestOpenAPI_AutoOperationID(t *testing.T) {
+	router := New()
+	router.GET[Empty, testUser]("/users", func(_ *Box[Empty, testUser]) error { return nil })
+	router.POST[testUser, testUser]("/users", func(_ *Box[testUser, testUser]) error { return nil })
+	router.GET[Empty, testUser]("/users/:id", func(_ *Box[Empty, testUser]) error { return nil })
+	router.DELETE[Empty, Empty]("/files/*path", func(_ *Box[Empty, Empty]) error { return nil })
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	got := map[string]string{
+		"get /users":           doc.Paths["/users"].Get.OperationID,
+		"post /users":          doc.Paths["/users"].Post.OperationID,
+		"get /users/{id}":      doc.Paths["/users/{id}"].Get.OperationID,
+		"delete /files/{path}": doc.Paths["/files/{path}"].Delete.OperationID,
+	}
+	want := map[string]string{
+		"get /users":           "getUsers",
+		"post /users":          "postUsers",
+		"get /users/{id}":      "getUsersById",
+		"delete /files/{path}": "deleteFilesByPath",
+	}
+	for route, wantID := range want {
+		if got[route] != wantID {
+			t.Errorf("%s operationId = %q, want %q", route, got[route], wantID)
+		}
+	}
+
+	// Every operation must have a unique, non-empty operationId.
+	seen := make(map[string]string)
+	for path, item := range doc.Paths {
+		for method, op := range operationsOf(item) {
+			if op.OperationID == "" {
+				t.Errorf("%s %s: empty operationId", method, path)
+				continue
+			}
+			if prev, dup := seen[op.OperationID]; dup {
+				t.Errorf("duplicate operationId %q (%s and %s %s)", op.OperationID, prev, method, path)
+			}
+			seen[op.OperationID] = method + " " + path
+		}
+	}
+}
+
+// TestOpenAPI_OperationIDUniqueness verifies explicit operationIds are
+// preserved and generated ones avoid collisions with them.
+func TestOpenAPI_OperationIDUniqueness(t *testing.T) {
+	router := New()
+	router.HandleWithOptions("GET", "/x", func(_ *Context) error { return nil }, &RouteOptions{
+		OperationID: "getUsersById",
+	})
+	router.GET[Empty, testUser]("/users/:id", func(_ *Box[Empty, testUser]) error { return nil })
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	if got := doc.Paths["/x"].Get.OperationID; got != "getUsersById" {
+		t.Errorf("explicit operationId = %q, want %q", got, "getUsersById")
+	}
+	if got := doc.Paths["/users/{id}"].Get.OperationID; got != "getUsersById_2" {
+		t.Errorf("colliding generated operationId = %q, want %q", got, "getUsersById_2")
+	}
+}
+
+// operationsOf returns the non-nil operations of a PathItem keyed by method.
+func operationsOf(item PathItem) map[string]*Operation {
+	all := map[string]*Operation{
+		"GET":     item.Get,
+		"POST":    item.Post,
+		"PUT":     item.Put,
+		"DELETE":  item.Delete,
+		"PATCH":   item.Patch,
+		"HEAD":    item.Head,
+		"OPTIONS": item.Options,
+	}
+	ops := make(map[string]*Operation, len(all))
+	for method, op := range all {
+		if op != nil {
+			ops[method] = op
+		}
+	}
+	return ops
 }

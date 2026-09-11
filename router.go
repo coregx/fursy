@@ -61,6 +61,7 @@ import (
 	"errors"
 	"net/http"
 	"os/signal"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -437,17 +438,21 @@ func (r *Router) Group(prefix string, middleware ...HandlerFunc) *RouteGroup {
 // GET registers a type-safe handler for GET requests.
 // Type parameters are inferred from the handler signature.
 //
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+//
 // Example:
 //
 //	router.GET("/users/:id", func(c *fursy.Box[fursy.Empty, UserResponse]) error {
 //	    return c.OK(UserResponse{ID: 1, Name: "Alice"})
 //	})
-func (r *Router) GET[Req, Res any](path string, handler Handler[Req, Res]) {
-	r.Handle(http.MethodGet, path, adaptGenericHandler(handler))
+func (r *Router) GET[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	r.registerGeneric(http.MethodGet, path, handler, firstRouteOptions(opts))
 }
 
 // POST registers a type-safe handler for POST requests.
 // The request body is automatically bound and validated.
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
 //
 // Example:
 //
@@ -455,33 +460,63 @@ func (r *Router) GET[Req, Res any](path string, handler Handler[Req, Res]) {
 //	    req := c.ReqBody
 //	    return c.Created("/users/1", UserResponse{ID: 1, Name: req.Name})
 //	})
-func (r *Router) POST[Req, Res any](path string, handler Handler[Req, Res]) {
-	r.Handle(http.MethodPost, path, adaptGenericHandler(handler))
+func (r *Router) POST[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	r.registerGeneric(http.MethodPost, path, handler, firstRouteOptions(opts))
 }
 
 // PUT registers a type-safe handler for PUT requests.
-func (r *Router) PUT[Req, Res any](path string, handler Handler[Req, Res]) {
-	r.Handle(http.MethodPut, path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (r *Router) PUT[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	r.registerGeneric(http.MethodPut, path, handler, firstRouteOptions(opts))
 }
 
 // DELETE registers a type-safe handler for DELETE requests.
-func (r *Router) DELETE[Req, Res any](path string, handler Handler[Req, Res]) {
-	r.Handle(http.MethodDelete, path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (r *Router) DELETE[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	r.registerGeneric(http.MethodDelete, path, handler, firstRouteOptions(opts))
 }
 
 // PATCH registers a type-safe handler for PATCH requests.
-func (r *Router) PATCH[Req, Res any](path string, handler Handler[Req, Res]) {
-	r.Handle(http.MethodPatch, path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (r *Router) PATCH[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	r.registerGeneric(http.MethodPatch, path, handler, firstRouteOptions(opts))
 }
 
 // HEAD registers a type-safe handler for HEAD requests.
-func (r *Router) HEAD[Req, Res any](path string, handler Handler[Req, Res]) {
-	r.Handle(http.MethodHead, path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (r *Router) HEAD[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	r.registerGeneric(http.MethodHead, path, handler, firstRouteOptions(opts))
 }
 
 // OPTIONS registers a type-safe handler for OPTIONS requests.
-func (r *Router) OPTIONS[Req, Res any](path string, handler Handler[Req, Res]) {
-	r.Handle(http.MethodOptions, path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (r *Router) OPTIONS[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	r.registerGeneric(http.MethodOptions, path, handler, firstRouteOptions(opts))
+}
+
+// registerGeneric registers a type-safe handler, recording the request and
+// response body types (from Req/Res) as route metadata for OpenAPI generation.
+//
+// The Empty sentinel maps to "no body" (nil type), mirroring Box.Bind.
+func (r *Router) registerGeneric[Req, Res any](method, path string, handler Handler[Req, Res], opts *RouteOptions) {
+	r.registerRoute(method, path, adaptGenericHandler(handler), opts,
+		genericBodyType[Req](), genericBodyType[Res]())
+}
+
+// firstRouteOptions returns the first *RouteOptions from opts, or nil.
+//
+// Generic route methods accept options variadically so existing two-argument
+// calls remain source-compatible.
+func firstRouteOptions(opts []*RouteOptions) *RouteOptions {
+	if len(opts) > 0 {
+		return opts[0]
+	}
+	return nil
 }
 
 // Handle registers a handler for the given HTTP method and path.
@@ -516,6 +551,14 @@ func (r *Router) Handle(method, path string, handler HandlerFunc) {
 //	    Tags:        []string{"users"},
 //	})
 func (r *Router) HandleWithOptions(method, path string, handler HandlerFunc, opts *RouteOptions) {
+	r.registerRoute(method, path, handler, opts, nil, nil)
+}
+
+// registerRoute is the shared registration path for all routes. It inserts the
+// handler into the method's radix tree and records RouteInfo for OpenAPI
+// generation. reqType and resType are the optional request/response body types
+// of type-safe handlers; they are nil for plain handlers and for Empty.
+func (r *Router) registerRoute(method, path string, handler HandlerFunc, opts *RouteOptions, reqType, resType reflect.Type) {
 	if method == "" {
 		panic("fursy: HTTP method cannot be empty")
 	}
@@ -540,29 +583,43 @@ func (r *Router) HandleWithOptions(method, path string, handler HandlerFunc, opt
 
 	// Store route metadata for OpenAPI generation.
 	routeInfo := RouteInfo{
-		Method: method,
-		Path:   path,
+		Method:       method,
+		Path:         path,
+		RequestType:  reqType,
+		ResponseType: resType,
 	}
-
-	if opts != nil {
-		routeInfo.Summary = opts.Summary
-		routeInfo.Description = opts.Description
-		routeInfo.Tags = opts.Tags
-		routeInfo.OperationID = opts.OperationID
-		routeInfo.Deprecated = opts.Deprecated
-		routeInfo.Parameters = opts.Parameters
-		routeInfo.Responses = opts.Responses
-	}
+	applyRouteOptions(&routeInfo, opts)
 
 	r.routes = append(r.routes, routeInfo)
 }
 
+// applyRouteOptions copies documentation metadata from opts into routeInfo.
+// It is a no-op when opts is nil.
+func applyRouteOptions(routeInfo *RouteInfo, opts *RouteOptions) {
+	if opts == nil {
+		return
+	}
+	routeInfo.Summary = opts.Summary
+	routeInfo.Description = opts.Description
+	routeInfo.Tags = opts.Tags
+	routeInfo.OperationID = opts.OperationID
+	routeInfo.Deprecated = opts.Deprecated
+	routeInfo.Parameters = opts.Parameters
+	routeInfo.Responses = opts.Responses
+	routeInfo.SuccessStatus = opts.SuccessStatus
+	routeInfo.OptionalRequestBody = opts.OptionalRequestBody
+}
+
 // handleWithGroupMiddleware registers a route with group middleware.
-// This is called by RouteGroup.Handle() to register routes with group-specific middleware.
+// This is called by the RouteGroup registration methods to register routes with
+// group-specific middleware.
 //
-// The groupHandlers slice contains: group.middleware + handler
+// The groupHandlers slice contains: group.middleware + handler.
 // These will be combined with router.middleware in ServeHTTP.
-func (r *Router) handleWithGroupMiddleware(method, path string, groupHandlers []HandlerFunc) {
+//
+// reqType and resType are the optional request/response body types of type-safe
+// handlers; they are nil for plain handlers and for Empty.
+func (r *Router) handleWithGroupMiddleware(method, path string, groupHandlers []HandlerFunc, opts *RouteOptions, reqType, resType reflect.Type) {
 	if method == "" {
 		panic("fursy: HTTP method cannot be empty")
 	}
@@ -589,10 +646,15 @@ func (r *Router) handleWithGroupMiddleware(method, path string, groupHandlers []
 	}
 
 	// Store route metadata for OpenAPI generation.
-	r.routes = append(r.routes, RouteInfo{
-		Method: method,
-		Path:   path,
-	})
+	routeInfo := RouteInfo{
+		Method:       method,
+		Path:         path,
+		RequestType:  reqType,
+		ResponseType: resType,
+	}
+	applyRouteOptions(&routeInfo, opts)
+
+	r.routes = append(r.routes, routeInfo)
 }
 
 // createGroupHandlerWrapper creates a handler that executes group middleware + handler.
