@@ -4,7 +4,10 @@
 
 package fursy
 
-import "net/http"
+import (
+	"net/http"
+	"reflect"
+)
 
 // Handler is a type-safe handler function for HTTP requests with typed request/response bodies.
 //
@@ -68,4 +71,17 @@ func adaptGenericHandler[Req, Res any](handler Handler[Req, Res]) HandlerFunc {
 		// Call generic handler
 		return handler(ctx)
 	}
+}
+
+// genericBodyType returns the reflect.Type for the generic parameter T, or nil
+// if T is the Empty sentinel (meaning "no body").
+//
+// It mirrors the Empty detection performed in Box.Bind so that the route
+// metadata recorded at registration matches runtime binding behavior.
+func genericBodyType[T any]() reflect.Type {
+	var zero T
+	if _, ok := any(zero).(Empty); ok {
+		return nil
+	}
+	return reflect.TypeFor[T]()
 }

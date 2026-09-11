@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **OpenAPI schemas from type-safe handlers** — `router.GET/POST/...` and `RouteGroup` methods now record `Req`/`Res` types and emit request-body/response schemas
+- **Named component schemas** — inferred types are registered once in `components.schemas` and referenced with `$ref` (removes inline duplication; recursive types terminate)
+- **Auto-generated `operationId`** — operations without an explicit id get a deterministic, unique id from method + path (e.g. `getUsersById`); explicit ids are preserved
+- **`RouteOptions.SuccessStatus`** — set the inferred success status (e.g. 201/204; 204 emits no body)
+- **`RouteOptions.OptionalRequestBody`** — mark the inferred request body as not required
+- **Auto-declared path parameters** — `:id` templates are emitted as required `in: path` parameters
+- **`RouteGroup.HandleWithOptions`** — OpenAPI metadata for grouped plain handlers
+- **New example** — `examples/03-rest-api-with-openapi/` demonstrates generated OpenAPI (schemas + `$ref`, status codes, groups, deprecation)
+
+### Changed
+- **Variadic `*RouteOptions`** on generic route methods (source-compatible; existing two-argument calls unchanged)
+- **Default 400/500 responses** no longer overwrite user-supplied `RouteOptions.Responses`
+
+### Fixed
+- **`generateSchema` cycle detection** — recursive/mutually-recursive types no longer recurse infinitely
+- **Deprecation markers** on package-level `GET`/`POST`/`PUT`/`DELETE`/`PATCH`/`HEAD`/`OPTIONS` now recognized by staticcheck/gopls
+
 ### Planned
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
 - Radix tree edge cases (root path + param routes) — tracked by differential fuzz

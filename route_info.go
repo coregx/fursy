@@ -41,6 +41,13 @@ type RouteInfo struct {
 
 	// Responses stores metadata about possible responses.
 	Responses map[int]RouteResponse
+
+	// SuccessStatus is the default success status code for the inferred
+	// response. Zero means 200. A value of 204 emits no response body.
+	SuccessStatus int
+
+	// OptionalRequestBody marks the inferred request body as not required.
+	OptionalRequestBody bool
 }
 
 // RouteParameter stores metadata about a route parameter.
@@ -95,4 +102,11 @@ type RouteOptions struct {
 
 	// Responses stores metadata about possible responses.
 	Responses map[int]RouteResponse
+
+	// SuccessStatus is the default success status code for the inferred
+	// response. Zero means 200. A value of 204 emits no response body.
+	SuccessStatus int
+
+	// OptionalRequestBody marks the inferred request body as not required.
+	OptionalRequestBody bool
 }
