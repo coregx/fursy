@@ -520,8 +520,8 @@ func validatePath(path string) error {
 	for i := 0; i < len(path); i++ {
 		c := path[i]
 
-		// Check for wildcard
-		if c == ':' || c == '*' {
+		// Check for wildcard — only at segment start (after '/' or position 0).
+		if (c == ':' || c == '*') && (i == 0 || path[i-1] == '/') {
 			// Ensure there's a name after wildcard
 			if i+1 >= len(path) || path[i+1] == '/' {
 				return fmt.Errorf("wildcard name cannot be empty at position %d", i)
@@ -556,10 +556,11 @@ func longestCommonPrefix(a, b string) int {
 }
 
 // findWildcardIndex finds the index of the first wildcard (: or *) in the path.
-// Returns -1 if no wildcard found.
+// Only colons/asterisks at segment start (after '/' or at position 0) are wildcards.
+// Mid-segment colons are literal (RFC 3986 Section 3.3, Google AIP-136 custom methods).
 func findWildcardIndex(path string) int {
 	for i := 0; i < len(path); i++ {
-		if path[i] == ':' || path[i] == '*' {
+		if (path[i] == ':' || path[i] == '*') && (i == 0 || path[i-1] == '/') {
 			return i
 		}
 	}

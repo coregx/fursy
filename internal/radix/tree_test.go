@@ -473,3 +473,96 @@ func TestTree_DuplicateRouteMessage(t *testing.T) {
 		t.Errorf("expected 'route already exists' in error, got: %s", err.Error())
 	}
 }
+
+// TestTree_LiteralColon_GoogleAIP136 tests that colons mid-segment are treated
+// as literal characters, supporting Google AIP-136 custom methods (resource:action).
+// RFC 3986 Section 3.3: ":" is a legal pchar — only segment-start colons are wildcards.
+func TestTree_LiteralColon_GoogleAIP136(t *testing.T) {
+	tree := New()
+
+	if err := tree.Insert("/documents:commit", "commit"); err != nil {
+		t.Fatalf("Insert /documents:commit: %v", err)
+	}
+	if err := tree.Insert("/documents:batchGet", "batchGet"); err != nil {
+		t.Fatalf("Insert /documents:batchGet: %v", err)
+	}
+	if err := tree.Insert("/documents:rollback", "rollback"); err != nil {
+		t.Fatalf("Insert /documents:rollback: %v", err)
+	}
+
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"/documents:commit", "commit"},
+		{"/documents:batchGet", "batchGet"},
+		{"/documents:rollback", "rollback"},
+	}
+
+	for _, tt := range tests {
+		h, _, found := tree.Lookup(tt.path, nil)
+		if !found {
+			t.Errorf("Lookup(%q) not found", tt.path)
+			continue
+		}
+		if h != tt.want {
+			t.Errorf("Lookup(%q) = %v, want %v", tt.path, h, tt.want)
+		}
+	}
+}
+
+// TestTree_LiteralColon_WithParam tests colons mid-segment combined with
+// actual wildcard params in subsequent segments.
+func TestTree_LiteralColon_WithParam(t *testing.T) {
+	tree := New()
+
+	if err := tree.Insert("/clients:getOrganization/:id", "org"); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+	if err := tree.Insert("/clients:getAddress/:id", "addr"); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	h, params, found := tree.Lookup("/clients:getOrganization/42", make([]Param, 0, 4))
+	if !found {
+		t.Fatal("Lookup /clients:getOrganization/42 not found")
+	}
+	if h != "org" {
+		t.Errorf("handler = %v, want org", h)
+	}
+	if len(params) != 1 || params[0].Value != "42" {
+		t.Errorf("params = %v, want [{id 42}]", params)
+	}
+
+	h, params, found = tree.Lookup("/clients:getAddress/99", make([]Param, 0, 4))
+	if !found {
+		t.Fatal("Lookup /clients:getAddress/99 not found")
+	}
+	if h != "addr" {
+		t.Errorf("handler = %v, want addr", h)
+	}
+	if len(params) != 1 || params[0].Value != "99" {
+		t.Errorf("params = %v, want [{id 99}]", params)
+	}
+}
+
+// TestTree_LiteralColon_NotAtSegmentStart ensures colons at segment start
+// are still treated as wildcard params (backward compatibility).
+func TestTree_LiteralColon_SegmentStartStillWildcard(t *testing.T) {
+	tree := New()
+
+	if err := tree.Insert("/users/:id/posts", "posts"); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	h, params, found := tree.Lookup("/users/42/posts", make([]Param, 0, 4))
+	if !found {
+		t.Fatal("Lookup not found")
+	}
+	if h != "posts" {
+		t.Errorf("handler = %v, want posts", h)
+	}
+	if len(params) != 1 || params[0].Value != "42" {
+		t.Errorf("params = %v, want [{id 42}]", params)
+	}
+}
