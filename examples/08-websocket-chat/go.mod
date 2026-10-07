@@ -3,9 +3,9 @@ module websocket-chat
 go 1.27
 
 require (
-	github.com/coregx/fursy v0.5.3
+	github.com/coregx/fursy v0.5.4
 	github.com/coregx/fursy/plugins/stream v0.0.0
-	github.com/coregx/stream v0.1.4
+	github.com/coregx/stream v0.1.5
 )
 
 require (

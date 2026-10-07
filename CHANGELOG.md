@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
-- Radix tree edge cases (root path + param routes) — tracked by differential fuzz
+
+## [0.6.1] - 2026-09-11
+
+### Fixed
+- **Literal colon in path segment** — mid-segment colons (e.g., `/documents:commit`) are now treated as literal characters per RFC 3986 Section 3.3. Only colons at segment start (after `/`) trigger wildcard param matching. Enables Google AIP-136 custom methods (`resource:action`) and Microsoft Azure patterns. Fixes #21.
 
 ## [0.6.0] - 2026-09-11
 
