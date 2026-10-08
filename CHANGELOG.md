@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
 
+## [0.6.2] - 2026-10-08
+
+### Security
+- **Open redirect via RedirectTrailingSlash** — paths with `\` or `//` rejected before redirect
+- **responseWriter: Hijack()** — WebSocket upgrades work through base wrapper (broken since v0.5.2)
+
+### Fixed
+- **Shutdown idempotent** — `sync.Once` prevents double callback execution
+- **Form/multipart parse errors → 400** — `ParseForm`/`ParseMultipartForm` errors wrapped in `DecodeError` (was 500)
+- **CORS default AllowHeaders** — includes `Content-Type,Accept,Authorization` (JSON POST works out of the box)
+- **CircuitBreaker: 4xx Problem not failure** — `fursy.NewProblem(404,...)` no longer trips the breaker
+- **CircuitBreaker: RequestWindow sliding** — ring buffer tracks last N requests (was cumulative)
+- **OpenAPI: literal colons preserved** — `convertPathToOpenAPI` segment-start check (AIP-136 regression)
+- **OpenAPI: path parameters auto-declared** — `:id`/`*path` → required Parameter objects (was invalid OAS 3.1)
+- Stale API references removed from README, SECURITY.md, llms.md, plugin READMEs
+
+### Added
+- **`Context.RoutePattern()`** — registered route pattern for observability (OTel span names, logging)
+- **OTel: `http.route` attribute** on spans; span names use pattern instead of raw URL
+
+### Dependencies
+- plugins/opentelemetry: OTel v1.38.0 → v1.46.0
+- plugins/validator: go-playground/validator v10.24.0 → v10.30.4
+- plugins/database: modernc.org/sqlite v1.40.1 → v1.58.0
+- plugins/stream: coregx/stream v0.1.4 → v0.1.5
+
 ## [0.6.1] - 2026-09-11
 
 ### Fixed
