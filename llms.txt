@@ -3,7 +3,7 @@
 > **DEFINITIVE GUIDE** for AI agents (Claude, ChatGPT, Copilot, etc.) working on fursy HTTP router project.
 >
 > **Project**: fursy - Fast Universal Routing SYstem
-> **Version**: v0.5.0 (Go 1.27 Generic Methods)
+> **Version**: see CHANGELOG.md for current version
 > **Go**: 1.27+ (uses generic methods on concrete types)
 > **Status**: Phase 4 (Ecosystem)
 
@@ -1710,5 +1710,5 @@ import "github.com/coregx/fursy/plugins/validator"
 
 **Version**: 2.0
 **Last Updated**: 2026-09-10
-**Project Version**: v0.5.0 (Go 1.27 Generic Methods)
+**Project Version**: see CHANGELOG.md for current version
 **For Questions**: See `.claude/STATUS.md` and `.claude/CLAUDE.md`

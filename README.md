@@ -109,7 +109,7 @@ spec, err := router.GenerateOpenAPI(fursy.Info{
     Title:   "My API",
     Version: "1.0.0",
 })
-// Complete OpenAPI 3.1 spec from code!
+// OpenAPI 3.1 spec with path parameters and error schemas
 
 // Or serve it directly:
 router.ServeOpenAPI("/openapi.json")
@@ -1167,32 +1167,9 @@ Your fursy application will automatically send traces to Jaeger. No configuratio
 
 ## 📈 Status
 
-**Current Version**: v0.3.3 (Production Ready)
+**Status**: Production Ready — see [CHANGELOG.md](CHANGELOG.md) for current version and release history.
 
-**Status**: Production Ready - Complete ecosystem with real-time, database, and production examples
-
-**Coverage**: 94.6% test coverage (total), 94.6% core, 97.7% binding, 95.6% middleware
-
-**Performance**: ~53 ns/op (static), ~75 ns/op (parametric), 0 alloc/op
-
-**Roadmap**:
-
-```
-✅ v0.1.0          ✅ v0.2.0          ✅ v0.3.0             🎯 v1.0.0 LTS
-(Foundation)     (Docs+Examples)  (Real-time+DB)         (TBD - After Full
-                                                          API Stabilization)
-    │                  │                 │                       │
-    ▼                  ▼                 ▼                       ▼
-Core Router        Documentation    Real-Time+DB            Stable API
-Middleware         11 Examples      Production Ready        Long-Term Support
-Production         Validation       2 Plugins               (NOT Rushing!)
-Features           OpenAPI          DDD Boilerplate
-```
-
-**Current Status**: v0.3.3 Production Ready ✅
-**Ecosystem**: stream v0.1.0 (SSE + WebSocket), 2 production plugins, 10 examples
-**Next**: v0.x.x feature releases as needed (Cache, more plugins, community tools)
-**v1.0.0 LTS**: After 6-12 months of production usage and full API stabilization
+**Roadmap**: see [ROADMAP.md](ROADMAP.md)
 
 ---
 
@@ -1268,7 +1245,7 @@ FURSY stands on the shoulders of giants:
 
 *Built with ❤️ by the coregx team*
 
-**Version**: v0.3.3 - Production Ready
+**Version**: see CHANGELOG.md for current version
 **Ecosystem**: stream v0.1.0 + 2 plugins + 10 examples + DDD boilerplate
 **Next**: v1.0.0 LTS (after full API stabilization)
 

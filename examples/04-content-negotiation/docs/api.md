@@ -7,7 +7,7 @@
 
 ## Overview
 
-**fursy** (Fast Universal Routing SYstem) is a production-ready HTTP router for Go 1.25+ with type-safe handlers, RFC 9457 Problem Details, and built-in OpenAPI 3.1 generation.
+**fursy** (Fast Universal Routing SYstem) is a production-ready HTTP router for Go 1.27+ with type-safe handlers, RFC 9457 Problem Details, and built-in OpenAPI 3.1 generation.
 
 ## Key Features
 
@@ -15,7 +15,7 @@
 - **RFC 9457 Problem Details** for standardized error responses
 - **Content negotiation** supporting JSON, XML, HTML, Markdown, and plain text
 - **Zero dependencies** (core = stdlib only)
-- **High performance** (~256 ns/op route lookup)
+- **High performance** (<100 ns/op route lookup)
 
 ## Quick Start
 
@@ -30,7 +30,7 @@ import (
 func main() {
     router := fursy.New()
 
-    router.GET("/", func(c *fursy.Context) error {
+    router.Handle("GET", "/", func(c *fursy.Context) error {
         return c.OK(map[string]string{"message": "Hello, World!"})
     })
 
@@ -163,8 +163,8 @@ router.POST("/users", createUser)
 
 ## Performance
 
-- Route lookup: **256 ns/op** (static routes)
-- Allocations: **1 alloc/op** (near-zero allocation routing)
+- Route lookup: **<100 ns/op** (static routes)
+- Allocations: **0 alloc/op** (zero-allocation routing)
 - Throughput: **~10M req/s** (simple routes)
 - Test coverage: **88.9%**
 

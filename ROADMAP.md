@@ -1,6 +1,6 @@
 # FURSY HTTP Router - Development Roadmap
 
-> **Strategic Advantage**: Modern Go 1.25+ features + proven routing patterns!
+> **Strategic Advantage**: Modern Go 1.27+ features + proven routing patterns!
 > **Approach**: Combine best practices from httprouter, Gin, Echo with type-safe generics
 
 **Last Updated**: 2026-09-11 | **Current Version**: v0.6.1 (RFC 9457 Default Errors + Security Fixes + AIP-136) | **Phase**: Phase 4 In Progress (Ecosystem) | **Target**: v1.0.0 LTS (TBD, after full API stabilization)
@@ -9,14 +9,14 @@
 
 ## 🎯 Vision
 
-Build a **next-generation HTTP router for Go 1.25+** with type-safe handlers, RFC 9457 error responses, and built-in OpenAPI 3.1 generation - all with **minimal dependencies** (core routing: stdlib only).
+Build a **next-generation HTTP router for Go 1.27+** with type-safe handlers, RFC 9457 error responses, and built-in OpenAPI 3.1 generation - all with **minimal dependencies** (core routing: stdlib only).
 
 ### Key Advantages
 
 ✅ **Type-Safe Generic Handlers**
 - Box[Req, Res any] for compile-time safety
 - No interface{} casting needed
-- Modern Go 1.25+ features
+- Modern Go 1.27+ features
 
 ✅ **Production-Ready Performance**
 - <500ns parametric route lookup
@@ -73,7 +73,7 @@ v1.0.0 LTS → Long-term support (Q3 2026)
 - **Performance benchmarks** (PERFORMANCE.md with 19 benchmarks)
 
 **Performance Metrics** (Phase 3):
-- Static routes: 256 ns/op, 1 alloc/op ✅
+- Static routes: <100 ns/op, 0 alloc/op ✅
 - Parametric routes: 326 ns/op, 1 alloc/op ✅
 - Deep nesting (4 params): 561 ns/op, 1 alloc/op ✅
 - Coverage: 91.7% ✅
@@ -89,7 +89,7 @@ v1.0.0 LTS → Long-term support (Q3 2026)
   - Automatic Validation section with examples
   - Content Negotiation section (RFC 9110, AI agent support)
   - Observability section (OpenTelemetry integration)
-  - llms.md - Complete AI agent guide (1,716 lines)
+  - llms.txt - Complete AI agent guide (1,716 lines)
 - **Examples** (11 total, 5,000+ lines of example code)
   - 01-hello-world, 02-rest-api-crud (basic)
   - 04-content-negotiation (1,507 lines, multi-format responses)
@@ -148,7 +148,7 @@ v1.0.0 LTS → Long-term support (Q3 2026)
 - ✅ **Trailing Slash Handling** (strip/redirect, bidirectional, 301/308)
 
 **Performance**:
-- ✅ Static routes: 256 ns/op, 1 alloc/op
+- ✅ Static routes: <100 ns/op, 0 alloc/op
 - ✅ Parametric routes: 326 ns/op, 1 alloc/op
 - ✅ Throughput: ~10M req/s (simple routes)
 - ✅ Memory efficient: context pooling prevents leaks
@@ -200,7 +200,7 @@ v1.0.0 LTS → Long-term support (Q3 2026)
   - Automatic Validation guide with examples
   - Content Negotiation guide (RFC 9110, AI agent support)
   - Observability guide (OpenTelemetry integration)
-- [x] **AI Agent Guide** (llms.md, 1,716 lines)
+- [x] **AI Agent Guide** (llms.txt, 1,716 lines)
   - Complete project architecture and structure
   - Development standards and testing requirements
   - All middleware documented with examples
@@ -413,7 +413,7 @@ v1.0.0 LTS → Long-term support (Q3 2026)
 ## 🔬 Development Approach
 
 **Modern Go Best Practices**:
-- Go 1.25+ features (generics, any type)
+- Go 1.27+ features (generics, any type)
 - stdlib (`encoding/json`, `log/slog`)
 - Minimal dependencies (core routing: stdlib only)
 - Pure Go (no CGo)

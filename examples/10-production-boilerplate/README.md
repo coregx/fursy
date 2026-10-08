@@ -117,7 +117,7 @@ This is a **reference implementation** of a production-ready REST API showcasing
 
 ### Prerequisites
 
-- **Go 1.25+**
+- **Go 1.27+**
 - **SQLite** (for local development)
 - **Make** (optional, for convenience)
 - **Docker** (optional, for containerized deployment)
@@ -590,6 +590,6 @@ For questions or issues:
 - [fursy](https://github.com/coregx/fursy) - Fast Universal Routing SYstem
 - [stream](https://github.com/coregx/stream) - SSE + WebSocket library
 - [Relica](https://github.com/coregx/relica) - Fluent SQL query builder
-- Go 1.25+ modern features
+- Go 1.27+ modern features
 
 **Status**: Production-ready reference implementation ✅

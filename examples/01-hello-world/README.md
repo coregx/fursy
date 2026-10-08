@@ -15,7 +15,7 @@ The simplest possible **fursy** application - a single endpoint that returns JSO
 func main() {
     router := fursy.New()
 
-    router.GET("/", func(c *fursy.Context) error {
+    router.Handle("GET", "/", func(c *fursy.Context) error {
         return c.OK(map[string]string{
             "message": "Hello, World!",
             "status":  "success",

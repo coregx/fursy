@@ -4,7 +4,7 @@ This directory contains comprehensive validation examples demonstrating fursy's 
 
 ## Prerequisites
 
-- Go 1.25 or higher
+- Go 1.27 or higher
 - fursy HTTP router
 - validator plugin
 
