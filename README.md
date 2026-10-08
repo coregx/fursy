@@ -229,7 +229,7 @@ router.Use(middleware.RecoveryWithConfig(middleware.RecoveryConfig{
 
 Cross-Origin Resource Sharing (RFC-compliant, OWASP recommended).
 
-> **Note**: CORS middleware **must** be registered globally via `router.Use()`, not on a `RouteGroup`. Preflight OPTIONS requests are handled before route matching, so group-level middleware is never reached for preflight. This is consistent with Gin, Echo, and Chi.
+> **Note**: CORS middleware **must** be registered globally via `router.Use()` **and before any auth middleware** (JWT, BasicAuth). Preflight OPTIONS requests don't carry credentials — if auth runs first, preflight gets 401 instead of CORS headers. This is consistent with Gin, Echo, and Chi.
 
 ```go
 router.Use(middleware.CORS())

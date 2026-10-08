@@ -173,10 +173,12 @@ type Router struct {
 	shutdownMu   sync.Mutex
 	shutdownOnce sync.Once
 
-	// maxBodySize is the maximum allowed request body size in bytes for
-	// generic handlers (those using Box[Req, Res] with automatic binding).
-	// Default: 4MB (4 << 20). Set to 0 to disable the limit.
-	// Plain handlers (HandlerFunc) are not affected.
+	// errorLogger is called when an unclassified error triggers a 500 response.
+	errorLogger func(err error, req *http.Request)
+
+	// maxBodySize is the maximum allowed request body size in bytes.
+	// Enforced in ServeHTTP for all handler types. Oversized bodies get 413.
+	// Default: 4MB (4 << 20). Set to 0 to disable.
 	maxBodySize int64
 }
 
@@ -280,15 +282,11 @@ func (r *Router) SetErrorHandler(h ErrorHandler) *Router {
 	return r
 }
 
-// SetMaxBodySize sets the maximum allowed request body size in bytes for
-// generic handlers (Box[Req, Res] with automatic binding).
+// SetMaxBodySize sets the maximum allowed request body size in bytes.
+// Applies to all handlers (generic and plain). The limit is enforced
+// in ServeHTTP; oversized bodies get 413 Payload Too Large.
 //
-// When a request body exceeds this limit, the binding step returns
-// an error that is mapped to 413 Payload Too Large by the default
-// error handler.
-//
-// The default limit is 4MB (4 << 20). Set to 0 to disable the limit.
-// Plain handlers (HandlerFunc) are not affected by this setting.
+// Default: 4MB (4 << 20). Set to 0 to disable.
 //
 // Example:
 //
@@ -308,6 +306,13 @@ func (r *Router) SetMaxBodySize(size int64) *Router {
 // Returns 0 if the limit is disabled.
 func (r *Router) MaxBodySize() int64 {
 	return r.maxBodySize
+}
+
+// SetErrorLogger sets a callback for unclassified errors that trigger 500 responses.
+// Only fires on unexpected errors — Problem, ValidationErrors, DecodeError, and
+// MaxBytesError are handled before this point and do NOT trigger the logger.
+func (r *Router) SetErrorLogger(fn func(err error, req *http.Request)) {
+	r.errorLogger = fn
 }
 
 // WithInfo sets the API metadata for OpenAPI generation.
@@ -684,6 +689,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		c.params = append(c.params, Param{Key: p.Key, Value: p.Value})
 	}
 
+	// Global body size limit — applies to ALL handler types.
+	if r.maxBodySize > 0 && req.Body != nil && req.Body != http.NoBody {
+		req.Body = http.MaxBytesReader(w, req.Body, r.maxBodySize)
+	}
+
 	// Extract handler and pattern from route entry.
 	entry := handler.(routeEntry)
 	c.routePattern = entry.pattern
@@ -713,52 +723,69 @@ func (r *Router) handleError(c *Context, err error) {
 }
 
 // defaultErrorHandler maps errors to appropriate HTTP responses.
+//
+//nolint:gocognit,gocyclo,cyclop // Error classification requires multiple type checks.
 func defaultErrorHandler(c *Context, err error) {
-	// If response already written, don't write again — would corrupt body.
-	if c.responseWriter.written {
-		return
-	}
+	// Classify the error first — even if response is partially written,
+	// we still need to log unclassified errors (streaming failures).
 
 	// Problem → use its Status field.
 	var prob Problem
 	if errors.As(err, &prob) {
-		_ = c.Problem(prob)
+		if !c.responseWriter.written {
+			_ = c.Problem(prob)
+		}
 		return
 	}
 
 	// ValidationErrors → 422 with RFC 9457 body.
 	var valErrs ValidationErrors
 	if errors.As(err, &valErrs) {
-		_ = c.Problem(ValidationProblem(valErrs))
+		if !c.responseWriter.written {
+			_ = c.Problem(ValidationProblem(valErrs))
+		}
 		return
 	}
 
 	// MaxBytesError → 413 Payload Too Large.
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {
-		_ = c.Problem(NewProblem(http.StatusRequestEntityTooLarge, "Request Entity Too Large", ""))
+		if !c.responseWriter.written {
+			_ = c.Problem(NewProblem(http.StatusRequestEntityTooLarge, "Request Entity Too Large", ""))
+		}
 		return
 	}
 
 	// Binding errors → 400 or 415.
 	if errors.Is(err, binding.ErrUnsupportedMediaType) {
-		_ = c.Problem(NewProblem(http.StatusUnsupportedMediaType, "Unsupported Media Type", ""))
+		if !c.responseWriter.written {
+			_ = c.Problem(NewProblem(http.StatusUnsupportedMediaType, "Unsupported Media Type", ""))
+		}
 		return
 	}
 	if errors.Is(err, binding.ErrEmptyRequestBody) {
-		_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", "request body is empty"))
+		if !c.responseWriter.written {
+			_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", "request body is empty"))
+		}
 		return
 	}
 
 	// JSON/XML decode errors → 400.
 	var decodeErr *binding.DecodeError
 	if errors.As(err, &decodeErr) {
-		_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", decodeErr.Error()))
+		if !c.responseWriter.written {
+			_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", decodeErr.Error()))
+		}
 		return
 	}
 
-	// Unknown → 500 without details (security: don't leak internals).
-	_ = c.Problem(NewProblem(http.StatusInternalServerError, "Internal Server Error", ""))
+	// Unknown → log always, write 500 only if response not started.
+	if c.router != nil && c.router.errorLogger != nil {
+		c.router.errorLogger(err, c.Request)
+	}
+	if !c.responseWriter.written {
+		_ = c.Problem(NewProblem(http.StatusInternalServerError, "Internal Server Error", ""))
+	}
 }
 
 // handleNotFound sends a 404 or 405 response depending on configuration.

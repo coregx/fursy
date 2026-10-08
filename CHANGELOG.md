@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
 
+## [0.6.3] - 2026-10-08
+
+### Security
+- **Global body limit** — `SetMaxBodySize` now applies to ALL handlers, not just generic `Box[Req,Res]`. Plain handlers via `router.Handle()` were previously unlimited — memory DoS vector.
+
+### Added
+- **`SetErrorLogger(func(error, *http.Request))`** — hook for unclassified errors before 500 response. Only fires on unexpected errors; Problem/ValidationErrors/DecodeError are handled before this point.
+- **Fuzz tests** — `FuzzRadixLookup` and `FuzzRoutePattern` for radix tree edge cases (~3.3M executions, no panics).
+
+### Changed
+- **Body limit applies to plain handlers** — `SetMaxBodySize` now enforces the limit on `router.Handle()` handlers too (was generic-only). Existing plain handlers accepting bodies >4MB will get 413. Use `SetMaxBodySize(0)` to disable.
+
+### Fixed
+- CORS docs: must be registered **before** auth middleware (JWT, BasicAuth), not just globally.
+
 ## [0.6.2] - 2026-10-08
 
 ### Security
