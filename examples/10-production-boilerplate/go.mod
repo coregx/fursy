@@ -3,7 +3,7 @@ module example.com/production-boilerplate
 go 1.27
 
 require (
-	github.com/coregx/fursy v0.6.1
+	github.com/coregx/fursy v0.5.4
 	github.com/coregx/stream v0.1.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0

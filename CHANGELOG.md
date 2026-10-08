@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - **Open redirect via RedirectTrailingSlash** — paths with `\` or `//` rejected before redirect
-- **responseWriter: Hijack()** — WebSocket upgrades work through base wrapper (broken since v0.5.2)
+- **responseWriter: Hijack()** — WebSocket upgrades work through base wrapper (broken since v0.5.2). Full middleware chain support pending `http.NewResponseController` adoption in coregx/stream
 
 ### Fixed
 - **Shutdown idempotent** — `sync.Once` prevents double callback execution
@@ -31,10 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OTel: `http.route` attribute** on spans; span names use pattern instead of raw URL
 
 ### Dependencies
-- plugins/opentelemetry: OTel v1.38.0 → v1.46.0
-- plugins/validator: go-playground/validator v10.24.0 → v10.30.4
-- plugins/database: modernc.org/sqlite v1.40.1 → v1.58.0
-- plugins/stream: coregx/stream v0.1.4 → v0.1.5
+- plugins/examples: fursy pin → v0.6.2 (post-release)
 
 ## [0.6.1] - 2026-09-11
 
