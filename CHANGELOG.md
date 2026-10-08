@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - **Open redirect via RedirectTrailingSlash** — paths with `\` or `//` rejected before redirect
-- **responseWriter: Hijack()** — WebSocket upgrades work through base wrapper (broken since v0.5.2). Full middleware chain support pending `http.NewResponseController` adoption in coregx/stream
+- **responseWriter: Hijack()** — WebSocket upgrades work through base wrapper (broken since v0.5.2). Full middleware-chain support since plugins/stream → coregx/stream v0.1.6 (#28)
 
 ### Fixed
 - **Shutdown idempotent** — `sync.Once` prevents double callback execution
