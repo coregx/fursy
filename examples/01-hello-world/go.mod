@@ -4,4 +4,4 @@ go 1.27
 
 replace github.com/coregx/fursy => ../..
 
-require github.com/coregx/fursy v0.5.4
+require github.com/coregx/fursy v0.6.2
