@@ -60,7 +60,8 @@ var (
 type JWTConfig struct {
 	// SigningKey is the key used to validate JWT signatures.
 	// For HS256: []byte("secret-key")
-	// For RS256/ES256: *rsa.PublicKey, *ecdsa.PublicKey, or []byte(publicKeyPEM)
+	// For RS256: *rsa.PublicKey (use jwt.ParseRSAPublicKeyFromPEM to convert PEM bytes)
+	// For ES256: *ecdsa.PublicKey (use jwt.ParseECPublicKeyFromPEM to convert PEM bytes)
 	// Required.
 	SigningKey interface{}
 

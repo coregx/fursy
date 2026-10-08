@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestContext_Param tests URL parameter extraction.
@@ -786,6 +787,68 @@ func TestRouter_ContextErrorHandling(t *testing.T) {
 	ct := w.Header().Get("Content-Type")
 	if !strings.Contains(ct, "application/problem+json") {
 		t.Errorf("Content-Type = %q, want application/problem+json", ct)
+	}
+}
+
+// TestContext_RoutePattern verifies that RoutePattern returns the registered
+// route pattern for observability (OTel span names, logging).
+func TestContext_RoutePattern(t *testing.T) {
+	r := New()
+	var captured string
+
+	r.Handle("GET", "/users/:id/posts", func(c *Context) error {
+		captured = c.RoutePattern()
+		return c.String(200, "OK")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/users/42/posts", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if captured != "/users/:id/posts" {
+		t.Errorf("RoutePattern() = %q, want /users/:id/posts", captured)
+	}
+}
+
+// TestResponseWriter_Hijack verifies that the responseWriter wrapper implements
+// http.Hijacker, required for WebSocket upgrades via the stream plugin.
+func TestResponseWriter_Hijack(t *testing.T) {
+	r := New()
+	result := make(chan error, 1)
+
+	r.Handle("GET", "/ws", func(c *Context) error {
+		h, ok := c.Response.(http.Hijacker)
+		if !ok {
+			err := errors.New("Response does not implement http.Hijacker")
+			result <- err
+			return err
+		}
+		conn, _, err := h.Hijack()
+		if err != nil {
+			result <- err
+			return err
+		}
+		conn.Close()
+		result <- nil
+		return nil
+	})
+
+	srv := httptest.NewServer(r)
+	defer srv.Close()
+
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, _ := client.Get(srv.URL + "/ws")
+	if resp != nil {
+		resp.Body.Close()
+	}
+
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("Hijack failed: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler was not called (timeout)")
 	}
 }
 

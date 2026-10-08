@@ -651,6 +651,226 @@ func TestOpenAPI_WriteJSON(t *testing.T) {
 	}
 }
 
+func TestConvertPathToOpenAPI_LiteralColon(t *testing.T) {
+	tests := []struct {
+		input, want string
+	}{
+		{"/documents:commit", "/documents:commit"},
+		{"/clients:getOrganization/:id", "/clients:getOrganization/{id}"},
+		{"/users/:id", "/users/{id}"},
+		{"/api/:version/resources:batchGet", "/api/{version}/resources:batchGet"},
+		{"/files/*path", "/files/{path}"},
+		{"/:root", "/{root}"},
+		{"/a:b/c:d/:e", "/a:b/c:d/{e}"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := convertPathToOpenAPI(tt.input)
+			if got != tt.want {
+				t.Errorf("convertPathToOpenAPI(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOpenAPI_PathParametersAutoDeclared(t *testing.T) {
+	router := New()
+
+	router.Handle("GET", "/users/:id", func(_ *Context) error {
+		return nil
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{
+		Title:   "Test",
+		Version: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	pathItem, exists := doc.Paths["/users/{id}"]
+	if !exists {
+		t.Fatal("/users/{id} path not found")
+	}
+
+	op := pathItem.Get
+	if op == nil {
+		t.Fatal("GET operation not found")
+	}
+
+	// Must have auto-declared path parameter "id".
+	if len(op.Parameters) == 0 {
+		t.Fatal("expected at least 1 parameter, got 0")
+	}
+
+	found := false
+	for _, p := range op.Parameters {
+		if p.Name == "id" && p.In == "path" && p.Required && p.Schema != nil && p.Schema.Type == "string" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected path parameter {name: 'id', in: 'path', required: true, schema: {type: 'string'}}, got %+v", op.Parameters)
+	}
+}
+
+func TestOpenAPI_PathParametersMultiple(t *testing.T) {
+	router := New()
+
+	router.Handle("GET", "/users/:userId/posts/:postId", func(_ *Context) error {
+		return nil
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{
+		Title:   "Test",
+		Version: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	pathItem, exists := doc.Paths["/users/{userId}/posts/{postId}"]
+	if !exists {
+		t.Fatal("/users/{userId}/posts/{postId} path not found")
+	}
+
+	op := pathItem.Get
+	if op == nil {
+		t.Fatal("GET operation not found")
+	}
+
+	if len(op.Parameters) != 2 {
+		t.Fatalf("expected 2 parameters, got %d", len(op.Parameters))
+	}
+
+	names := map[string]bool{}
+	for _, p := range op.Parameters {
+		names[p.Name] = true
+		if p.In != "path" {
+			t.Errorf("expected parameter %q in 'path', got %q", p.Name, p.In)
+		}
+		if !p.Required {
+			t.Errorf("expected parameter %q to be required", p.Name)
+		}
+	}
+
+	if !names["userId"] {
+		t.Error("expected parameter 'userId'")
+	}
+	if !names["postId"] {
+		t.Error("expected parameter 'postId'")
+	}
+}
+
+func TestOpenAPI_PathParametersCatchAll(t *testing.T) {
+	router := New()
+
+	router.Handle("GET", "/files/*path", func(_ *Context) error {
+		return nil
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{
+		Title:   "Test",
+		Version: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	pathItem, exists := doc.Paths["/files/{path}"]
+	if !exists {
+		t.Fatal("/files/{path} path not found")
+	}
+
+	op := pathItem.Get
+	if op == nil {
+		t.Fatal("GET operation not found")
+	}
+
+	if len(op.Parameters) != 1 {
+		t.Fatalf("expected 1 parameter, got %d", len(op.Parameters))
+	}
+
+	p := op.Parameters[0]
+	if p.Name != "path" || p.In != "path" || !p.Required {
+		t.Errorf("expected {name: 'path', in: 'path', required: true}, got %+v", p)
+	}
+}
+
+func TestOpenAPI_PathParametersLiteralColonIgnored(t *testing.T) {
+	router := New()
+
+	router.Handle("POST", "/documents:commit", func(_ *Context) error {
+		return nil
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{
+		Title:   "Test",
+		Version: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	pathItem, exists := doc.Paths["/documents:commit"]
+	if !exists {
+		t.Fatal("/documents:commit path not found")
+	}
+
+	op := pathItem.Post
+	if op == nil {
+		t.Fatal("POST operation not found")
+	}
+
+	// Literal colon is NOT a parameter; should have zero auto-declared params.
+	if len(op.Parameters) != 0 {
+		t.Errorf("expected 0 parameters for literal colon path, got %d: %+v", len(op.Parameters), op.Parameters)
+	}
+}
+
+func TestOpenAPI_PathParametersNoDuplicates(t *testing.T) {
+	router := New()
+
+	// Route with :id plus manually declared parameter for :id.
+	router.HandleWithOptions("GET", "/users/:id", func(_ *Context) error {
+		return nil
+	}, &RouteOptions{
+		Parameters: []RouteParameter{
+			{Name: "id", In: "path", Required: true, Type: reflect.TypeOf(0)},
+		},
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{
+		Title:   "Test",
+		Version: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	pathItem, exists := doc.Paths["/users/{id}"]
+	if !exists {
+		t.Fatal("/users/{id} path not found")
+	}
+
+	op := pathItem.Get
+	if op == nil {
+		t.Fatal("GET operation not found")
+	}
+
+	// Should NOT have duplicate "id" parameters.
+	idCount := 0
+	for _, p := range op.Parameters {
+		if p.Name == "id" && p.In == "path" {
+			idCount++
+		}
+	}
+	if idCount != 1 {
+		t.Errorf("expected exactly 1 'id' path parameter, got %d", idCount)
+	}
+}
+
 func TestOpenAPI_WriteYAML(t *testing.T) {
 	router := New()
 	router.Handle("GET", "/test", func(_ *Context) error {

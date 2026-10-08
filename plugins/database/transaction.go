@@ -136,7 +136,7 @@ func WithTx(ctx context.Context, db *DB, fn func(*Tx) error) error {
 //	txGroup.Use(database.Middleware(db))
 //	txGroup.Use(database.TxMiddleware(db))
 //
-//	txGroup.POST("/users", func(c *fursy.Context) error {
+//	txGroup.Handle("POST", "/users", func(c *fursy.Context) error {
 //	    tx, _ := database.GetTx(c)
 //	    // Use tx for all database operations
 //	    // Auto-commit on success, auto-rollback on error
@@ -195,7 +195,7 @@ func GetTx(c *fursy.Context) (*Tx, bool) {
 //	txGroup := router.Group("/api")
 //	txGroup.Use(database.TxMiddleware(db))
 //
-//	txGroup.POST("/transfer", func(c *fursy.Context) error {
+//	txGroup.Handle("POST", "/transfer", func(c *fursy.Context) error {
 //	    tx := database.MustGetTx(c) // Panic if TxMiddleware not configured
 //	    _, err := tx.Exec(c.Request.Context(), "UPDATE accounts SET ...")
 //	    return err
@@ -220,7 +220,7 @@ func MustGetTx(c *fursy.Context) *Tx {
 //
 // Example:
 //
-//	txGroup.POST("/transfer", func(c *fursy.Context) error {
+//	txGroup.Handle("POST", "/transfer", func(c *fursy.Context) error {
 //	    tx, err := database.GetTxOrError(c)
 //	    if err != nil {
 //	        return c.Problem(err.(fursy.Problem))

@@ -6,11 +6,13 @@
 package fursy
 
 import (
+	"bufio"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 
 	"github.com/coregx/fursy/internal/negotiate"
@@ -77,6 +79,15 @@ func (w *responseWriter) Flush() {
 	}
 }
 
+// Hijack implements http.Hijacker by delegating to the underlying ResponseWriter.
+// Required for WebSocket upgrades via the stream plugin.
+func (w *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := w.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, errors.New("underlying ResponseWriter does not support hijacking")
+}
+
 // Unwrap returns the underlying ResponseWriter.
 // This allows middleware wrappers (e.g., logger, circuitbreaker) to access
 // the original ResponseWriter via http.ResponseController or type assertions.
@@ -119,6 +130,10 @@ type Context struct {
 
 	// data stores arbitrary values for passing data between middleware.
 	data map[string]any
+
+	// routePattern is the registered route pattern (e.g., "/users/:id").
+	// Set during route matching for observability (OTel span names, logging).
+	routePattern string
 
 	// Middleware chain execution.
 	// Pre-allocated with capacity 16 to avoid allocations for typical middleware chains.
@@ -168,6 +183,7 @@ func (c *Context) reset() {
 	c.Response = nil
 	c.router = nil
 	c.query = nil
+	c.routePattern = ""
 
 	// Reset params slice: keep capacity if reasonable, otherwise reallocate.
 	// This prevents memory leaks from holding large backing arrays.
@@ -270,6 +286,13 @@ func (c *Context) Param(name string) string {
 		}
 	}
 	return ""
+}
+
+// RoutePattern returns the registered route pattern for the current request
+// (e.g., "/users/:id"). Empty string for 404/405 responses.
+// Use this for OTel span names, metrics labels, and logging.
+func (c *Context) RoutePattern() string {
+	return c.routePattern
 }
 
 // Query returns the first value for the named query parameter.

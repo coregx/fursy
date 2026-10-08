@@ -128,6 +128,9 @@ func CORSWithConfig(config CORSConfig) fursy.HandlerFunc {
 	if config.AllowMethods == "" {
 		config.AllowMethods = "GET,HEAD,PUT,POST,DELETE,PATCH"
 	}
+	if config.AllowHeaders == "" {
+		config.AllowHeaders = "Content-Type,Accept,Authorization"
+	}
 
 	// Reject insecure combination: wildcard origin + credentials.
 	if config.AllowOrigins == "*" && config.AllowCredentials {

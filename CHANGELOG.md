@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
 
+## [0.6.2] - 2026-10-08
+
+### Security
+- **Open redirect via RedirectTrailingSlash** — paths with `\` or `//` rejected before redirect
+- **responseWriter: Hijack()** — WebSocket upgrades work through base wrapper (broken since v0.5.2). Full middleware chain support pending `http.NewResponseController` adoption in coregx/stream
+
+### Fixed
+- **Shutdown idempotent** — `sync.Once` prevents double callback execution
+- **Form/multipart parse errors → 400** — `ParseForm`/`ParseMultipartForm` errors wrapped in `DecodeError` (was 500)
+- **CORS default AllowHeaders** — includes `Content-Type,Accept,Authorization` (JSON POST works out of the box)
+- **CircuitBreaker: 4xx Problem not failure** — `fursy.NewProblem(404,...)` no longer trips the breaker
+- **CircuitBreaker: RequestWindow sliding** — ring buffer tracks last N requests (was cumulative)
+- **OpenAPI: literal colons preserved** — `convertPathToOpenAPI` segment-start check (AIP-136 regression)
+- **OpenAPI: path parameters auto-declared** — `:id`/`*path` → required Parameter objects (was invalid OAS 3.1)
+- Stale API references removed from README, SECURITY.md, llms.md, plugin READMEs
+
+### Added
+- **`Context.RoutePattern()`** — registered route pattern for observability (OTel span names, logging)
+- **OTel: `http.route` attribute** on spans; span names use pattern instead of raw URL
+
+### Dependencies
+- plugins/examples: fursy pin → v0.6.2 (post-release)
+
 ## [0.6.1] - 2026-09-11
 
 ### Fixed

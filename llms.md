@@ -147,7 +147,7 @@
 ```go
 func CreateUser(c *gin.Context) {
     var req CreateUserRequest
-    if err := c.BindJSON(&req); err != nil {
+    if err := c.ShouldBindJSON(&req); err != nil {
         c.JSON(400, gin.H{"error": err.Error()})
         return
     }
@@ -257,12 +257,15 @@ type Problem struct {
 **Automatic generation** from code:
 
 ```go
-spec := router.OpenAPI(fursy.OpenAPIConfig{
+spec, err := router.GenerateOpenAPI(fursy.Info{
     Title:       "My API",
     Version:     "1.0.0",
     Description: "API description",
 })
-// Returns complete OpenAPI 3.1 spec
+// Returns (*OpenAPI, error) — complete OpenAPI 3.1 spec
+
+// Or serve it directly at an endpoint:
+router.ServeOpenAPI("/openapi.json")
 ```
 
 **How it works**:
@@ -277,7 +280,7 @@ spec := router.OpenAPI(fursy.OpenAPIConfig{
 **Automatic format selection** based on `Accept` header:
 
 ```go
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     user := getUser(c.Param("id"))
     // Automatically picks JSON/HTML/XML/Markdown based on Accept header
     return c.Negotiate(200, user)

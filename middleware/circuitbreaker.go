@@ -118,10 +118,15 @@ type circuitBreaker struct {
 	expiry time.Time
 	mu     sync.RWMutex
 
-	// For time-based window tracking
+	// For time-based window tracking.
 	requests []requestRecord
 
-	// isCustomReadyToTrip indicates if ReadyToTrip was customized by user
+	// For count-based sliding window (RequestWindow without TimeWindow).
+	// Ring buffer of recent request outcomes.
+	windowBuf []bool // true = success, false = failure
+	windowPos int    // next write position in ring buffer
+
+	// isCustomReadyToTrip indicates if ReadyToTrip was customized by user.
 	isCustomReadyToTrip bool
 }
 
@@ -300,6 +305,12 @@ func CircuitBreakerWithConfig(config CircuitBreakerConfig) fursy.HandlerFunc {
 		cb.requests = make([]requestRecord, 0)
 	}
 
+	// If using count-based sliding window, initialize ring buffer.
+	if config.FailureThreshold > 0 && config.RequestWindow > 0 && config.TimeWindow == 0 {
+		cb.windowBuf = make([]bool, config.RequestWindow)
+		cb.windowPos = 0
+	}
+
 	return func(c *fursy.Context) error {
 		// Skip if Skipper returns true.
 		if config.Skipper != nil && config.Skipper(c) {
@@ -332,7 +343,19 @@ func CircuitBreakerWithConfig(config CircuitBreakerConfig) fursy.HandlerFunc {
 		err := c.Next()
 
 		// Record result.
+		// Check if error is a client-side Problem (4xx) — not a backend failure.
+		// Handlers commonly return fursy.NewProblem(404, ...) for "not found" etc.
+		// These are valid business responses, not signs of backend failure.
 		success := err == nil && config.IsSuccessful(c)
+		if err != nil {
+			var p fursy.Problem
+			if errors.As(err, &p) && p.Status > 0 && p.Status < 500 {
+				// Client error (4xx) — not a backend failure.
+				// The response hasn't been written yet (error handler runs later),
+				// so IsSuccessful would see status 0. Treat 4xx Problems as success directly.
+				success = true
+			}
+		}
 		cb.afterRequest(success)
 
 		return err
@@ -380,7 +403,7 @@ func (cb *circuitBreaker) beforeRequest() error {
 
 // afterRequest records the request result and updates state.
 //
-//nolint:gocognit,gocyclo,cyclop // State machine logic has natural complexity.
+//nolint:gocognit,gocyclo,cyclop,nestif // State machine logic has natural complexity.
 func (cb *circuitBreaker) afterRequest(success bool) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -399,6 +422,30 @@ func (cb *circuitBreaker) afterRequest(success bool) {
 		cb.counts.TotalFailures++
 		cb.counts.ConsecutiveFailures++
 		cb.counts.ConsecutiveSuccesses = 0
+	}
+
+	// For count-based sliding window, use ring buffer to track last N requests.
+	if cb.windowBuf != nil && cb.config.TimeWindow == 0 {
+		cb.windowBuf[cb.windowPos] = success
+		cb.windowPos = (cb.windowPos + 1) % len(cb.windowBuf)
+
+		// Recalculate counts from ring buffer (sliding window of last RequestWindow requests).
+		filled := cb.counts.Requests
+		if filled > len(cb.windowBuf) {
+			filled = len(cb.windowBuf)
+		}
+		windowSuccesses := 0
+		windowFailures := 0
+		for i := 0; i < filled; i++ {
+			if cb.windowBuf[i] {
+				windowSuccesses++
+			} else {
+				windowFailures++
+			}
+		}
+		cb.counts.TotalSuccesses = windowSuccesses
+		cb.counts.TotalFailures = windowFailures
+		cb.counts.Requests = filled
 	}
 
 	// For time-based window, track individual requests.
@@ -470,6 +517,11 @@ func (cb *circuitBreaker) afterRequest(success bool) {
 				cb.setState(StateClosed)
 				cb.counts = Counts{}
 				cb.requests = nil
+				// Reset count-based sliding window ring buffer.
+				if cb.windowBuf != nil {
+					cb.windowBuf = make([]bool, cb.config.RequestWindow)
+					cb.windowPos = 0
+				}
 			}
 		} else {
 			// Failure in Half-Open, reopen circuit.
@@ -524,6 +576,10 @@ func (cb *circuitBreaker) Reset() {
 	cb.counts = Counts{}
 	cb.expiry = time.Time{}
 	cb.requests = nil
+	if cb.windowBuf != nil {
+		cb.windowBuf = make([]bool, cb.config.RequestWindow)
+		cb.windowPos = 0
+	}
 }
 
 // CircuitBreakerWithName returns a circuit breaker with a specific name.

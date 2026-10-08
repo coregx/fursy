@@ -27,6 +27,7 @@ const (
 	descSuccess                = "Success"
 	descBadRequest             = "Bad Request"
 	descInternalServerError    = "Internal Server Error"
+	paramInPath                = "path"
 )
 
 // OpenAPI represents an OpenAPI 3.1 document.
@@ -538,7 +539,8 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 			Responses:   make(map[string]Response),
 		}
 
-		// Add parameters.
+		// Add manually declared parameters.
+		declared := make(map[string]bool)
 		if len(route.Parameters) > 0 {
 			for _, param := range route.Parameters {
 				operation.Parameters = append(operation.Parameters, Parameter{
@@ -548,6 +550,17 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 					Required:    param.Required,
 					Schema:      generateSchema(param.Type),
 				})
+				if param.In == paramInPath {
+					declared[param.Name] = true
+				}
+			}
+		}
+
+		// Auto-declare path parameters extracted from the route path.
+		// Skip any that were already manually declared to avoid duplicates.
+		for _, p := range extractPathParams(route.Path) {
+			if !declared[p.Name] {
+				operation.Parameters = append(operation.Parameters, p)
 			}
 		}
 
@@ -641,13 +654,14 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 // /users/:id -> /users/{id}
 // /files/*path -> /files/{path}.
 //
-//nolint:gocritic,staticcheck // if-else chain is clearer than switch for path parsing.
+//nolint:gocritic // if-else chain is clearer than switch for path parsing.
 func convertPathToOpenAPI(path string) string {
 	result := strings.Builder{}
 	i := 0
 	for i < len(path) {
-		if path[i] == ':' {
-			// Named parameter: :id -> {id}
+		if path[i] == ':' && (i == 0 || path[i-1] == '/') {
+			// Named parameter at segment start: :id -> {id}
+			// Mid-segment colons are literal (Google AIP-136 custom verbs).
 			result.WriteByte('{')
 			i++
 			start := i
@@ -656,8 +670,8 @@ func convertPathToOpenAPI(path string) string {
 			}
 			result.WriteString(path[start:i])
 			result.WriteByte('}')
-		} else if path[i] == '*' {
-			// Wildcard parameter: *path -> {path}
+		} else if path[i] == '*' && (i == 0 || path[i-1] == '/') {
+			// Wildcard parameter at segment start: *path -> {path}
 			result.WriteByte('{')
 			i++
 			start := i
@@ -672,6 +686,42 @@ func convertPathToOpenAPI(path string) string {
 		}
 	}
 	return result.String()
+}
+
+// extractPathParams extracts path parameter declarations from a FURSY route path.
+// Named parameters (:id) and catch-all wildcards (*path) at segment start become
+// required path parameters with string schema. Mid-segment colons are ignored
+// (literal text per Google AIP-136).
+func extractPathParams(path string) []Parameter {
+	var params []Parameter
+	segments := strings.Split(path, "/")
+	for _, seg := range segments {
+		if seg == "" {
+			continue
+		}
+		switch seg[0] {
+		case ':':
+			name := seg[1:]
+			// Remove regex constraint if present: :id(\d+) -> id.
+			if idx := strings.IndexByte(name, '('); idx >= 0 {
+				name = name[:idx]
+			}
+			params = append(params, Parameter{
+				Name:     name,
+				In:       paramInPath,
+				Required: true,
+				Schema:   &Schema{Type: schemaTypeString},
+			})
+		case '*':
+			params = append(params, Parameter{
+				Name:     seg[1:],
+				In:       paramInPath,
+				Required: true,
+				Schema:   &Schema{Type: schemaTypeString},
+			})
+		}
+	}
+	return params
 }
 
 // MarshalJSON is implemented by the default json/v2 marshaler.

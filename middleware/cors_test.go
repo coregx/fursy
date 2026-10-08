@@ -525,6 +525,31 @@ func TestCORS_PreflightFilteredHeaders(t *testing.T) {
 	}
 }
 
+// TestCORS_DefaultAllowHeaders_JSONPost verifies that the default CORS()
+// config allows JSON POST from browsers (Content-Type header in preflight).
+func TestCORS_DefaultAllowHeaders_JSONPost(t *testing.T) {
+	r := fursy.New()
+	r.Use(CORS()) // default config — must work for JSON POST
+	r.Handle("POST", "/api", func(c *fursy.Context) error {
+		return c.String(200, "OK")
+	})
+	r.Handle("OPTIONS", "/api", func(c *fursy.Context) error {
+		return c.NoContent(204)
+	})
+
+	req := httptest.NewRequest("OPTIONS", "/api", http.NoBody)
+	req.Header.Set("Origin", "https://example.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "Content-Type")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	allowHeaders := w.Header().Get("Access-Control-Allow-Headers")
+	if !strings.Contains(strings.ToLower(allowHeaders), "content-type") {
+		t.Errorf("default CORS must allow Content-Type for JSON POST, got Allow-Headers: %q", allowHeaders)
+	}
+}
+
 // --- F4 audit fix: CORS preflight unreachable + Vary: Origin ---
 
 // TestCORS_PreflightWithoutRoute verifies that an OPTIONS preflight request

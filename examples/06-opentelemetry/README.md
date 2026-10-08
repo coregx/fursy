@@ -411,12 +411,7 @@ Errors returned from handlers are automatically recorded:
 ```go
 func handler(c *fursy.Context) error {
     // This error will be recorded in the span
-    return c.Error(500, fursy.Problem{
-        Type:   "database_error",
-        Title:  "Database Connection Failed",
-        Status: 500,
-        Detail: "Could not connect to database",
-    })
+    return fursy.NewProblem(500, "Database Connection Failed", "Could not connect to database")
 }
 ```
 
@@ -435,7 +430,7 @@ func handler(c *fursy.Context) error {
     if err := validate(data); err != nil {
         span.RecordError(err)
         span.SetStatus(codes.Error, "validation failed")
-        return c.Error(400, ...)
+        return fursy.NewProblem(400, "Bad Request", err.Error())
     }
 
     return c.OK(data)

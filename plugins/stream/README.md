@@ -67,7 +67,7 @@ func main() {
         hub, _ := stream.GetSSEHub[Notification](c)
 
         var notification Notification
-        if err := c.Bind(&notification); err != nil {
+        if err := json.NewDecoder(c.Request.Body).Decode(&notification); err != nil {
             return c.Problem(fursy.BadRequest(err.Error()))
         }
 

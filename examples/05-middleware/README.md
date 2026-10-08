@@ -181,7 +181,7 @@ router.Use(middleware.BasicAuth(middleware.BasicAuthAccounts(accounts)))
 **Access user in handler:**
 
 ```go
-router.GET("/dashboard", func(c *fursy.Context) error {
+router.Handle("GET", "/dashboard", func(c *fursy.Context) error {
     username := c.GetString(middleware.UserContextKey)
     return c.OK(map[string]string{"user": username})
 })
@@ -227,7 +227,7 @@ router.Use(middleware.JWTWithConfig(middleware.JWTConfig{
 **Access claims in handler:**
 
 ```go
-router.GET("/protected", func(c *fursy.Context) error {
+router.Handle("GET", "/protected", func(c *fursy.Context) error {
     claims := c.Get(middleware.JWTContextKey).(jwt.MapClaims)
     userID := claims["sub"].(string)
     return c.String(200, "Hello, "+userID)
@@ -516,7 +516,7 @@ Apply middleware to **route groups** instead of globally:
 api := router.Group("/api")
 api.Use(middleware.CORS())
 
-api.GET("/public", handler)  // Has CORS
+api.Handle("GET", "/public", handler)  // Has CORS
 ```
 
 ### Example 2: Protected API with JWT
@@ -525,7 +525,7 @@ api.GET("/public", handler)  // Has CORS
 protected := router.Group("/protected")
 protected.Use(middleware.JWT(secret))
 
-protected.GET("/users", handler)  // Requires JWT
+protected.Handle("GET", "/users", handler)  // Requires JWT
 ```
 
 ### Example 3: Admin with BasicAuth
@@ -534,7 +534,7 @@ protected.GET("/users", handler)  // Requires JWT
 admin := router.Group("/admin")
 admin.Use(middleware.BasicAuth(accounts))
 
-admin.GET("/dashboard", handler)  // Requires BasicAuth
+admin.Handle("GET", "/dashboard", handler)  // Requires BasicAuth
 ```
 
 ### Example 4: Nested Groups
@@ -549,7 +549,7 @@ v1.Use(middleware.JWT(secret))
 
 // Final path: /api/v1/users
 // Middleware: CORS -> RateLimit -> JWT
-v1.GET("/users", handler)
+v1.Handle("GET", "/users", handler)
 ```
 
 ---
@@ -696,7 +696,7 @@ Wrap external API calls with circuit breaker:
 ```go
 external := router.Group("/external")
 external.Use(middleware.CircuitBreaker(...))
-external.GET("/api", callExternalAPI)
+external.Handle("GET", "/api", callExternalAPI)
 ```
 
 ---

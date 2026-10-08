@@ -94,6 +94,12 @@ const (
 	RedirectTrailingSlash
 )
 
+// routeEntry wraps a handler with its registered pattern for observability.
+type routeEntry struct {
+	handler HandlerFunc
+	pattern string
+}
+
 // Router is the main HTTP router for FURSY.
 // It provides fast URL routing with support for static paths,
 // parameters (:id), and wildcards (*path).
@@ -164,7 +170,8 @@ type Router struct {
 	shutdownCallbacks []func()
 
 	// shutdownMu protects shutdown callbacks from concurrent access.
-	shutdownMu sync.Mutex
+	shutdownMu   sync.Mutex
+	shutdownOnce sync.Once
 
 	// maxBodySize is the maximum allowed request body size in bytes for
 	// generic handlers (those using Box[Req, Res] with automatic binding).
@@ -533,8 +540,9 @@ func (r *Router) HandleWithOptions(method, path string, handler HandlerFunc, opt
 		r.trees[method] = tree
 	}
 
-	// Insert route into radix tree.
-	if err := tree.Insert(path, handler); err != nil {
+	// Insert route into radix tree with pattern for observability.
+	entry := routeEntry{handler: handler, pattern: path}
+	if err := tree.Insert(path, entry); err != nil {
 		panic("fursy: " + err.Error())
 	}
 
@@ -583,8 +591,9 @@ func (r *Router) handleWithGroupMiddleware(method, path string, groupHandlers []
 		r.trees[method] = tree
 	}
 
-	// Insert route into radix tree with the wrapper.
-	if err := tree.Insert(path, wrapper); err != nil {
+	// Insert route into radix tree with pattern for observability.
+	entry := routeEntry{handler: wrapper, pattern: path}
+	if err := tree.Insert(path, entry); err != nil {
 		panic("fursy: " + err.Error())
 	}
 
@@ -675,10 +684,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		c.params = append(c.params, Param{Key: p.Key, Value: p.Value})
 	}
 
+	// Extract handler and pattern from route entry.
+	entry := handler.(routeEntry)
+	c.routePattern = entry.pattern
+
 	c.init(w, req, r, c.params)
 
 	// Build handler chain: middleware + route handler.
-	routeHandler := handler.(HandlerFunc)
+	routeHandler := entry.handler
 	c.handlers = c.handlers[:0]
 	c.handlers = append(c.handlers, r.middleware...)
 	c.handlers = append(c.handlers, routeHandler)
@@ -842,6 +855,9 @@ func (r *Router) tryTrailingSlashLookup(
 	}
 
 	if r.trailingSlash == RedirectTrailingSlash {
+		if strings.ContainsAny(altPath, `\`) || strings.HasPrefix(altPath, "//") {
+			return nil, nil, false, false
+		}
 		r.redirectTrailingSlash(w, req, altPath)
 		return nil, nil, false, true
 	}
@@ -916,17 +932,22 @@ func trailingSlashAlternate(path string) string {
 // GET requests use 301 Moved Permanently.
 // All other methods use 308 Permanent Redirect to preserve the HTTP method.
 func (r *Router) redirectTrailingSlash(w http.ResponseWriter, req *http.Request, target string) {
+	// Reject paths that could cause open redirects.
+	// WHATWG URL spec treats \ as / in path context: /\evil.com → //evil.com → https://evil.com
+	if strings.ContainsAny(target, `\`) || strings.HasPrefix(target, "//") {
+		return
+	}
+
 	code := http.StatusMovedPermanently
 	if req.Method != http.MethodGet {
 		code = http.StatusPermanentRedirect
 	}
 
-	// Preserve query string in the redirect.
 	if req.URL.RawQuery != "" {
 		target = target + "?" + req.URL.RawQuery
 	}
 
-	http.Redirect(w, req, target, code) //nolint:gosec // target is derived from request path by toggling slash, not user input
+	http.Redirect(w, req, target, code) //nolint:gosec // G710: target sanitized above — backslash and // paths rejected.
 }
 
 // OnShutdown registers a function to be called during graceful shutdown.
@@ -1016,24 +1037,25 @@ func (r *Router) OnShutdown(f func()) {
 //	    log.Printf("Shutdown error: %v", err)
 //	}
 func (r *Router) Shutdown(ctx context.Context) error {
-	// 1. Drain active connections first — active requests must finish
-	// before we close resources they depend on.
-	var serverErr error
-	if r.server != nil {
-		serverErr = r.server.Shutdown(ctx)
-	}
+	var shutdownErr error
+	r.shutdownOnce.Do(func() {
+		// 1. Drain active connections first — active requests must finish
+		// before we close resources they depend on.
+		if r.server != nil {
+			shutdownErr = r.server.Shutdown(ctx)
+		}
 
-	// 2. Then call cleanup callbacks (db.Close, etc.) in reverse order.
-	r.shutdownMu.Lock()
-	callbacks := make([]func(), len(r.shutdownCallbacks))
-	copy(callbacks, r.shutdownCallbacks)
-	r.shutdownMu.Unlock()
+		// 2. Then call cleanup callbacks (db.Close, etc.) in reverse order.
+		r.shutdownMu.Lock()
+		callbacks := make([]func(), len(r.shutdownCallbacks))
+		copy(callbacks, r.shutdownCallbacks)
+		r.shutdownMu.Unlock()
 
-	for i := len(callbacks) - 1; i >= 0; i-- {
-		callbacks[i]()
-	}
-
-	return serverErr
+		for i := len(callbacks) - 1; i >= 0; i-- {
+			callbacks[i]()
+		}
+	})
+	return shutdownErr
 }
 
 // SetServer sets the http.Server for graceful shutdown.

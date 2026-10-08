@@ -6,8 +6,8 @@ FURSY HTTP Router is currently in active development (0.x versions). We provide 
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.5.x   | :white_check_mark: |
-| < 0.5.0 | :x:                |
+| 0.6.x   | :white_check_mark: |
+| < 0.6.0 | :x:                |
 
 Future stable releases (v1.0+) will follow semantic versioning with LTS support.
 
@@ -75,19 +75,21 @@ HTTP routers process untrusted input from web requests, which introduces securit
 **User Recommendations**:
 ```go
 // ❌ BAD - Don't use route parameters directly for filesystem operations
-router.GET("/files/:path", func(c *fursy.Context) error {
+router.Handle("GET", "/files/:path", func(c *fursy.Context) error {
     filePath := c.Param("path")  // Could be "../../etc/passwd"
-    return c.File(filePath)
+    http.ServeFile(c.Response, c.Request, filePath)
+    return nil
 })
 
 // ✅ GOOD - Validate and sanitize paths
-router.GET("/files/:path", func(c *fursy.Context) error {
+router.Handle("GET", "/files/:path", func(c *fursy.Context) error {
     filename := filepath.Base(c.Param("path"))
     if !isValidFilename(filename) {
-        return c.Error(400, fursy.BadRequest("Invalid filename"))
+        return fursy.NewProblem(400, "Bad Request", "Invalid filename")
     }
     safePath := filepath.Join(safeDir, filename)
-    return c.File(safePath)
+    http.ServeFile(c.Response, c.Request, safePath)
+    return nil
 })
 ```
 
@@ -142,16 +144,18 @@ router.SetMaxBodySize(10 * 1024 * 1024)  // 10MB max
 **User Best Practices**:
 ```go
 // ❌ BAD - Don't execute unsanitized input
-router.POST("/search", func(c *fursy.Context) error {
+router.Handle("POST", "/search", func(c *fursy.Context) error {
     query := c.Query("q")
     // UNSAFE: SQL injection vulnerability
     db.Exec("SELECT * FROM users WHERE name = '" + query + "'")
+    return nil
 })
 
 // ✅ GOOD - Use parameterized queries
-router.POST("/search", func(c *fursy.Context) error {
+router.Handle("POST", "/search", func(c *fursy.Context) error {
     query := c.Query("q")
     db.Exec("SELECT * FROM users WHERE name = ?", query)
+    return nil
 })
 ```
 
@@ -189,9 +193,10 @@ protected.Handle("POST", "/users", createUserHandler)
 func getUsersHandler(c *fursy.Context) error {
     user := c.Get("user").(User)
     if !user.IsAdmin() {
-        return c.Problem(fursy.Forbidden("Admin required"))
+        return fursy.NewProblem(403, "Forbidden", "Admin required")
     }
     // ...
+    return c.OK(nil)
 }
 ```
 
@@ -222,13 +227,13 @@ router.Use(middleware.SecureWithConfig(middleware.SecureConfig{
 }))
 
 // ✅ Return JSON (auto-escaped)
-router.GET("/user/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/user/:id", func(c *fursy.Context) error {
     user := getUserByID(c.Param("id"))
     return c.JSON(200, user)  // Automatically escaped
 })
 
 // ⚠️ If returning HTML, sanitize first
-router.GET("/profile", func(c *fursy.Context) error {
+router.Handle("GET", "/profile", func(c *fursy.Context) error {
     userInput := c.Query("name")
     sanitized := html.EscapeString(userInput)
     return c.String(200, "<h1>"+sanitized+"</h1>")
@@ -274,19 +279,23 @@ type CreateUserRequest struct {
     Password string `json:"password" validate:"required,min=8"`
 }
 
-router.POST("/users", func(c *fursy.Context) error {
-    var req CreateUserRequest
-    if err := c.BindJSON(&req); err != nil {
-        return c.Error(400, fursy.BadRequest("Invalid request"))
-    }
+// Option 1: Type-safe generic handler (recommended — auto-binds and validates)
+router.POST("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+    // c.ReqBody is automatically bound and validated!
+    // Process validated request
+    return c.Created("/users/"+c.ReqBody.Email, UserResponse{})
+})
 
-    // Additional validation
-    if err := validator.Validate(req); err != nil {
-        return c.Error(400, fursy.BadRequest(err.Error()))
+// Option 2: Plain handler with manual decoding
+router.Handle("POST", "/users", func(c *fursy.Context) error {
+    var req CreateUserRequest
+    if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+        return fursy.NewProblem(400, "Bad Request", "Invalid request body")
     }
 
     // Process validated request
     // ...
+    return c.OK(req)
 })
 ```
 
@@ -312,20 +321,22 @@ Never leak sensitive information in errors:
 
 ```go
 // ❌ BAD - Leaks internal details
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     user, err := db.Query("SELECT * FROM users WHERE id = ?", c.Param("id"))
     if err != nil {
-        return c.Error(500, fursy.InternalServerError(err.Error()))  // Leaks SQL!
+        return fursy.NewProblem(500, "Internal Server Error", err.Error())  // Leaks SQL!
     }
+    return c.OK(user)
 })
 
 // ✅ GOOD - Generic error messages
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     user, err := db.Query("SELECT * FROM users WHERE id = ?", c.Param("id"))
     if err != nil {
         log.Printf("Database error: %v", err)  // Log internally
-        return c.Error(500, fursy.InternalServerError("Failed to fetch user"))
+        return fursy.NewProblem(500, "Internal Server Error", "Failed to fetch user")
     }
+    return c.OK(user)
 })
 ```
 

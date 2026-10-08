@@ -161,6 +161,10 @@ func MiddlewareWithConfig(config Config) fursy.HandlerFunc {
 		status := wrapper.statusCode
 		span.SetAttributes(semconv.HTTPResponseStatusCode(status))
 
+		if route := c.RoutePattern(); route != "" {
+			span.SetAttributes(attribute.String("http.route", route))
+		}
+
 		// Set span status based on HTTP status code.
 		if status >= 400 {
 			span.SetStatus(codes.Error, http.StatusText(status))
@@ -185,14 +189,10 @@ func MiddlewareWithConfig(config Config) fursy.HandlerFunc {
 func defaultSpanNameFormatter(c *fursy.Context) string {
 	method := c.Request.Method
 
-	// Try to get route pattern from context.
-	// In FURSY, the route pattern isn't currently stored, so we use the path.
-	// Future improvement: store matched route pattern in context.
-	route := c.Request.URL.Path
-
-	// For known paths, use them directly.
-	// This creates better span names like "GET /users/:id" vs "GET /users/123".
-	// TODO: Store route pattern in context during routing.
+	route := c.RoutePattern()
+	if route == "" {
+		route = c.Request.URL.Path
+	}
 
 	return fmt.Sprintf("%s %s", method, route)
 }
