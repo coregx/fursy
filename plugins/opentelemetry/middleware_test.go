@@ -62,9 +62,9 @@ func TestMiddleware_BasicTracing(t *testing.T) {
 
 	span := spans[0]
 
-	// Check span name.
-	if span.Name != "GET /users/123" {
-		t.Errorf("expected span name 'GET /users/123', got '%s'", span.Name)
+	// Check span name uses route pattern, not raw URL (low cardinality).
+	if span.Name != "GET /users/:id" {
+		t.Errorf("expected span name 'GET /users/:id', got '%s'", span.Name)
 	}
 
 	// Check span kind.
