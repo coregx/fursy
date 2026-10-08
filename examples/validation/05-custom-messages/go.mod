@@ -7,7 +7,7 @@ replace github.com/coregx/fursy => ../../..
 replace github.com/coregx/fursy/plugins/validator => ../../../plugins/validator
 
 require (
-	github.com/coregx/fursy v0.5.4
+	github.com/coregx/fursy v0.6.2
 	github.com/coregx/fursy/plugins/validator v0.0.0
 )
 
