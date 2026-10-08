@@ -176,10 +176,9 @@ type Router struct {
 	// errorLogger is called when an unclassified error triggers a 500 response.
 	errorLogger func(err error, req *http.Request)
 
-	// maxBodySize is the maximum allowed request body size in bytes for
-	// generic handlers (those using Box[Req, Res] with automatic binding).
-	// Default: 4MB (4 << 20). Set to 0 to disable the limit.
-	// Applies to all handler types (generic and plain).
+	// maxBodySize is the maximum allowed request body size in bytes.
+	// Enforced in ServeHTTP for all handler types. Oversized bodies get 413.
+	// Default: 4MB (4 << 20). Set to 0 to disable.
 	maxBodySize int64
 }
 
@@ -283,15 +282,11 @@ func (r *Router) SetErrorHandler(h ErrorHandler) *Router {
 	return r
 }
 
-// SetMaxBodySize sets the maximum allowed request body size in bytes for
-// generic handlers (Box[Req, Res] with automatic binding).
+// SetMaxBodySize sets the maximum allowed request body size in bytes.
+// Applies to all handlers (generic and plain). The limit is enforced
+// in ServeHTTP; oversized bodies get 413 Payload Too Large.
 //
-// When a request body exceeds this limit, the binding step returns
-// an error that is mapped to 413 Payload Too Large by the default
-// error handler.
-//
-// The default limit is 4MB (4 << 20). Set to 0 to disable the limit.
-// Plain handlers (HandlerFunc) are not affected by this setting.
+// Default: 4MB (4 << 20). Set to 0 to disable.
 //
 // Example:
 //
