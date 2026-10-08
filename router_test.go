@@ -643,12 +643,16 @@ func TestRouter_RedirectTrailingSlash_OpenRedirect(t *testing.T) {
 			req := httptest.NewRequest("GET", tt.path, http.NoBody)
 			r.ServeHTTP(w, req)
 
-			// Must NOT redirect — should be 404 or stripped safely.
+			// Must NOT redirect — should fall through to normal routing or 404.
 			if w.Code == 301 || w.Code == 308 {
 				loc := w.Header().Get("Location")
 				if strings.Contains(loc, `\`) || strings.HasPrefix(loc, "//") {
 					t.Errorf("open redirect: %s → %d Location: %s", tt.path, w.Code, loc)
 				}
+			}
+			// Must NOT be empty 200 — that means nothing was written.
+			if w.Code == 200 && w.Body.Len() == 0 {
+				t.Errorf("empty 200 for %s — redirect guard swallowed the response", tt.path)
 			}
 		})
 	}

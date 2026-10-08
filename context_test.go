@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestContext_Param tests URL parameter extraction.
@@ -813,35 +814,41 @@ func TestContext_RoutePattern(t *testing.T) {
 // http.Hijacker, required for WebSocket upgrades via the stream plugin.
 func TestResponseWriter_Hijack(t *testing.T) {
 	r := New()
-	hijacked := false
+	result := make(chan error, 1)
 
 	r.Handle("GET", "/ws", func(c *Context) error {
 		h, ok := c.Response.(http.Hijacker)
 		if !ok {
-			t.Fatal("Response does not implement http.Hijacker")
+			err := errors.New("Response does not implement http.Hijacker")
+			result <- err
+			return err
 		}
 		conn, _, err := h.Hijack()
 		if err != nil {
-			t.Fatalf("Hijack failed: %v", err)
+			result <- err
+			return err
 		}
-		hijacked = true
 		conn.Close()
+		result <- nil
 		return nil
 	})
 
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ws")
-	if err != nil && !hijacked {
-		t.Fatalf("request failed without hijack: %v", err)
-	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, _ := client.Get(srv.URL + "/ws")
 	if resp != nil {
 		resp.Body.Close()
 	}
 
-	if !hijacked {
-		t.Error("handler was not called or hijack failed")
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("Hijack failed: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler was not called (timeout)")
 	}
 }
 

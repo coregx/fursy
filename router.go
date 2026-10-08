@@ -855,6 +855,9 @@ func (r *Router) tryTrailingSlashLookup(
 	}
 
 	if r.trailingSlash == RedirectTrailingSlash {
+		if strings.ContainsAny(altPath, `\`) || strings.HasPrefix(altPath, "//") {
+			return nil, nil, false, false
+		}
 		r.redirectTrailingSlash(w, req, altPath)
 		return nil, nil, false, true
 	}
