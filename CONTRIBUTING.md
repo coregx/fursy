@@ -367,7 +367,7 @@ FURSY prioritizes performance. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) fo
 - Comparison with other routers
 
 **Current metrics** (v0.4.0):
-- Static routes: 256 ns/op, 1 alloc/op
+- Static routes: <100 ns/op, 0 alloc/op
 - Parametric routes: 326 ns/op, 1 alloc/op
 - Coverage: 94.6%
 

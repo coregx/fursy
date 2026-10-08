@@ -820,7 +820,7 @@ This example demonstrated:
 - ✅ **Best practices** - Production-ready patterns
 - ✅ **Testing** - curl commands for all endpoints
 
-Fursy provides **everything you need** for production HTTP middleware in Go 1.25+!
+Fursy provides **everything you need** for production HTTP middleware in Go 1.27+!
 
 ---
 

@@ -443,7 +443,7 @@ spec:
 ### Health Check Endpoint (Add This!)
 
 ```go
-router.GET("/health", func(c *fursy.Context) error {
+router.Handle("GET", "/health", func(c *fursy.Context) error {
     return c.JSON(200, map[string]string{
         "status": "healthy",
         "version": "1.0.0",

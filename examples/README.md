@@ -39,7 +39,7 @@ This directory contains comprehensive examples demonstrating fursy features.
 ### Prerequisites
 
 ```bash
-go version  # Requires Go 1.25+
+go version  # Requires Go 1.27+
 ```
 
 ### Running Examples

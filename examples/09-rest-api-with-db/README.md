@@ -172,7 +172,7 @@ Makes database available in all handlers via `database.GetDB(c)`.
 Simple database operations without transactions:
 
 ```go
-router.GET("/users/:id", func(c *fursy.Context) error {
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
     db, _ := database.GetDB(c)
 
     var user User

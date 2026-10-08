@@ -425,7 +425,7 @@ AI models can better understand context, relationships, and semantics from markd
 ### Using Accepts() - Simple Format Check
 
 ```go
-router.GET("/docs", func(c *fursy.Context) error {
+router.Handle("GET", "/docs", func(c *fursy.Context) error {
     if c.Accepts(fursy.MIMETextMarkdown) {
         // Client accepts markdown - preferred by AI agents
         return c.Markdown(markdownContent)
@@ -441,7 +441,7 @@ router.GET("/docs", func(c *fursy.Context) error {
 ### Using AcceptsAny() - Multi-Format with Priority
 
 ```go
-router.GET("/users", func(c *fursy.Context) error {
+router.Handle("GET", "/users", func(c *fursy.Context) error {
     users := getUserList()
 
     switch c.AcceptsAny(fursy.MIMETextMarkdown, fursy.MIMETextHTML, fursy.MIMEApplicationJSON) {
@@ -461,7 +461,7 @@ router.GET("/users", func(c *fursy.Context) error {
 ### Using Negotiate() - Automatic Selection
 
 ```go
-router.GET("/api/data", func(c *fursy.Context) error {
+router.Handle("GET", "/api/data", func(c *fursy.Context) error {
     data := getData()
 
     // Automatically responds in JSON, XML, or plain text

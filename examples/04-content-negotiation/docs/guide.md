@@ -52,7 +52,7 @@ Accept: text/markdown, text/html;q=0.9, application/json;q=0.8
 Check if client accepts a specific media type:
 
 ```go
-router.GET("/docs", func(c *fursy.Context) error {
+router.Handle("GET", "/docs", func(c *fursy.Context) error {
     if c.Accepts(fursy.MIMETextMarkdown) {
         // Client accepts markdown - preferred by AI agents
         return c.Markdown("# Documentation\n\nContent here...")
@@ -73,7 +73,7 @@ router.GET("/docs", func(c *fursy.Context) error {
 Returns the **best match** based on q-values:
 
 ```go
-router.GET("/users", func(c *fursy.Context) error {
+router.Handle("GET", "/users", func(c *fursy.Context) error {
     users := []User{
         {ID: 1, Name: "Alice"},
         {ID: 2, Name: "Bob"},
@@ -113,7 +113,7 @@ router.GET("/users", func(c *fursy.Context) error {
 Automatically selects the best format and serializes data:
 
 ```go
-router.GET("/api/data", func(c *fursy.Context) error {
+router.Handle("GET", "/api/data", func(c *fursy.Context) error {
     data := map[string]any{
         "version": "1.0",
         "status":  "healthy",

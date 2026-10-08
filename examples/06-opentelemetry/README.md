@@ -56,7 +56,7 @@ This example demonstrates comprehensive OpenTelemetry instrumentation for FURSY 
 
 ## Prerequisites
 
-- **Go 1.25+**
+- **Go 1.27+**
 - **Docker** and **Docker Compose**
 - **curl** (for testing)
 
