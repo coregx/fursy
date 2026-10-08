@@ -5,7 +5,7 @@ go 1.27
 replace github.com/coregx/fursy => ../..
 
 require (
-	github.com/coregx/fursy v0.6.2
+	github.com/coregx/fursy v0.6.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
 )
 

@@ -9,7 +9,7 @@ replace github.com/coregx/fursy/plugins/opentelemetry => ../../plugins/opentelem
 replace github.com/coregx/fursy/plugins/database => ../../plugins/database
 
 require (
-	github.com/coregx/fursy v0.6.2
+	github.com/coregx/fursy v0.6.3
 	github.com/coregx/fursy/plugins/opentelemetry v0.0.0
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.38.0
