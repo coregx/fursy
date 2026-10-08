@@ -105,11 +105,14 @@ router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) erro
 ### Built-in OpenAPI 3.1 Generation
 
 ```go
-spec := r.OpenAPI(fursy.OpenAPIConfig{
-    Title: "My API",
+spec, err := router.GenerateOpenAPI(fursy.Info{
+    Title:   "My API",
     Version: "1.0.0",
 })
 // Complete OpenAPI 3.1 spec from code!
+
+// Or serve it directly:
+router.ServeOpenAPI("/openapi.json")
 ```
 
 ### Minimal Dependencies
@@ -695,7 +698,7 @@ Traditional routers require **manual validation** on every handler:
 // ❌ Manual validation (Gin, Echo, Fiber)
 func CreateUser(c *gin.Context) {
     var req CreateUserRequest
-    if err := c.BindJSON(&req); err != nil {  // No validation!
+    if err := c.ShouldBindJSON(&req); err != nil {  // No validation!
         c.JSON(400, gin.H{"error": err.Error()})
         return
     }
@@ -887,7 +890,7 @@ router.Handle("GET", "/api/data", func(c *fursy.Context) error {
     case fursy.MIMEApplicationJSON:
         return c.JSON(200, data)
     case fursy.MIMETextHTML:
-        return c.HTML(200, renderHTML(data))
+        return c.String(200, renderHTML(data))
     case fursy.MIMETextMarkdown:
         return c.Markdown(formatMarkdown(data))
     default:

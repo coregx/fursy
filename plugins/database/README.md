@@ -203,7 +203,7 @@ txGroup := router.Group("/api/v1")
 txGroup.Use(database.Middleware(db))
 txGroup.Use(database.TxMiddleware(db))
 
-txGroup.POST("/users", func(c *fursy.Context) error {
+txGroup.Handle("POST", "/users", func(c *fursy.Context) error {
     tx, _ := database.GetTx(c)
     // Use tx for all database operations
     // Auto-commit on success, auto-rollback on error
@@ -393,20 +393,22 @@ Similar helpers exist for transactions:
 txGroup := router.Group("/api")
 txGroup.Use(database.TxMiddleware(db))
 
-txGroup.POST("/transfer", func(c *fursy.Context) error {
+txGroup.Handle("POST", "/transfer", func(c *fursy.Context) error {
     tx, err := database.GetTxOrError(c)
     if err != nil {
         return err
     }
     // Use tx - auto-commit on success, auto-rollback on error
+    return nil
 })
 ```
 
 **MustGetTx (Prototyping):**
 ```go
-txGroup.POST("/batch", func(c *fursy.Context) error {
+txGroup.Handle("POST", "/batch", func(c *fursy.Context) error {
     tx := database.MustGetTx(c) // Panics if TxMiddleware not configured
     // Use tx...
+    return nil
 })
 ```
 

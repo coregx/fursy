@@ -203,7 +203,8 @@ func TestRouter_SetServer(t *testing.T) {
 	}
 }
 
-// TestRouter_Shutdown_MultipleCalls tests multiple shutdown calls.
+// TestRouter_Shutdown_MultipleCalls tests that Shutdown is idempotent.
+// Callbacks are called exactly once even if Shutdown is called multiple times.
 func TestRouter_Shutdown_MultipleCalls(t *testing.T) {
 	router := New()
 
@@ -219,16 +220,14 @@ func TestRouter_Shutdown_MultipleCalls(t *testing.T) {
 		t.Fatalf("First shutdown failed: %v", err)
 	}
 
-	// Second shutdown - callbacks will be called again.
+	// Second shutdown — no-op, callbacks not called again.
 	if err := router.Shutdown(ctx); err != nil {
 		t.Fatalf("Second shutdown failed: %v", err)
 	}
 
-	// Note: Callbacks are called on each Shutdown() call.
-	// This is by design - user should guard against multiple calls if needed.
 	count := atomic.LoadInt32(&callCount)
-	if count != 2 {
-		t.Errorf("Expected callbacks called twice, got %d times", count)
+	if count != 1 {
+		t.Errorf("Expected callbacks called once (idempotent), got %d times", count)
 	}
 }
 

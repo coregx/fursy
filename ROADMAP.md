@@ -29,10 +29,10 @@ Build a **next-generation HTTP router for Go 1.25+** with type-safe handlers, RF
 - Native support, no external library
 - OpenAPI-compatible error schema
 
-✅ **Zero Dependencies (Core)**
-- Core package = stdlib only
-- Uses `encoding/json/v2` and `log/slog`
-- Plugins can have dependencies
+✅ **Minimal Dependencies (Core)**
+- Core routing = stdlib only; middleware has 2 deps (JWT: golang-jwt/jwt, RateLimit: x/time)
+- Uses `encoding/json` and `log/slog`
+- Plugins can have additional dependencies
 
 ---
 
@@ -414,7 +414,7 @@ v1.0.0 LTS → Long-term support (Q3 2026)
 
 **Modern Go Best Practices**:
 - Go 1.25+ features (generics, any type)
-- stdlib v2 (`encoding/json/v2`, `log/slog`)
+- stdlib (`encoding/json`, `log/slog`)
 - Minimal dependencies (core routing: stdlib only)
 - Pure Go (no CGo)
 - TDD approach (tests first!)

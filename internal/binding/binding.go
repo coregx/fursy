@@ -106,7 +106,7 @@ type formBinder struct{}
 
 func (formBinder) Bind(req *http.Request, obj any) error {
 	if err := req.ParseForm(); err != nil {
-		return fmt.Errorf("parse form error: %w", err)
+		return &DecodeError{Err: fmt.Errorf("parse form: %w", err)}
 	}
 
 	if len(req.Form) == 0 {
@@ -121,7 +121,7 @@ type multipartBinder struct{}
 
 func (multipartBinder) Bind(req *http.Request, obj any) error {
 	if err := req.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
-		return fmt.Errorf("parse multipart form error: %w", err)
+		return &DecodeError{Err: fmt.Errorf("parse multipart form: %w", err)}
 	}
 
 	if req.MultipartForm == nil || len(req.MultipartForm.Value) == 0 {

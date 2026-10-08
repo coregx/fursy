@@ -814,6 +814,110 @@ func containsSubstring(s, substr string) bool {
 	return false
 }
 
+// TestCircuitBreaker_4xxProblemNotCountedAsFailure tests that returning a 4xx Problem
+// from a handler does not trip the circuit breaker (Bug #16).
+// A 404 "user not found" is a client error, not a backend failure.
+func TestCircuitBreaker_4xxProblemNotCountedAsFailure(t *testing.T) {
+	router := fursy.New()
+
+	cb := CircuitBreakerWithConfig(CircuitBreakerConfig{
+		ConsecutiveFailures: 3,
+		Timeout:             1 * time.Second,
+	})
+	router.Use(cb)
+
+	router.Handle("GET", "/users/:id", func(_ *fursy.Context) error {
+		// Idiomatic fursy pattern: return Problem as error for 4xx.
+		return fursy.NewProblem(http.StatusNotFound, "Not Found", "user not found")
+	})
+
+	// Send ConsecutiveFailures+1 requests, all returning 404 Problem.
+	for i := 0; i < 4; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/users/999", http.NoBody)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		// The 4th request must NOT be 503 (circuit must stay CLOSED).
+		if rec.Code == http.StatusServiceUnavailable {
+			t.Fatalf("Request %d: circuit opened after 4xx Problem responses — "+
+				"client errors should not trip the circuit breaker", i+1)
+		}
+	}
+}
+
+// TestCircuitBreaker_5xxProblemCountedAsFailure verifies that 5xx Problems still trip the breaker.
+func TestCircuitBreaker_5xxProblemCountedAsFailure(t *testing.T) {
+	router := fursy.New()
+
+	cb := CircuitBreakerWithConfig(CircuitBreakerConfig{
+		ConsecutiveFailures: 3,
+		Timeout:             1 * time.Second,
+	})
+	router.Use(cb)
+
+	router.Handle("GET", "/test", func(_ *fursy.Context) error {
+		return fursy.NewProblem(http.StatusInternalServerError, "Internal Server Error", "db connection failed")
+	})
+
+	// 3 failures with 500 Problem → circuit open.
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+	}
+
+	// 4th request should be blocked.
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("Expected circuit open (503) after 5xx Problem errors, got %d", rec.Code)
+	}
+}
+
+// TestCircuitBreaker_RequestWindowIsSlidingNotCumulative tests that counts in a
+// count-based RequestWindow are sliding, not cumulative (Bug #18).
+// With FailureThreshold=5 and RequestWindow=10, the breaker should check the
+// LAST 10 requests, not ALL requests ever. At 5% actual failure rate the circuit
+// must stay closed because any window of 10 requests has at most 1 failure.
+func TestCircuitBreaker_RequestWindowIsSlidingNotCumulative(t *testing.T) {
+	router := fursy.New()
+
+	var requestCount int32
+
+	cb := CircuitBreakerWithConfig(CircuitBreakerConfig{
+		FailureThreshold: 5,
+		RequestWindow:    10,
+		Timeout:          1 * time.Second,
+	})
+	router.Use(cb)
+
+	router.Handle("GET", "/test", func(c *fursy.Context) error {
+		n := atomic.AddInt32(&requestCount, 1)
+		// Fail every 20th request = 5% failure rate.
+		if n%20 == 0 {
+			return errors.New("occasional failure")
+		}
+		return c.String(http.StatusOK, "OK")
+	})
+
+	// Send 120 requests with 5% failure rate (6 failures total, but never
+	// more than 1 failure in any window of 10 consecutive requests).
+	// With cumulative counting, the breaker wrongly trips at request ~101
+	// (5 cumulative failures, Requests >= 10).
+	for i := 0; i < 120; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		if rec.Code == http.StatusServiceUnavailable {
+			t.Fatalf("Request %d: circuit opened at 5%% failure rate — "+
+				"RequestWindow counts are cumulative instead of sliding", i+1)
+		}
+	}
+}
+
 // TestCbResponseWriter_Flush tests that the circuit breaker wrapper implements http.Flusher.
 func TestCbResponseWriter_Flush(t *testing.T) {
 	w := httptest.NewRecorder()

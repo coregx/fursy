@@ -618,6 +618,42 @@ func TestRouter_StripTrailingSlash(t *testing.T) {
 	}
 }
 
+// TestRouter_RedirectTrailingSlash_OpenRedirect verifies that backslash paths
+// do not produce open redirects. WHATWG URL spec treats \ as / in path context,
+// so /\evil.com/ → /\evil.com → //evil.com → https://evil.com (open redirect).
+func TestRouter_RedirectTrailingSlash_OpenRedirect(t *testing.T) {
+	r := New()
+	r.WithTrailingSlash(RedirectTrailingSlash)
+	r.Handle("GET", "/:slug", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{"backslash host", `/\evil.com/`},
+		{"double slash", `//evil.com/`},
+		{"backslash mid", `/foo\bar/`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", tt.path, http.NoBody)
+			r.ServeHTTP(w, req)
+
+			// Must NOT redirect — should be 404 or stripped safely.
+			if w.Code == 301 || w.Code == 308 {
+				loc := w.Header().Get("Location")
+				if strings.Contains(loc, `\`) || strings.HasPrefix(loc, "//") {
+					t.Errorf("open redirect: %s → %d Location: %s", tt.path, w.Code, loc)
+				}
+			}
+		})
+	}
+}
+
 // TestRouter_StripTrailingSlash_Bidirectional tests adding slash when the
 // registered route has a trailing slash.
 func TestRouter_StripTrailingSlash_Bidirectional(t *testing.T) {
