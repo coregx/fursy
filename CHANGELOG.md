@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`SetErrorLogger(func(error, *http.Request))`** — hook for unclassified errors before 500 response. Only fires on unexpected errors; Problem/ValidationErrors/DecodeError are handled before this point.
 - **Fuzz tests** — `FuzzRadixLookup` and `FuzzRoutePattern` for radix tree edge cases (~3.3M executions, no panics).
 
+### Changed
+- **Body limit applies to plain handlers** — `SetMaxBodySize` now enforces the limit on `router.Handle()` handlers too (was generic-only). Existing plain handlers accepting bodies >4MB will get 413. Use `SetMaxBodySize(0)` to disable.
+
 ### Fixed
 - CORS docs: must be registered **before** auth middleware (JWT, BasicAuth), not just globally.
 

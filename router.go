@@ -179,7 +179,7 @@ type Router struct {
 	// maxBodySize is the maximum allowed request body size in bytes for
 	// generic handlers (those using Box[Req, Res] with automatic binding).
 	// Default: 4MB (4 << 20). Set to 0 to disable the limit.
-	// Plain handlers (HandlerFunc) are not affected.
+	// Applies to all handler types (generic and plain).
 	maxBodySize int64
 }
 
@@ -728,55 +728,69 @@ func (r *Router) handleError(c *Context, err error) {
 }
 
 // defaultErrorHandler maps errors to appropriate HTTP responses.
+//
+//nolint:gocognit,gocyclo,cyclop // Error classification requires multiple type checks.
 func defaultErrorHandler(c *Context, err error) {
-	// If response already written, don't write again — would corrupt body.
-	if c.responseWriter.written {
-		return
-	}
+	// Classify the error first — even if response is partially written,
+	// we still need to log unclassified errors (streaming failures).
 
 	// Problem → use its Status field.
 	var prob Problem
 	if errors.As(err, &prob) {
-		_ = c.Problem(prob)
+		if !c.responseWriter.written {
+			_ = c.Problem(prob)
+		}
 		return
 	}
 
 	// ValidationErrors → 422 with RFC 9457 body.
 	var valErrs ValidationErrors
 	if errors.As(err, &valErrs) {
-		_ = c.Problem(ValidationProblem(valErrs))
+		if !c.responseWriter.written {
+			_ = c.Problem(ValidationProblem(valErrs))
+		}
 		return
 	}
 
 	// MaxBytesError → 413 Payload Too Large.
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {
-		_ = c.Problem(NewProblem(http.StatusRequestEntityTooLarge, "Request Entity Too Large", ""))
+		if !c.responseWriter.written {
+			_ = c.Problem(NewProblem(http.StatusRequestEntityTooLarge, "Request Entity Too Large", ""))
+		}
 		return
 	}
 
 	// Binding errors → 400 or 415.
 	if errors.Is(err, binding.ErrUnsupportedMediaType) {
-		_ = c.Problem(NewProblem(http.StatusUnsupportedMediaType, "Unsupported Media Type", ""))
+		if !c.responseWriter.written {
+			_ = c.Problem(NewProblem(http.StatusUnsupportedMediaType, "Unsupported Media Type", ""))
+		}
 		return
 	}
 	if errors.Is(err, binding.ErrEmptyRequestBody) {
-		_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", "request body is empty"))
+		if !c.responseWriter.written {
+			_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", "request body is empty"))
+		}
 		return
 	}
 
 	// JSON/XML decode errors → 400.
 	var decodeErr *binding.DecodeError
 	if errors.As(err, &decodeErr) {
-		_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", decodeErr.Error()))
+		if !c.responseWriter.written {
+			_ = c.Problem(NewProblem(http.StatusBadRequest, "Bad Request", decodeErr.Error()))
+		}
 		return
 	}
 
-	// Unknown → 500 without details (security: don't leak internals).
+	// Unknown → log always, write 500 only if response not started.
 	if c.router != nil && c.router.errorLogger != nil {
 		c.router.errorLogger(err, c.Request)
 	}
-	_ = c.Problem(NewProblem(http.StatusInternalServerError, "Internal Server Error", ""))
+	if !c.responseWriter.written {
+		_ = c.Problem(NewProblem(http.StatusInternalServerError, "Internal Server Error", ""))
+	}
 }
 
 // handleNotFound sends a 404 or 405 response depending on configuration.
