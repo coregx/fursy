@@ -971,7 +971,7 @@ router.Use(middleware.Recovery())
 **Dependencies**: Zero
 **Coverage**: High
 
-**IMPORTANT**: CORS middleware **must** be registered globally via `router.Use()`, not on a `RouteGroup`. Preflight OPTIONS requests are handled before route matching, so group-level middleware is never reached for preflight. This is consistent with Gin, Echo, and Chi.
+**IMPORTANT**: CORS middleware **must** be registered globally via `router.Use()` **and before any auth middleware** (JWT, BasicAuth). Preflight OPTIONS requests don't carry credentials — if auth runs first, preflight gets 401 instead of CORS headers.
 
 **Usage**:
 ```go

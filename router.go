@@ -173,6 +173,9 @@ type Router struct {
 	shutdownMu   sync.Mutex
 	shutdownOnce sync.Once
 
+	// errorLogger is called when an unclassified error triggers a 500 response.
+	errorLogger func(err error, req *http.Request)
+
 	// maxBodySize is the maximum allowed request body size in bytes for
 	// generic handlers (those using Box[Req, Res] with automatic binding).
 	// Default: 4MB (4 << 20). Set to 0 to disable the limit.
@@ -308,6 +311,13 @@ func (r *Router) SetMaxBodySize(size int64) *Router {
 // Returns 0 if the limit is disabled.
 func (r *Router) MaxBodySize() int64 {
 	return r.maxBodySize
+}
+
+// SetErrorLogger sets a callback for unclassified errors that trigger 500 responses.
+// Only fires on unexpected errors — Problem, ValidationErrors, DecodeError, and
+// MaxBytesError are handled before this point and do NOT trigger the logger.
+func (r *Router) SetErrorLogger(fn func(err error, req *http.Request)) {
+	r.errorLogger = fn
 }
 
 // WithInfo sets the API metadata for OpenAPI generation.
@@ -684,6 +694,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		c.params = append(c.params, Param{Key: p.Key, Value: p.Value})
 	}
 
+	// Global body size limit — applies to ALL handler types.
+	if r.maxBodySize > 0 && req.Body != nil && req.Body != http.NoBody {
+		req.Body = http.MaxBytesReader(w, req.Body, r.maxBodySize)
+	}
+
 	// Extract handler and pattern from route entry.
 	entry := handler.(routeEntry)
 	c.routePattern = entry.pattern
@@ -758,6 +773,9 @@ func defaultErrorHandler(c *Context, err error) {
 	}
 
 	// Unknown → 500 without details (security: don't leak internals).
+	if c.router != nil && c.router.errorLogger != nil {
+		c.router.errorLogger(err, c.Request)
+	}
 	_ = c.Problem(NewProblem(http.StatusInternalServerError, "Internal Server Error", ""))
 }
 

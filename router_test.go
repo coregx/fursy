@@ -3,6 +3,7 @@ package fursy
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1323,5 +1324,97 @@ func TestRouter_PercentEncodedColon(t *testing.T) {
 	}
 	if w2.Body.String() != "id=42" {
 		t.Errorf("GET /users/42: expected body 'id=42', got %q", w2.Body.String())
+	}
+}
+
+// TestErrorLogger_CalledOn500 verifies that ErrorLogger fires on unclassified errors.
+func TestErrorLogger_CalledOn500(t *testing.T) {
+	r := New()
+	var logged error
+	r.SetErrorLogger(func(err error, _ *http.Request) {
+		logged = err
+	})
+
+	r.Handle("GET", "/fail", func(_ *Context) error {
+		return fmt.Errorf("database connection lost")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/fail", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 500 {
+		t.Fatalf("want 500, got %d", w.Code)
+	}
+	if logged == nil {
+		t.Fatal("ErrorLogger was not called")
+	}
+	if logged.Error() != "database connection lost" {
+		t.Errorf("logged error = %q, want 'database connection lost'", logged.Error())
+	}
+}
+
+// TestErrorLogger_NotCalledOnProblem404 verifies ErrorLogger does NOT fire on expected errors.
+func TestErrorLogger_NotCalledOnProblem404(t *testing.T) {
+	r := New()
+	called := false
+	r.SetErrorLogger(func(_ error, _ *http.Request) {
+		called = true
+	})
+
+	r.Handle("GET", "/notfound", func(_ *Context) error {
+		return NewProblem(404, "Not Found", "")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/notfound", http.NoBody)
+	r.ServeHTTP(w, req)
+
+	if called {
+		t.Error("ErrorLogger should NOT fire on Problem(404)")
+	}
+}
+
+// TestBodyLimit_PlainHandler verifies that plain handlers (router.Handle)
+// also respect SetMaxBodySize — not just generic Box handlers.
+func TestBodyLimit_PlainHandler(t *testing.T) {
+	r := New()
+	r.SetMaxBodySize(1024) // 1KB
+
+	r.Handle("POST", "/upload", func(c *Context) error {
+		body, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			return err
+		}
+		return c.String(200, fmt.Sprintf("got %d bytes", len(body)))
+	})
+
+	// 2KB body — should be rejected.
+	bigBody := strings.Repeat("x", 2048)
+	req := httptest.NewRequest("POST", "/upload", strings.NewReader(bigBody))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("plain handler with 2KB body: want 413, got %d; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBodyLimit_GET_NoWrapper verifies that GET requests without a body
+// do not get wrapped in MaxBytesReader (no unnecessary allocation).
+func TestBodyLimit_GET_NoWrapper(t *testing.T) {
+	r := New()
+	r.SetMaxBodySize(1024)
+
+	r.Handle("GET", "/health", func(c *Context) error {
+		return c.String(200, "OK")
+	})
+
+	req := httptest.NewRequest("GET", "/health", http.NoBody)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("GET /health: want 200, got %d", w.Code)
 	}
 }
