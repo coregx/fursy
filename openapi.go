@@ -775,27 +775,25 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 			}
 		}
 
-		// Add responses. Explicit RouteOptions.Responses take precedence over
-		// the inferred success response.
+		// Always add the inferred success response, using SuccessStatus (0 means 200).
+		status := route.SuccessStatus
+		if status == 0 {
+			status = http.StatusOK
+		}
+		response := Response{Description: successDescription(status)}
+		if status != http.StatusNoContent && route.ResponseType != nil {
+			response.Content = map[string]MediaType{
+				MIMEApplicationJSON: {
+					Schema: reg.schemaFor(route.ResponseType),
+				},
+			}
+		}
+		operation.Responses[fmt.Sprintf("%d", status)] = response
+
+		// Explicit RouteOptions.Responses overwrite the inferred response by status
+		// code, so a custom error keeps the inferred success schema intact.
 		if len(route.Responses) > 0 {
 			addExplicitResponses(operation.Responses, route.Responses, reg)
-		} else {
-			// Default success response, using SuccessStatus (0 means 200).
-			status := route.SuccessStatus
-			if status == 0 {
-				status = http.StatusOK
-			}
-			statusStr := fmt.Sprintf("%d", status)
-
-			response := Response{Description: successDescription(status)}
-			if status != http.StatusNoContent && route.ResponseType != nil {
-				response.Content = map[string]MediaType{
-					MIMEApplicationJSON: {
-						Schema: reg.schemaFor(route.ResponseType),
-					},
-				}
-			}
-			operation.Responses[statusStr] = response
 		}
 
 		// Add default error responses, unless the user already supplied them.

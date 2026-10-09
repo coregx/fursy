@@ -1077,6 +1077,39 @@ func TestOpenAPI_UserResponsesNotClobbered(t *testing.T) {
 	}
 }
 
+// TestOpenAPI_ExplicitResponsesKeepInferredSuccess verifies that documenting a
+// custom error response does not remove the inferred success response.
+func TestOpenAPI_ExplicitResponsesKeepInferredSuccess(t *testing.T) {
+	router := New()
+	router.GET[Empty, testUser]("/users", func(_ *Box[Empty, testUser]) error { return nil },
+		&RouteOptions{
+			Responses: map[int]RouteResponse{
+				404: {
+					Description: "Not Found",
+					ContentType: MIMEApplicationJSON,
+					Type:        reflect.TypeOf(testUser{}),
+				},
+			},
+		})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	op := doc.Paths["/users"].Get
+	if _, ok := op.Responses["404"]; !ok {
+		t.Fatal("expected explicit 404 response")
+	}
+	success, ok := op.Responses["200"]
+	if !ok {
+		t.Fatal("inferred 200 response was dropped when explicit responses were set")
+	}
+	if _, ok := success.Content[MIMEApplicationJSON]; !ok {
+		t.Errorf("inferred 200 response is missing its schema content: %+v", success.Content)
+	}
+}
+
 // findOpenAPIParameter returns the first parameter matching name and location.
 func findOpenAPIParameter(params []Parameter, name, in string) *Parameter {
 	for i := range params {
@@ -1311,7 +1344,8 @@ func TestOpenAPI_OptionalRequestBody(t *testing.T) {
 }
 
 // TestOpenAPI_ExplicitResponsesOverrideInference verifies that explicit
-// RouteOptions.Responses suppress the inferred success response.
+// RouteOptions.Responses are merged on top of the inferred success response:
+// the inferred 200 stays, and an explicit entry with the same status overrides it.
 func TestOpenAPI_ExplicitResponsesOverrideInference(t *testing.T) {
 	router := New()
 	router.POST[testUser, testUser]("/users", func(_ *Box[testUser, testUser]) error {
@@ -1332,11 +1366,36 @@ func TestOpenAPI_ExplicitResponsesOverrideInference(t *testing.T) {
 	}
 
 	post := doc.Paths["/users"].Post
-	if _, ok := post.Responses["200"]; ok {
-		t.Error("inference should not add 200 when explicit Responses are provided")
+	if _, ok := post.Responses["200"]; !ok {
+		t.Error("inferred 200 success response must remain when explicit Responses are provided")
 	}
 	if _, ok := post.Responses["201"]; !ok {
 		t.Error("expected user-provided 201 response")
+	}
+}
+
+// TestOpenAPI_ExplicitResponseOverridesSameStatus verifies an explicit response
+// replaces the inferred one when both use the same status code.
+func TestOpenAPI_ExplicitResponseOverridesSameStatus(t *testing.T) {
+	router := New()
+	router.GET[Empty, testUser]("/users", func(_ *Box[Empty, testUser]) error { return nil },
+		&RouteOptions{
+			Responses: map[int]RouteResponse{
+				http.StatusOK: {
+					Description: "Custom OK",
+					ContentType: MIMEApplicationJSON,
+					Type:        reflect.TypeOf(testUser{}),
+				},
+			},
+		})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	if got := doc.Paths["/users"].Get.Responses["200"].Description; got != "Custom OK" {
+		t.Errorf("explicit 200 should override the inferred one, got description %q", got)
 	}
 }
 
