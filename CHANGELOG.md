@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned
+- ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
+
+## [0.7.0] - 2026-10-09
+
+### Breaking
+- **Removed package-level generic functions** — `fursy.GET[Req, Res](router, path, handler)` and the six siblings (`POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`) are removed. Migration: `router.POST(path, handler)` (type parameters inferred). These functions were deprecated since v0.5.0 and did not record type metadata for OpenAPI generation.
+
 ### Added
-- **OpenAPI schemas from type-safe handlers** — `router.GET/POST/...` and `RouteGroup` methods now record `Req`/`Res` types and emit request-body/response schemas
+- **OpenAPI schemas from type-safe handlers** — `router.GET/POST/...` and `RouteGroup` methods now record `Req`/`Res` types and emit request-body/response schemas ([#20], contributed by [@esmin](https://github.com/esmin))
 - **Named component schemas** — inferred types are registered once in `components.schemas` and referenced with `$ref` (removes inline duplication; recursive types terminate)
 - **Auto-generated `operationId`** — operations without an explicit id get a deterministic, unique id from method + path (e.g. `getUsersById`); explicit ids are preserved
 - **`RouteOptions.SuccessStatus`** — set the inferred success status (e.g. 201/204; 204 emits no body)
@@ -20,13 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Variadic `*RouteOptions`** on generic route methods (source-compatible; existing two-argument calls unchanged)
 - **Default 400/500 responses** no longer overwrite user-supplied `RouteOptions.Responses`
+- **`Res == Empty` defaults to 204** — handlers with no response body (`Box[Req, Empty]`) now infer `204 No Content` instead of `200 Success` in the generated OpenAPI document. Override with `RouteOptions{SuccessStatus: 200}` if needed.
+- **Explicit + inferred responses merge** — `RouteOptions.Responses` entries are merged with the inferred success response, not replaced. A custom `404` no longer drops the inferred `200`.
 
 ### Fixed
 - **`generateSchema` cycle detection** — recursive/mutually-recursive types no longer recurse infinitely
-- **Deprecation markers** on package-level `GET`/`POST`/`PUT`/`DELETE`/`PATCH`/`HEAD`/`OPTIONS` now recognized by staticcheck/gopls
+- **`time.Time`** → `{"type":"string","format":"date-time"}` (was `{"type":"object"}`)
+- **Embedded structs** — anonymous fields are promoted into the parent schema (unless they have an explicit JSON tag)
+- **`[]byte`** → `{"type":"string","format":"byte"}` (was array of integers); named `[]byte` types handled the same way
+- **`json.RawMessage`** → `{}` (unconstrained schema, not base64)
+- **`RouteResponse` without `ContentType`** — defaults to `application/json` (2xx) or `application/problem+json` (4xx+) instead of an empty media-type key
 
-### Planned
-- ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
+[#20]: https://github.com/coregx/fursy/pull/20
 
 ## [0.6.3] - 2026-10-08
 
