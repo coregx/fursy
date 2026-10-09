@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -401,10 +402,22 @@ func generateSchema(t reflect.Type) *Schema {
 // refs as well.
 func (r *schemaRegistry) schemaFor(t reflect.Type) *Schema {
 	if t == nil {
-		return &Schema{Type: schemaTypeObject}
+		// A nil type carries no shape information; an unconstrained schema is
+		// more accurate than asserting an object.
+		return &Schema{}
 	}
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
+	}
+
+	// Special well-known types must be handled before the component branch,
+	// otherwise they would be registered as named components with the wrong body.
+	if t == reflect.TypeFor[time.Time]() {
+		return &Schema{Type: schemaTypeString, Format: "date-time"}
+	}
+	if t == reflect.TypeFor[json.RawMessage]() {
+		// Raw JSON carries no fixed shape; an unconstrained schema is correct.
+		return &Schema{}
 	}
 
 	if r.isComponentType(t) {
@@ -459,8 +472,6 @@ func (r *schemaRegistry) nameFor(t reflect.Type) string {
 }
 
 // build constructs the schema body for t without applying a top-level $ref.
-//
-//nolint:gocognit,gocyclo,cyclop // Schema generation requires complex type introspection.
 func (r *schemaRegistry) build(t reflect.Type) *Schema {
 	// Inline cycle guard: if this type is already being expanded on the current
 	// path (possible when components are disabled), stop with a placeholder.
@@ -483,58 +494,30 @@ func (r *schemaRegistry) build(t reflect.Type) *Schema {
 	case reflect.Bool:
 		schema.Type = "boolean"
 	case reflect.Slice, reflect.Array:
+		// []byte (and named types like `type Blob []byte`) encode as base64 strings.
+		if t.Elem().Kind() == reflect.Uint8 {
+			schema.Type = schemaTypeString
+			schema.Format = "byte"
+			break
+		}
 		schema.Type = "array"
 		schema.Items = r.schemaFor(t.Elem())
 	case reflect.Map:
 		schema.Type = schemaTypeObject
 		schema.AdditionalProperties = r.schemaFor(t.Elem())
+	case reflect.Interface:
+		// any / interface{} accepts any JSON value, so no constraint is correct.
+		// Leave the schema empty rather than claiming a fixed object type.
+		return schema
 	case reflect.Struct:
 		schema.Type = schemaTypeObject
 		schema.Properties = make(map[string]*Schema)
-		required := []string{}
 
 		// Mark this struct as in-progress so self-referential fields terminate.
 		r.seen[t] = true
 		defer delete(r.seen, t)
 
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
-
-			// Skip unexported fields.
-			if !field.IsExported() {
-				continue
-			}
-
-			// Get JSON tag.
-			jsonTag := field.Tag.Get("json")
-			if jsonTag == "-" {
-				continue
-			}
-
-			// Parse JSON tag.
-			fieldName := field.Name
-			omitempty := false
-			if jsonTag != "" {
-				parts := strings.Split(jsonTag, ",")
-				if parts[0] != "" {
-					fieldName = parts[0]
-				}
-				for _, opt := range parts[1:] {
-					if opt == "omitempty" {
-						omitempty = true
-					}
-				}
-			}
-
-			schema.Properties[fieldName] = r.schemaFor(field.Type)
-
-			// Check if required.
-			if !omitempty && field.Type.Kind() != reflect.Pointer {
-				required = append(required, fieldName)
-			}
-		}
-
-		if len(required) > 0 {
+		if required := r.buildStructFields(schema.Properties, t); len(required) > 0 {
 			schema.Required = required
 		}
 	default:
@@ -543,6 +526,96 @@ func (r *schemaRegistry) build(t reflect.Type) *Schema {
 	}
 
 	return schema
+}
+
+// buildStructFields populates props with the JSON properties of struct type t
+// and returns the names of fields that are required.
+//
+// Embedded fields are promoted (flattened) unless they carry an explicit JSON
+// name; promoted fields are handled before the exported check because an
+// embedded field reports IsExported()==false when its own type name is
+// unexported, while encoding/json still promotes its exported fields.
+//
+//nolint:gocognit // Field promotion and JSON tag parsing are inherently branchy.
+func (r *schemaRegistry) buildStructFields(props map[string]*Schema, t reflect.Type) []string {
+	required := []string{}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+
+		jsonTag := field.Tag.Get("json")
+		if jsonTag == "-" {
+			continue
+		}
+
+		if field.Anonymous {
+			embeddedType := field.Type
+			for embeddedType.Kind() == reflect.Pointer {
+				embeddedType = embeddedType.Elem()
+			}
+			// A tag such as json:"base" keeps the field as a nested object,
+			// matching encoding/json; otherwise the fields are promoted.
+			if hasJSONName(jsonTag) {
+				name := jsonFieldName(jsonTag, embeddedType.Name())
+				props[name] = r.schemaFor(field.Type)
+				if !jsonOmitempty(jsonTag) && field.Type.Kind() != reflect.Pointer {
+					required = append(required, name)
+				}
+				continue
+			}
+			promoted := r.build(embeddedType)
+			for name, prop := range promoted.Properties {
+				props[name] = prop
+			}
+			required = append(required, promoted.Required...)
+			continue
+		}
+
+		if !field.IsExported() {
+			continue
+		}
+
+		name := jsonFieldName(jsonTag, field.Name)
+		props[name] = r.schemaFor(field.Type)
+		if !jsonOmitempty(jsonTag) && field.Type.Kind() != reflect.Pointer {
+			required = append(required, name)
+		}
+	}
+
+	return required
+}
+
+// hasJSONName reports whether a JSON tag specifies an explicit name.
+//
+// A tag of "-" or "" has no name; "name" or "name,omitempty" does. This
+// matches when encoding/json promotes an anonymous field: only untagged
+// (or option-only) embedded fields are flattened into the parent object.
+func hasJSONName(tag string) bool {
+	if tag == "" || tag == "-" {
+		return false
+	}
+	name, _, _ := strings.Cut(tag, ",")
+	return name != ""
+}
+
+// jsonFieldName returns the effective JSON name for a tagged field, falling
+// back to fallback when the tag carries no name (e.g. only options).
+func jsonFieldName(tag, fallback string) string {
+	if name, _, _ := strings.Cut(tag, ","); name != "" {
+		return name
+	}
+	return fallback
+}
+
+// jsonOmitempty reports whether a JSON tag includes the omitempty option.
+func jsonOmitempty(tag string) bool {
+	_, opts, _ := strings.Cut(tag, ",")
+	for _, opt := range strings.Split(opts, ",") {
+		if opt == "omitempty" {
+			return true
+		}
+	}
+	return false
 }
 
 // GenerateOpenAPI generates an OpenAPI 3.1 document from the router.
@@ -559,7 +632,7 @@ func (r *schemaRegistry) build(t reflect.Type) *Schema {
 //	    Version: "1.0.0",
 //	})
 //
-//nolint:gocognit,gocyclo,cyclop,gocritic,funlen,maintidx // OpenAPI generation requires complex route introspection.
+//nolint:gocognit,gocyclo,cyclop,gocritic,funlen // OpenAPI generation requires complex route introspection.
 func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 	// Use router info if set, otherwise use parameter.
 	if r.info != nil {
@@ -705,17 +778,7 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 		// Add responses. Explicit RouteOptions.Responses take precedence over
 		// the inferred success response.
 		if len(route.Responses) > 0 {
-			for status, resp := range route.Responses {
-				statusStr := fmt.Sprintf("%d", status)
-				operation.Responses[statusStr] = Response{
-					Description: resp.Description,
-					Content: map[string]MediaType{
-						resp.ContentType: {
-							Schema: reg.schemaFor(resp.Type),
-						},
-					},
-				}
-			}
+			addExplicitResponses(operation.Responses, route.Responses, reg)
 		} else {
 			// Default success response, using SuccessStatus (0 means 200).
 			status := route.SuccessStatus
@@ -798,6 +861,37 @@ func successDescription(status int) string {
 		return descNoContent
 	default:
 		return descSuccess
+	}
+}
+
+// responseContentType resolves the media type for an explicit RouteResponse.
+//
+// An empty ContentType would otherwise produce an invalid OpenAPI document with
+// an empty media-type key, so errors default to application/problem+json and
+// everything else to application/json.
+func responseContentType(status int, contentType string) string {
+	if contentType != "" {
+		return contentType
+	}
+	if status >= http.StatusBadRequest {
+		return mimeApplicationProblemJSON
+	}
+	return MIMEApplicationJSON
+}
+
+// addExplicitResponses records user-supplied responses verbatim: their content
+// is emitted only when the response declares a body type or media type.
+func addExplicitResponses(dst map[string]Response, responses map[int]RouteResponse, reg *schemaRegistry) {
+	for status, resp := range responses {
+		response := Response{Description: resp.Description}
+		if resp.Type != nil || resp.ContentType != "" {
+			response.Content = map[string]MediaType{
+				responseContentType(status, resp.ContentType): {
+					Schema: reg.schemaFor(resp.Type),
+				},
+			}
+		}
+		dst[fmt.Sprintf("%d", status)] = response
 	}
 }
 

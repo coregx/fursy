@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // Test types for OpenAPI generation.
@@ -1463,4 +1464,151 @@ func operationsOf(item PathItem) map[string]*Operation {
 		}
 	}
 	return ops
+}
+
+// --- Special schema mapping (review round 2) ---
+
+type timeEvent struct {
+	At    time.Time  `json:"at"`
+	Ends  *time.Time `json:"ends,omitempty"`
+	Label string     `json:"label"`
+}
+
+// TestOpenAPI_TimeSchema verifies time.Time maps to a string with date-time format
+// and is not emitted as an object component.
+func TestOpenAPI_TimeSchema(t *testing.T) {
+	schema := (&schemaRegistry{seen: make(map[reflect.Type]bool)}).schemaFor(reflect.TypeFor[time.Time]())
+	if schema.Type != schemaTypeString || schema.Format != "date-time" {
+		t.Errorf("time.Time schema = %+v, want type=string format=date-time", schema)
+	}
+
+	// A field of type time.Time must not create a named "Time" component.
+	docRouter := New()
+	docRouter.GET[Empty, timeEvent]("/events", func(_ *Box[Empty, timeEvent]) error { return nil })
+	doc, err := docRouter.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+	if _, ok := doc.Components.Schemas["Time"]; ok {
+		t.Error("time.Time must not be registered as a component")
+	}
+	at := doc.Components.Schemas["timeEvent"].Properties["at"]
+	if at.Type != schemaTypeString || at.Format != "date-time" {
+		t.Errorf("event.at schema = %+v, want string/date-time", at)
+	}
+}
+
+// TestOpenAPI_ByteAndRawJSON verifies []byte maps to a base64 string and
+// json.RawMessage yields an unconstrained schema.
+func TestOpenAPI_ByteAndRawJSON(t *testing.T) {
+	reg := &schemaRegistry{seen: make(map[reflect.Type]bool)}
+
+	bytesSchema := reg.schemaFor(reflect.TypeFor[[]byte]())
+	if bytesSchema.Type != schemaTypeString || bytesSchema.Format != "byte" {
+		t.Errorf("[]byte schema = %+v, want type=string format=byte", bytesSchema)
+	}
+
+	rawSchema := reg.schemaFor(reflect.TypeFor[json.RawMessage]())
+	if rawSchema.Type != "" || rawSchema.Format != "" {
+		t.Errorf("json.RawMessage schema = %+v, want empty (unconstrained)", rawSchema)
+	}
+}
+
+// namedBytes exercises the named-slice path for the []byte mapping.
+type namedBytes []byte
+
+// TestOpenAPI_NamedByteSlice verifies a named []byte type also maps to a string.
+func TestOpenAPI_NamedByteSlice(t *testing.T) {
+	reg := &schemaRegistry{seen: make(map[reflect.Type]bool)}
+	schema := reg.schemaFor(reflect.TypeFor[namedBytes]())
+	if schema.Type != schemaTypeString || schema.Format != "byte" {
+		t.Errorf("namedBytes schema = %+v, want type=string format=byte", schema)
+	}
+}
+
+// Embedded flattening test types.
+type baseModel struct {
+	ID int `json:"id"`
+}
+
+type taggedEmbedded struct {
+	baseModel `json:"base"`
+	Name      string `json:"name"`
+}
+
+type pointerEmbedded struct {
+	*baseModel
+	Name string `json:"name"`
+}
+
+// TestOpenAPI_EmbeddedFlattening verifies anonymous fields are promoted unless
+// they carry an explicit JSON name, and that embedded pointers are dereferenced.
+func TestOpenAPI_EmbeddedFlattening(t *testing.T) {
+	reg := &schemaRegistry{seen: make(map[reflect.Type]bool)}
+
+	flattened := reg.build(reflect.TypeFor[pointerEmbedded]())
+	if _, ok := flattened.Properties["id"]; !ok {
+		t.Errorf("embedded pointer field was not promoted: properties=%v", flattened.Properties)
+	}
+	if _, ok := flattened.Properties["name"]; !ok {
+		t.Errorf("named field missing: properties=%v", flattened.Properties)
+	}
+
+	reg2 := &schemaRegistry{seen: make(map[reflect.Type]bool)}
+	nested := reg2.build(reflect.TypeFor[taggedEmbedded]())
+	if _, ok := nested.Properties["base"]; !ok {
+		t.Errorf("embedded field with explicit json tag should stay nested: properties=%v", nested.Properties)
+	}
+	if _, ok := nested.Properties["id"]; ok {
+		t.Error("embedded field with explicit json tag must not be promoted")
+	}
+}
+
+// TestOpenAPI_AnySchema verifies any/interface{} maps to an unconstrained
+// schema rather than a fixed object type.
+func TestOpenAPI_AnySchema(t *testing.T) {
+	reg := &schemaRegistry{seen: make(map[reflect.Type]bool)}
+
+	schema := reg.schemaFor(reflect.TypeFor[any]())
+	if schema.Type != "" || schema.Format != "" {
+		t.Errorf("any schema = %+v, want unconstrained (empty)", schema)
+	}
+
+	if got := reg.schemaFor(nil); got.Type != "" {
+		t.Errorf("nil type schema = %+v, want unconstrained (empty)", got)
+	}
+}
+
+// TestOpenAPI_ExplicitResponseMediaType verifies an empty ContentType is
+// defaulted so the document never contains an empty media-type key.
+func TestOpenAPI_ExplicitResponseMediaType(t *testing.T) {
+	router := New()
+	router.HandleWithOptions("GET", "/things", func(_ *Context) error { return nil }, &RouteOptions{
+		Responses: map[int]RouteResponse{
+			404: {Description: "Not Found", Type: reflect.TypeOf(testUser{})},
+			418: {Description: "No Body"},
+			200: {Description: "OK", Type: reflect.TypeOf(testUser{})},
+		},
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+	op := doc.Paths["/things"].Get
+
+	if _, ok := op.Responses["404"].Content[mimeApplicationProblemJSON]; !ok {
+		t.Errorf("404 without ContentType should default to problem+json, got %v", op.Responses["404"].Content)
+	}
+	if _, ok := op.Responses["200"].Content[MIMEApplicationJSON]; !ok {
+		t.Errorf("2xx without ContentType should default to application/json, got %v", op.Responses["200"].Content)
+	}
+	if op.Responses["418"].Content != nil {
+		t.Errorf("response with neither Type nor ContentType must omit content, got %v", op.Responses["418"].Content)
+	}
+	for status, resp := range op.Responses {
+		if _, empty := resp.Content[""]; empty {
+			t.Errorf("response %s contains an empty media-type key", status)
+		}
+	}
 }
