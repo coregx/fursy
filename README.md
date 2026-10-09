@@ -104,14 +104,24 @@ router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) erro
 
 ### Built-in OpenAPI 3.1 Generation
 
+Request/response schemas are inferred from type-safe handlers (`Box[Req, Res]`);
+add summaries, tags, and status codes via `RouteOptions`.
+
 ```go
-spec, err := router.GenerateOpenAPI(fursy.Info{
+router := fursy.New()
+
+router.WithInfo(fursy.Info{
     Title:   "My API",
     Version: "1.0.0",
 })
-// OpenAPI 3.1 spec with path parameters and error schemas
 
-// Or serve it directly:
+router.POST("/users", createUser, &fursy.RouteOptions{
+    Summary:       "Create user",
+    Tags:          []string{"users"},
+    SuccessStatus: 201, // 204 emits no body
+})
+
+// Serve the generated OpenAPI 3.1 document at GET /openapi.json.
 router.ServeOpenAPI("/openapi.json")
 ```
 

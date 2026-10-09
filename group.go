@@ -80,38 +80,61 @@ func (g *RouteGroup) Group(prefix string, middleware ...HandlerFunc) *RouteGroup
 
 // GET registers a type-safe GET route on the group.
 // Type parameters are inferred from the handler signature.
-func (g *RouteGroup) GET[Req, Res any](path string, handler Handler[Req, Res]) {
-	g.Handle("GET", path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (g *RouteGroup) GET[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	g.registerGeneric("GET", path, handler, firstRouteOptions(opts))
 }
 
 // POST registers a type-safe POST route on the group.
-func (g *RouteGroup) POST[Req, Res any](path string, handler Handler[Req, Res]) {
-	g.Handle("POST", path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (g *RouteGroup) POST[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	g.registerGeneric("POST", path, handler, firstRouteOptions(opts))
 }
 
 // PUT registers a type-safe PUT route on the group.
-func (g *RouteGroup) PUT[Req, Res any](path string, handler Handler[Req, Res]) {
-	g.Handle("PUT", path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (g *RouteGroup) PUT[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	g.registerGeneric("PUT", path, handler, firstRouteOptions(opts))
 }
 
 // DELETE registers a type-safe DELETE route on the group.
-func (g *RouteGroup) DELETE[Req, Res any](path string, handler Handler[Req, Res]) {
-	g.Handle("DELETE", path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (g *RouteGroup) DELETE[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	g.registerGeneric("DELETE", path, handler, firstRouteOptions(opts))
 }
 
 // PATCH registers a type-safe PATCH route on the group.
-func (g *RouteGroup) PATCH[Req, Res any](path string, handler Handler[Req, Res]) {
-	g.Handle("PATCH", path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (g *RouteGroup) PATCH[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	g.registerGeneric("PATCH", path, handler, firstRouteOptions(opts))
 }
 
 // HEAD registers a type-safe HEAD route on the group.
-func (g *RouteGroup) HEAD[Req, Res any](path string, handler Handler[Req, Res]) {
-	g.Handle("HEAD", path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (g *RouteGroup) HEAD[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	g.registerGeneric("HEAD", path, handler, firstRouteOptions(opts))
 }
 
 // OPTIONS registers a type-safe OPTIONS route on the group.
-func (g *RouteGroup) OPTIONS[Req, Res any](path string, handler Handler[Req, Res]) {
-	g.Handle("OPTIONS", path, adaptGenericHandler(handler))
+//
+// An optional *RouteOptions may be supplied to document the route for OpenAPI.
+func (g *RouteGroup) OPTIONS[Req, Res any](path string, handler Handler[Req, Res], opts ...*RouteOptions) {
+	g.registerGeneric("OPTIONS", path, handler, firstRouteOptions(opts))
+}
+
+// registerGeneric registers a type-safe handler on the group, recording the
+// Req/Res body types as route metadata for OpenAPI generation.
+func (g *RouteGroup) registerGeneric[Req, Res any](method, path string, handler Handler[Req, Res], opts *RouteOptions) {
+	fullPath := g.prefix + path
+	groupHandlers := g.combineMiddleware(adaptGenericHandler(handler))
+	g.router.handleWithGroupMiddleware(method, fullPath, groupHandlers, opts,
+		genericBodyType[Req](), genericBodyType[Res]())
 }
 
 // Handle registers a route with the given HTTP method, path, and handler.
@@ -125,6 +148,20 @@ func (g *RouteGroup) OPTIONS[Req, Res any](path string, handler Handler[Req, Res
 //	api := router.Group("/api")
 //	api.Handle("GET", "/users", handler)  // Registers GET /api/users
 func (g *RouteGroup) Handle(method, path string, handler HandlerFunc) {
+	g.HandleWithOptions(method, path, handler, nil)
+}
+
+// HandleWithOptions registers a route with documentation metadata for OpenAPI
+// generation, in addition to the group prefix and middleware.
+//
+// Example:
+//
+//	api := router.Group("/api")
+//	api.HandleWithOptions("GET", "/users/:id", handler, &RouteOptions{
+//	    Summary: "Get user by ID",
+//	    Tags:    []string{"users"},
+//	})
+func (g *RouteGroup) HandleWithOptions(method, path string, handler HandlerFunc, opts *RouteOptions) {
 	// Combine group prefix with route path
 	fullPath := g.prefix + path
 
@@ -133,7 +170,7 @@ func (g *RouteGroup) Handle(method, path string, handler HandlerFunc) {
 
 	// Register route on parent router with group handlers
 	// The router will combine its own middleware with these handlers in ServeHTTP
-	g.router.handleWithGroupMiddleware(method, fullPath, groupHandlers)
+	g.router.handleWithGroupMiddleware(method, fullPath, groupHandlers, opts, nil, nil)
 }
 
 // combineMiddleware combines group middleware and the handler.
