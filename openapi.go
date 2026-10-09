@@ -632,7 +632,7 @@ func jsonOmitempty(tag string) bool {
 //	    Version: "1.0.0",
 //	})
 //
-//nolint:gocognit,gocyclo,cyclop,gocritic,funlen // OpenAPI generation requires complex route introspection.
+//nolint:gocognit,gocyclo,cyclop,gocritic,funlen,maintidx // OpenAPI generation requires complex route introspection.
 func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 	// Use router info if set, otherwise use parameter.
 	if r.info != nil {
@@ -778,7 +778,11 @@ func (r *Router) GenerateOpenAPI(info Info) (*OpenAPI, error) {
 		// Always add the inferred success response, using SuccessStatus (0 means 200).
 		status := route.SuccessStatus
 		if status == 0 {
-			status = http.StatusOK
+			if route.ResponseType == nil {
+				status = http.StatusNoContent
+			} else {
+				status = http.StatusOK
+			}
 		}
 		response := Response{Description: successDescription(status)}
 		if status != http.StatusNoContent && route.ResponseType != nil {

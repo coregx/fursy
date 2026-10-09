@@ -1321,6 +1321,36 @@ func TestOpenAPI_SuccessStatus(t *testing.T) {
 	}
 }
 
+// TestOpenAPI_EmptyResponseDefaults204 verifies that handlers returning Empty
+// (no response body) default to 204 No Content without requiring explicit
+// SuccessStatus.
+func TestOpenAPI_EmptyResponseDefaults204(t *testing.T) {
+	router := New()
+	router.DELETE[Empty, Empty]("/items/:id", func(c *Box[Empty, Empty]) error {
+		return c.NoContentSuccess()
+	})
+
+	doc, err := router.GenerateOpenAPI(Info{Title: "Test", Version: "1.0.0"})
+	if err != nil {
+		t.Fatalf("GenerateOpenAPI failed: %v", err)
+	}
+
+	del := doc.Paths["/items/{id}"].Delete
+	if _, ok := del.Responses["200"]; ok {
+		t.Error("Empty response type should not produce a 200 response")
+	}
+	noContent, ok := del.Responses["204"]
+	if !ok {
+		t.Fatal("expected auto-inferred 204 for Empty response type")
+	}
+	if noContent.Description != descNoContent {
+		t.Errorf("204 description = %q, want %q", noContent.Description, descNoContent)
+	}
+	if len(noContent.Content) != 0 {
+		t.Errorf("204 response must not have content, got %d media types", len(noContent.Content))
+	}
+}
+
 // TestOpenAPI_OptionalRequestBody verifies OptionalRequestBody relaxes the
 // inferred request body's required flag.
 func TestOpenAPI_OptionalRequestBody(t *testing.T) {
