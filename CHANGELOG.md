@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Timeout middleware** — `middleware.Timeout(d)` and `middleware.TimeoutWithConfig(cfg)` attach a deadline to `c.Request.Context()` and return a 503 RFC 9457 Problem when the handler fails with the deadline error before writing a response (handler-set headers are discarded). Cooperative (no extra goroutine, safe with pooled `Context`); supports `Skipper`, custom `ErrorHandler`, and the `ErrRequestTimeout` cancellation cause
+
 ### Planned
 - ozzo-routing compatibility layer (lowercase `Get`/`Post` methods) — deferred, see ADR-001
 

@@ -177,7 +177,7 @@ go get github.com/coregx/fursy
 
 ## 🎛️ Middleware
 
-FURSY includes **8 production-ready middleware** with minimal dependencies. Core middleware have **zero external dependencies** (stdlib only), with only 2 exceptions: JWT (golang-jwt/jwt) and RateLimit (x/time).
+FURSY includes **9 production-ready middleware** with minimal dependencies. Core middleware have **zero external dependencies** (stdlib only), with only 2 exceptions: JWT (golang-jwt/jwt) and RateLimit (x/time).
 
 ### Core Middleware (Zero Dependencies)
 
@@ -433,6 +433,67 @@ router.Use(middleware.CircuitBreakerWithConfig(middleware.CircuitBreakerConfig{
 **Coverage**: 95.6%
 **Dependencies**: Zero (stdlib only)
 
+#### Timeout
+
+Request timeout with RFC 9457 error responses.
+
+```go
+// Recommended order: Recovery → Logger → Timeout → your other middleware
+router.Use(middleware.Recovery(), middleware.Logger())
+router.Use(middleware.Timeout(5 * time.Second)) // zero or negative → DefaultTimeout (30s)
+
+// With full configuration
+router.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+    Timeout: 2 * time.Second,
+    // Skip long-lived connections (SSE, WebSocket)
+    Skipper: func(c *fursy.Context) bool {
+        return strings.HasPrefix(c.Request.URL.Path, "/events")
+    },
+    // Return 504 instead of the default 503
+    ErrorHandler: func(_ *fursy.Context, _ error) error {
+        return fursy.NewProblem(http.StatusGatewayTimeout, "Gateway Timeout", "")
+    },
+}))
+
+// Handlers must pass the request context to slow calls
+router.GET("/report", func(c *fursy.Box[Req, Res]) error {
+    rows, err := db.QueryContext(c.Request.Context(), query)
+    if err != nil {
+        return err // deadline exceeded → 503 Problem
+    }
+    // ...
+})
+```
+
+The timeout is **cooperative**: the deadline is set on `c.Request.Context()` and only stops work that honors it (database drivers, HTTP clients, `select` on `ctx.Done()`). Handlers are not moved to a separate goroutine, because fursy reuses pooled `Context` objects as soon as a request returns.
+
+| When the deadline expires and the handler... | Response |
+|---|---|
+| returns the context error (e.g. `context.DeadlineExceeded`) before writing | **503** Problem; headers set by the handler are discarded |
+| has already written a response | kept as is |
+| returns `nil` or an unrelated error | kept as is |
+
+Client disconnects and shorter deadlines set elsewhere are not reported as timeouts.
+
+**Limitations**:
+- **Keep `http.Server` timeouts.** Body reads and response writes are not bounded by the request context. Set `ReadHeaderTimeout`, `ReadTimeout` and `WriteTimeout`, with `WriteTimeout` longer than the middleware timeout.
+- **Deadlines only shrink.** A nested `Timeout` cannot extend an outer one, so apply it per group when routes need different limits:
+
+```go
+api := router.Group("/api", middleware.Timeout(5*time.Second))
+uploads := router.Group("/uploads", middleware.Timeout(5*time.Minute))
+```
+
+**Features**:
+- ✅ Zero external dependencies (pure Go)
+- ✅ No extra goroutines (safe with pooled `Context`)
+- ✅ Custom error handler and Skipper
+- ✅ `ErrRequestTimeout` cancellation cause (`context.Cause`)
+- ✅ Preserves `http.Flusher` / `http.Hijacker`
+
+**Coverage**: 100%
+**Dependencies**: Zero (stdlib only)
+
 ---
 
 ### Middleware Comparison
@@ -447,6 +508,7 @@ router.Use(middleware.CircuitBreakerWithConfig(middleware.CircuitBreakerConfig{
 | **Rate Limit** | ✅ Built-in (RFC headers) | 🔧 Plugin | 🔧 Plugin | ✅ Built-in |
 | **Security Headers** | ✅ OWASP 2025 | ❌ | 🔧 Plugin | ✅ Basic |
 | **Circuit Breaker** | ✅ Zero deps | ❌ | ❌ | ❌ |
+| **Timeout** | ✅ RFC 9457 (context-based) | 🔧 Plugin | ✅ Built-in | ✅ Built-in |
 | **Test Coverage** | **94.6%** | ? | ? | ? |
 | **Dependencies** | **Core: 0, JWT: 1, RateLimit: 1** | Multiple | Multiple | Multiple |
 
