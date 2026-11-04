@@ -50,11 +50,6 @@ func NewService(repo Repository, jwtSvc *auth.JWTService) Service {
 
 // Register creates a new user account.
 func (s *serviceImpl) Register(ctx context.Context, req RegisterRequest) (*User, error) {
-	// Validate request
-	if err := req.Validate(); err != nil {
-		return nil, err
-	}
-
 	// Check if email already exists
 	email, _ := NewEmail(req.Email)
 	_, err := s.repo.GetByEmail(ctx, email)
@@ -81,11 +76,6 @@ func (s *serviceImpl) Register(ctx context.Context, req RegisterRequest) (*User,
 
 // Login authenticates user and returns JWT token.
 func (s *serviceImpl) Login(ctx context.Context, req LoginRequest) (string, error) {
-	// Validate request
-	if err := req.Validate(); err != nil {
-		return "", err
-	}
-
 	// Get user by email
 	email, _ := NewEmail(req.Email)
 	user, err := s.repo.GetByEmail(ctx, email)
@@ -122,11 +112,6 @@ func (s *serviceImpl) GetProfile(ctx context.Context, userID string) (*User, err
 
 // UpdateProfile updates user profile.
 func (s *serviceImpl) UpdateProfile(ctx context.Context, userID string, req UpdateProfileRequest) (*User, error) {
-	// Validate request
-	if err := req.Validate(); err != nil {
-		return nil, err
-	}
-
 	// Get user
 	user, err := s.repo.Get(ctx, userID)
 	if err != nil {
@@ -148,11 +133,6 @@ func (s *serviceImpl) UpdateProfile(ctx context.Context, userID string, req Upda
 
 // ChangePassword changes user password.
 func (s *serviceImpl) ChangePassword(ctx context.Context, userID string, req ChangePasswordRequest) error {
-	// Validate request
-	if err := req.Validate(); err != nil {
-		return err
-	}
-
 	// Get user
 	user, err := s.repo.Get(ctx, userID)
 	if err != nil {

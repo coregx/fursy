@@ -1,8 +1,6 @@
 package user
 
 import (
-	"encoding/json"
-	"net/http"
 	"strconv"
 
 	"example.com/production-boilerplate/internal/shared/auth"
@@ -22,114 +20,89 @@ func NewAPI(service Service) *API {
 // RegisterRoutes registers user routes.
 func (api *API) RegisterRoutes(r *fursy.Router, authMiddleware fursy.HandlerFunc) {
 	// Public routes
-	r.Handle("POST", "/api/auth/register", api.register)
-	r.Handle("POST", "/api/auth/login", api.login)
+	authGroup := r.Group("/api/auth")
+	authGroup.POST("/login", api.login)
+	authGroup.POST("/register", api.register)
 
 	// Protected routes
 	protected := r.Group("/api")
 	protected.Use(authMiddleware)
 	{
-		protected.Handle("GET", "/users/me", api.getProfile)
-		protected.Handle("PUT", "/users/me", api.updateProfile)
-		protected.Handle("POST", "/users/me/password", api.changePassword)
+		protected.GET("/users/me", api.getProfile)
+		protected.PUT("/users/me", api.updateProfile)
+		protected.POST("/users/me/password", api.changePassword)
 
 		// Admin routes (with role middleware)
 		admin := protected.Group("/users")
 		admin.Use(auth.RequireRole("admin"))
 		{
-			admin.Handle("GET", "", api.listUsers)
-			admin.Handle("POST", "/:id/ban", api.banUser)
-			admin.Handle("POST", "/:id/promote", api.promoteToAdmin)
+			admin.GET("", api.listUsers)
+			admin.POST("/:id/ban", api.banUser)
+			admin.POST("/:id/promote", api.promoteToAdmin)
 		}
 	}
 }
 
 // register handles user registration.
-func (api *API) register(c *fursy.Context) error {
-	var req RegisterRequest
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error()))
-	}
-
-	user, err := api.service.Register(c.Request.Context(), req)
+func (api *API) register(c *fursy.Box[RegisterRequest, UserResponse]) error {
+	user, err := api.service.Register(c.Request.Context(), *c.ReqBody)
 	if err != nil {
-		return MapError(c, err)
+		return MapError(c.Context, err)
 	}
 
-	resp := ToResponse(user)
-	return c.JSON(http.StatusCreated, resp)
+	// Todo: fix this dummy url.
+	return c.Created("/api/users/me", ToResponse(user))
 }
 
 // login handles user login.
-func (api *API) login(c *fursy.Context) error {
-	var req LoginRequest
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error()))
-	}
-
-	token, err := api.service.Login(c.Request.Context(), req)
+func (api *API) login(c *fursy.Box[LoginRequest, LoginResponse]) error {
+	token, err := api.service.Login(c.Request.Context(), *c.ReqBody)
 	if err != nil {
-		return MapError(c, err)
+		return MapError(c.Context, err)
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{
-		"token": token,
-	})
+	return c.OK(LoginResponse{Token: token})
 }
 
 // getProfile retrieves current user profile.
-func (api *API) getProfile(c *fursy.Context) error {
+func (api *API) getProfile(c *fursy.Box[fursy.Empty, UserResponse]) error {
 	// Get user ID from JWT claims (set by auth middleware)
 	userID := auth.GetUserID(c.Request.Context())
 
 	user, err := api.service.GetProfile(c.Request.Context(), userID)
 	if err != nil {
-		return MapError(c, err)
+		return MapError(c.Context, err)
 	}
 
-	resp := ToResponse(user)
-	return c.JSON(http.StatusOK, resp)
+	return c.OK(ToResponse(user))
 }
 
 // updateProfile updates current user profile.
-func (api *API) updateProfile(c *fursy.Context) error {
+func (api *API) updateProfile(c *fursy.Box[UpdateProfileRequest, UserResponse]) error {
 	userID := auth.GetUserID(c.Request.Context())
 
-	var req UpdateProfileRequest
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error()))
-	}
-
-	user, err := api.service.UpdateProfile(c.Request.Context(), userID, req)
+	user, err := api.service.UpdateProfile(c.Request.Context(), userID, *c.ReqBody)
 	if err != nil {
-		return MapError(c, err)
+		return MapError(c.Context, err)
 	}
 
-	resp := ToResponse(user)
-	return c.JSON(http.StatusOK, resp)
+	return c.OK(ToResponse(user))
 }
 
 // changePassword changes current user password.
-func (api *API) changePassword(c *fursy.Context) error {
+func (api *API) changePassword(c *fursy.Box[ChangePasswordRequest, MessageResponse]) error {
 	userID := auth.GetUserID(c.Request.Context())
 
-	var req ChangePasswordRequest
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid Request: " + err.Error()))
-	}
-
-	err := api.service.ChangePassword(c.Request.Context(), userID, req)
+	err := api.service.ChangePassword(c.Request.Context(), userID, *c.ReqBody)
 	if err != nil {
-		return MapError(c, err)
+		return MapError(c.Context, err)
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{
-		"message": "Password changed successfully",
-	})
+	return c.OK(MessageResponse{Message: "Password changed successfully"})
 }
 
 // listUsers lists all users (admin only).
-func (api *API) listUsers(c *fursy.Context) error {
+func (api *API) listUsers(c *fursy.Box[fursy.Empty, ListUsersResponse]) error {
 	// Parse pagination from query params
 	offset, _ := strconv.Atoi(c.Query("offset"))
 	if offset == 0 {
@@ -142,7 +115,7 @@ func (api *API) listUsers(c *fursy.Context) error {
 
 	users, total, err := api.service.ListUsers(c.Request.Context(), offset, limit)
 	if err != nil {
-		return MapError(c, err)
+		return MapError(c.Context, err)
 	}
 
 	// Convert to response DTOs
@@ -151,38 +124,29 @@ func (api *API) listUsers(c *fursy.Context) error {
 		resp[i] = ToResponse(user)
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"users":  resp,
-		"total":  total,
-		"offset": offset,
-		"limit":  limit,
-	})
+	return c.OK(ListUsersResponse{Limit: limit, Offset: offset, Total: total, Users: resp})
 }
 
 // banUser bans a user (admin only).
-func (api *API) banUser(c *fursy.Context) error {
+func (api *API) banUser(c *fursy.Box[fursy.Empty, MessageResponse]) error {
 	userID := c.Param("id")
 
 	err := api.service.BanUser(c.Request.Context(), userID)
 	if err != nil {
-		return MapError(c, err)
+		return MapError(c.Context, err)
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{
-		"message": "User banned successfully",
-	})
+	return c.OK(MessageResponse{Message: "User banned successfully"})
 }
 
 // promoteToAdmin promotes a user to admin (admin only).
-func (api *API) promoteToAdmin(c *fursy.Context) error {
+func (api *API) promoteToAdmin(c *fursy.Box[fursy.Empty, MessageResponse]) error {
 	userID := c.Param("id")
 
 	err := api.service.PromoteToAdmin(c.Request.Context(), userID)
 	if err != nil {
-		return MapError(c, err)
+		return MapError(c.Context, err)
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{
-		"message": "User promoted to admin successfully",
-	})
+	return c.OK(MessageResponse{Message: "User promoted to admin successfully"})
 }

@@ -11,6 +11,7 @@ import (
 
 	"example.com/production-boilerplate/internal/shared/auth"
 	"github.com/coregx/fursy"
+	"github.com/coregx/fursy/plugins/validator"
 )
 
 // mockService is a mock implementation of Service for API testing.
@@ -84,6 +85,7 @@ func (m *mockService) PromoteToAdmin(ctx context.Context, userID string) error {
 // setupTestRouter creates a router with basic test routes (skip admin to avoid route conflicts in tests).
 func setupTestRouter(api *API) *fursy.Router {
 	router := fursy.New()
+	router.SetValidator(validator.New())
 	jwtSvc := auth.NewJWTService([]byte("test-secret"), 24*time.Hour)
 
 	// Auth middleware
@@ -113,16 +115,16 @@ func setupTestRouter(api *API) *fursy.Router {
 	}
 
 	// Register only public and basic protected routes (skip admin routes due to route conflicts)
-	router.Handle("POST", "/api/auth/register", api.register)
-	router.Handle("POST", "/api/auth/login", api.login)
+	router.POST("/api/auth/register", api.register)
+	router.POST("/api/auth/login", api.login)
 
 	// Protected routes
 	protected := router.Group("/api")
 	protected.Use(authMiddleware)
 	{
-		protected.Handle("GET", "/users/me", api.getProfile)
-		protected.Handle("PUT", "/users/me", api.updateProfile)
-		protected.Handle("POST", "/users/me/password", api.changePassword)
+		protected.GET("/users/me", api.getProfile)
+		protected.PUT("/users/me", api.updateProfile)
+		protected.POST("/users/me/password", api.changePassword)
 	}
 
 	return router
@@ -181,8 +183,8 @@ func TestAPI_Register(t *testing.T) {
 			payload:        "invalid json",
 			wantStatusCode: http.StatusBadRequest,
 			checkBody: func(t *testing.T, body string) {
-				if !contains(body, "Invalid Request") {
-					t.Errorf("Response should contain 'Invalid Request', got: %s", body)
+				if !contains(body, "Bad Request") {
+					t.Errorf("Response should contain 'Bad Request', got: %s", body)
 				}
 			},
 		},

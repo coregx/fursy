@@ -27,9 +27,9 @@ import (
 	"example.com/production-boilerplate/internal/shared/auth"
 	"example.com/production-boilerplate/internal/shared/database"
 	"example.com/production-boilerplate/internal/user"
-
 	"github.com/coregx/fursy"
 	"github.com/coregx/fursy/middleware"
+	"github.com/coregx/fursy/plugins/validator"
 	"github.com/coregx/stream/sse"
 	"github.com/coregx/stream/websocket"
 )
@@ -80,6 +80,7 @@ func main() {
 
 	// Create fursy router
 	router := fursy.New()
+	router.SetValidator(validator.New())
 
 	// Global middleware
 	router.Use(middleware.Logger())
