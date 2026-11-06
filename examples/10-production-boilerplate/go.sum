@@ -1,5 +1,3 @@
-github.com/coregx/fursy/plugins/validator v0.0.0-20261009142955-d351afa6d304 h1:yZdEP2s9ElaAfqI1xoZcQJ5txRNX4bt/4y957sG8FC4=
-github.com/coregx/fursy/plugins/validator v0.0.0-20261009142955-d351afa6d304/go.mod h1:33Dupt3UTLRMQDKAHhGdBR8Qkm7VSXLyg8MXSJAozBA=
 github.com/coregx/stream v0.1.4 h1:MQE88pkvuFBlFkrtogk1X39CZJG8oE+avkx3+Y5GJq4=
 github.com/coregx/stream v0.1.4/go.mod h1:Nv8tdDu8yQ8jK7ctayRkXdmk3TMX1sS8En2qg0Izz7A=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

@@ -24,6 +24,10 @@ const (
 
 // NewNotification creates a new notification.
 func NewNotification(userID, message string, notifType NotificationType) *Notification {
+	if notifType == "" {
+		notifType = NotificationTypeInfo // default value
+	}
+
 	return &Notification{
 		ID:        generateID(),
 		UserID:    userID,

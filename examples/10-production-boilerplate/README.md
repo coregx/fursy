@@ -63,12 +63,13 @@ This is a **reference implementation** of a production-ready REST API showcasing
 │   │   ├── entity.go              # User entity (RICH MODEL)
 │   │   ├── repository.go          # Data access interface + impl
 │   │   ├── service.go             # Business logic / use cases
-│   │   ├── api.go                 # HTTP handlers
-│   │   └── validation.go          # Request validation
+│   │   ├── api.go                 # HTTP handlers (generic Box[Req, Res])
+│   │   └── dto.go                 # Request/response DTOs (validate tags)
 │   │
 │   ├── notification/               # Notification bounded context
 │   │   ├── entity.go
 │   │   ├── service.go
+│   │   ├── dto.go                 # Request/response DTOs
 │   │   └── api.go                 # SSE handler
 │   │
 │   ├── chat/                       # Chat bounded context

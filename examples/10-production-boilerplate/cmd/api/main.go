@@ -97,12 +97,12 @@ func main() {
 
 	// API documentation endpoint
 	router.Handle("GET", "/", func(c *fursy.Context) error {
-		return c.JSON(http.StatusOK, map[string]interface{}{
+		return c.JSON(http.StatusOK, map[string]any{
 			"name":    "Production Boilerplate API",
 			"version": "1.0.0",
 			"docs":    "/api/docs",
 			"health":  "/health",
-			"endpoints": map[string]interface{}{
+			"endpoints": map[string]any{
 				"auth": map[string]string{
 					"register": "POST /api/auth/register",
 					"login":    "POST /api/auth/login",

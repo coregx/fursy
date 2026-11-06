@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/coregx/fursy v0.7.0
-	github.com/coregx/fursy/plugins/validator v0.0.0-20261009142955-d351afa6d304
+	github.com/coregx/fursy/plugins/validator v0.0.0
 	github.com/coregx/stream v0.1.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
@@ -34,3 +34,5 @@ require (
 replace github.com/coregx/fursy => ../..
 
 replace github.com/coregx/fursy/plugins/database => ../../plugins/database
+
+replace github.com/coregx/fursy/plugins/validator => ../../plugins/validator

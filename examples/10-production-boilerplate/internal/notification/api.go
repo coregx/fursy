@@ -1,9 +1,6 @@
 package notification
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"github.com/coregx/fursy"
 	"github.com/coregx/stream/sse"
 )
@@ -27,13 +24,13 @@ func (api *API) RegisterRoutes(r *fursy.Router, authMiddleware fursy.HandlerFunc
 	protected := r.Group("/api")
 	protected.Use(authMiddleware)
 	{
-		protected.Handle("GET", "/notifications/stream", api.stream)
-		protected.Handle("POST", "/notifications/broadcast", api.broadcast)
+		protected.GET("/notifications/stream", api.stream)
+		protected.POST("/notifications/broadcast", api.broadcast)
 	}
 }
 
 // stream handles SSE notification stream.
-func (api *API) stream(c *fursy.Context) error {
+func (api *API) stream(c *fursy.Box[fursy.Empty, fursy.Empty]) error {
 	// Upgrade to SSE connection
 	conn, err := sse.Upgrade(c.Response, c.Request)
 	if err != nil {
@@ -50,29 +47,10 @@ func (api *API) stream(c *fursy.Context) error {
 }
 
 // broadcast broadcasts notification to all connected clients (admin only).
-func (api *API) broadcast(c *fursy.Context) error {
-	var req struct {
-		Message string           `json:"message"`
-		Type    NotificationType `json:"type"`
-	}
-
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		return c.Problem(fursy.BadRequest("Invalid request: " + err.Error()))
-	}
-
-	if req.Message == "" {
-		return c.Problem(fursy.BadRequest("Message is required"))
-	}
-
-	if req.Type == "" {
-		req.Type = NotificationTypeInfo
-	}
-
-	if err := api.service.Broadcast(req.Message, req.Type); err != nil {
+func (api *API) broadcast(c *fursy.Box[BroadcastRequest, MessageResponse]) error {
+	if err := api.service.Broadcast(c.ReqBody.Message, c.ReqBody.Type); err != nil {
 		return c.Problem(fursy.InternalServerError("Broadcast failed: " + err.Error()))
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{
-		"message": "Notification broadcasted successfully",
-	})
+	return c.OK(MessageResponse{Message: "Notification broadcasted successfully"})
 }
