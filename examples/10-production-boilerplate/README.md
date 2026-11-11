@@ -475,7 +475,7 @@ DATABASE_DSN=./data/app.db
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
 JWT_EXPIRATION=24h
 
-# CORS
+# CORS (comma-separated allowed origins; "*" allows any origin)
 CORS_ORIGINS=http://localhost:3000,http://localhost:8080
 ```
 
