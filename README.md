@@ -134,10 +134,12 @@ router.ServeOpenAPI("/openapi.json")
 
 ### Production-Ready Performance
 
-- **~53 ns/op** static routes, **~75 ns/op** parametric routes
-- **0 allocations/op** (zero-allocation routing)
+- **Zero allocations per request** (zero-allocation routing)
+- **Sub-microsecond routing** for static and parametric routes
 - Zero-allocation radix tree routing
 - Efficient context pooling
+
+Measured example: **142 ns/op** static and **213 ns/op** parametric, **0 B/op**, on a 12th Gen Intel i7-1255U (go1.27.4, 2026-11-11). Routing time depends on the hardware; run `go test -bench=BenchmarkRouter -benchmem ./` for your own numbers.
 
 ---
 
@@ -153,7 +155,7 @@ go get github.com/coregx/fursy
 
 ## 🚀 Features
 
-- ✅ **High Performance Routing** - ~53 ns/op static, ~75 ns/op parametric, 0 alloc/op
+- ✅ **High Performance Routing** - sub-microsecond routing, 0 allocations/op
 - ✅ **Type-Safe Generic Methods** - `router.POST()` with Box[Req, Res] and Go 1.27 type inference
 - ✅ **Automatic Validation** - Set once, validate everywhere with 100+ tags
 - ✅ **Content Negotiation** - RFC 9110 compliant, AI agent support
