@@ -1,436 +1,242 @@
 # fursy - AI Agent Guide
 
-> **DEFINITIVE GUIDE** for AI agents (Claude, ChatGPT, Copilot, etc.) working on fursy HTTP router project.
->
-> **Project**: fursy - Fast Universal Routing SYstem
-> **Version**: see CHANGELOG.md for current version
-> **Go**: 1.27+ (uses generic methods on concrete types)
-> **Status**: Phase 4 (Ecosystem)
+> **Module**: `github.com/coregx/fursy`
+> **Go**: 1.27+ (generic methods on concrete types)
+> **License**: MIT
+> **Current version**: `CHANGELOG.md` is the source of truth. This repository may be ahead of the latest tag (the `Unreleased` section lists merged but unreleased work), so do not hardcode a version in code or docs.
+
+This file is the public, machine-oriented guide to the fursy HTTP router. It describes the code in this repository, not a roadmap. Every API name and number below was checked against the source or produced by the commands shown next to it.
 
 ---
 
 ## Table of Contents
 
 1. [Project Overview](#project-overview)
-2. [Critical Files to Read First](#critical-files-to-read-first)
-3. [Architecture](#architecture)
-4. [Project Structure](#project-structure)
-5. [Core Concepts](#core-concepts)
-6. [Quick Start for AI Agents](#quick-start-for-ai-agents)
-7. [Development Standards](#development-standards)
-8. [Testing Requirements](#testing-requirements)
-9. [Git Workflow](#git-workflow)
-10. [Middleware](#middleware)
-11. [Examples](#examples)
-12. [Comparison with Other Routers](#comparison-with-other-routers)
-13. [Key Files Reference](#key-files-reference)
-14. [Performance Metrics](#performance-metrics)
-15. [Common Gotchas](#common-gotchas)
-16. [Contributing Guidelines](#contributing-guidelines)
+2. [Measured Repository State](#measured-repository-state)
+3. [Repository Layout](#repository-layout)
+4. [Critical Files](#critical-files)
+5. [Quick Start](#quick-start)
+6. [Core Concepts](#core-concepts)
+7. [Routing API](#routing-api)
+8. [Request Binding and Validation](#request-binding-and-validation)
+9. [Error Handling with RFC 9457](#error-handling-with-rfc-9457)
+10. [OpenAPI 3.1 Generation](#openapi-31-generation)
+11. [Middleware](#middleware)
+12. [Plugins](#plugins)
+13. [Examples](#examples)
+14. [Testing and Quality Gates](#testing-and-quality-gates)
+15. [Git and Contribution Workflow](#git-and-contribution-workflow)
+16. [Common Gotchas](#common-gotchas)
+17. [Key Files Reference](#key-files-reference)
+18. [Summary for AI Agents](#summary-for-ai-agents)
 
 ---
 
 ## Project Overview
 
-**FURSY** is a next-generation HTTP router for Go 1.27+ that combines blazing performance with modern features:
+fursy (Fast Universal Routing SYstem) is an HTTP router for Go 1.27+ with two handler styles:
 
-### Key Features
+- **Plain handlers** registered with `router.Handle(method, path, handler)`. They receive `*fursy.Context`.
+- **Type-safe handlers** registered with `router.GET`, `router.POST`, `router.PUT`, `router.DELETE`, `router.PATCH`, `router.HEAD`, `router.OPTIONS`. They receive `*fursy.Box[Req, Res]`; Go 1.27 infers `Req` and `Res` from the handler signature.
 
-- **Type-Safe Generic Methods**: `router.POST()` with `Box[Req, Res]` — Go 1.27 generic methods with type inference (FIRST in Go!)
-- **RFC 9457 Problem Details**: Standardized error responses built-in
-- **OpenAPI 3.1 Generation**: Automatic API documentation from code
-- **Minimal Dependencies**: Core = stdlib only, middleware = 2 dependencies (JWT, RateLimit)
-- **Zero-Allocation Routing**: ~53 ns/op, 0 alloc/op (production-ready performance)
-- **Production Middleware**: 8 built-in middleware (Logger, Recovery, CORS, BasicAuth, JWT, RateLimit, CircuitBreaker, Secure)
-- **Content Negotiation**: RFC 9110 compliant with AI agent support (Markdown responses)
+The same split exists on `*RouteGroup`.
 
-### Current Status (2025-11-17)
+### Main capabilities
 
-- **Version**: v0.2.0 (Documentation & Examples release)
-- **Phase**: Phase 3 Complete ✅ (Foundation, API Excellence, Production Features)
-- **Next Phase**: Phase 4 - Ecosystem (documentation, community, plugins)
-- **Coverage**: 88.9% core (exceeds >85% target)
-- **Linter**: 0 issues (golangci-lint strict mode)
-- **Tests**: 150+ test functions, 19 benchmarks
-- **Performance**: ~53 ns/op static, ~75 ns/op parametric, 0 alloc/op
+| Capability | Public API | Notes |
+|---|---|---|
+| Radix tree routing | `Router.Handle`, `Router.GET`-style methods | Static, `:param`, and `*catchAll` segments. No regex constraints. |
+| Type-safe request/response | `Box[Req, Res]`, `Handler[Req, Res]` | Request body is bound and optionally validated before the handler runs. |
+| RFC 9457 errors | `Problem`, `NotFound`, `BadRequest`, `ValidationProblem`, ... | Default error format for router and middleware errors (`application/problem+json`). |
+| OpenAPI 3.1 | `Router.GenerateOpenAPI`, `Router.ServeOpenAPI`, `RouteOptions` | Schemas inferred from `Box[Req, Res]`; named components and `$ref`; deterministic `operationId`. |
+| Route groups | `Router.Group`, `RouteGroup.Group`, `RouteGroup.Use` | Nested prefixes and middleware inheritance. |
+| Nine middleware | package `middleware` | Logger, Recovery, CORS, BasicAuth, JWT, RateLimit, CircuitBreaker, Secure, Timeout. |
+| Content negotiation | `Context.Negotiate`, `Context.NegotiateFormat`, `Context.Accepts` | RFC 9110 quality values. `Negotiate` renders JSON, XML, and plain text. |
+| API versioning | `Version`, `RequireVersion`, `DeprecateVersion`, `Context.APIVersion` | Header or URL-path version extraction; RFC 8594 deprecation headers. |
+| Graceful shutdown | `OnShutdown`, `Shutdown`, `ListenAndServeWithShutdown`, `SetServer` | Drains connections, then runs callbacks in reverse order. |
+| Body limits | `SetMaxBodySize`, `MaxBodySize` | Default 4 MiB; applies to plain and generic handlers. |
+| Plugins | `plugins/validator`, `plugins/opentelemetry`, `plugins/stream`, `plugins/database` | Separate Go modules. |
 
-### Production Ready
+### Dependencies
 
-- All core features complete
-- Comprehensive test coverage
-- Zero linter issues
-- Performance validated
-- Ready for production use
+The root module requires only two external modules (`go.mod`):
 
----
+- `github.com/golang-jwt/jwt/v5` for JWT middleware.
+- `golang.org/x/time` for rate limiting.
 
-## Critical Files to Read First
-
-**IMPORTANT**: Always read these files in this order when starting work:
-
-### 1. `.claude/STATUS.md` ⭐ HIGHEST PRIORITY
-
-**Why**: Contains current project status, active tasks, metrics, and known issues.
-
-**What's inside**:
-- Current phase and progress (Phase 3 Complete, Phase 4 Ready)
-- Active tasks (currently: documentation and examples)
-- Test coverage (88.9%)
-- Performance metrics (53 ns/op, 0 alloc)
-- Recent updates (rebranding FURY → fursy)
-- Kanban status (25 done, 32 in backlog)
-
-**Read it**: `D:\projects\coregx\fursy\.claude\STATUS.md`
-
-### 2. `.claude/LINTER_RULES.md` 🔍 BEFORE WRITING CODE
-
-**Why**: Prevents repeating common linter errors. Code MUST pass `golangci-lint run` with 0 issues!
-
-**What's inside**:
-- 8-point checklist for pre-commit validation
-- 31 common linter errors with fixes
-- Real examples from radix tree implementation
-- Quick reference for gocritic, godot, revive, staticcheck, unparam
-
-**Critical rules**:
-- Use `s == ""` instead of `len(s) == 0` (gocritic)
-- All comments must end with period (godot)
-- Add package comment to every file (revive)
-- No if-else after return (indent-error-flow)
-- Use `errors.Is()` for error comparison (errorlint)
-
-**Read it**: `D:\projects\coregx\fursy\.claude\LINTER_RULES.md`
-
-### 3. `.claude/CLAUDE.md` 📖 PROJECT CONFIGURATION
-
-**Why**: Complete project configuration and standards for AI agents.
-
-**What's inside**:
-- Project vision and goals
-- Architecture decisions
-- Technical requirements
-- Workflow and processes
-- Kanban organization
-
-**Read it**: `D:\projects\coregx\fursy\.claude\CLAUDE.md`
-
-### 4. `README.md` 📚 PUBLIC DOCUMENTATION
-
-**Why**: User-facing documentation showing what fursy does and how to use it.
-
-**Read it**: `D:\projects\coregx\fursy\README.md`
+Routing, context, groups, errors, OpenAPI, negotiation, and the other seven middleware use the standard library.
 
 ---
 
-## Architecture
+## Measured Repository State
 
-### Radix Tree Routing Engine
+The values below were produced in this checkout with Go 1.27.4 on Windows/amd64. Re-run the commands before quoting them; hardware and Go versions change nanoseconds.
 
-**Location**: `internal/radix/`
+### Tests and coverage
 
-**What it does**: High-performance routing using radix tree algorithm (inspired by httprouter).
-
-**Features**:
-- Zero-allocation parameter extraction
-- Supports: static paths, named params (`:id`), wildcards (`*path`)
-- Optional regex constraints: `/users/:id(\\d+)`
-- O(log n) lookup complexity
-- 87.9% test coverage
-
-**Performance**: ~53 ns/op (static), ~75 ns/op (parametric), 0 alloc/op
-
-### Generic Type-Safe Methods (Go 1.27+)
-
-**Innovation**: First Go router with generic methods on concrete types. Go 1.27 enables generic methods, and fursy is the first router to use this for compile-time type safety.
-
-**Traditional approach** (Gin, Echo, Fiber):
-```go
-func CreateUser(c *gin.Context) {
-    var req CreateUserRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": err.Error()})
-        return
-    }
-    // Manual validation needed for every field!
-}
+```bash
+go test -cover ./...
 ```
 
-**fursy approach** (type-safe generic methods):
-```go
-// Type parameters are inferred from the handler signature — no explicit [Req,Res] needed!
-router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-    // box.ReqBody is automatically bound, validated, and type-safe!
-    user := createUser(box.ReqBody)
-    return box.Created("/users/"+user.ID, user)
-})
+| Package | Coverage |
+|---|---|
+| `github.com/coregx/fursy` (root) | 94.0% |
+| `github.com/coregx/fursy/internal/binding` | 93.5% |
+| `github.com/coregx/fursy/internal/negotiate` | 88.0% |
+| `github.com/coregx/fursy/internal/radix` | 89.0% |
+| `github.com/coregx/fursy/middleware` | 95.6% |
 
-// For plain handlers without typed bodies, use Handle():
-router.Handle("GET", "/health", func(c *fursy.Context) error {
-    return c.Text("OK")
-})
+Top-level test functions and benchmark/fuzz counts for the root module (plugins and examples are separate modules and are not included):
+
+```bash
+go test -list '^Test' ./... | grep -c '^Test'   # 501
+grep -rh '^func Benchmark' --include='*_test.go' . | wc -l   # 22
+grep -rh '^func Fuzz' --include='*_test.go' . | wc -l        # 2
 ```
 
-**Key types**:
-```go
-// Generic context
-type Box[Req, Res any] struct {
-    *Context          // Embedded base context
-    ReqBody *Req      // Automatically bound and validated request body
-    ResBody *Res      // Response to serialize
-}
+The fuzz targets are `FuzzRadixLookup` and `FuzzRoutePattern` in `internal/radix`.
 
-// Generic handler
-type Handler[Req, Res any] func(*Box[Req, Res]) error
+### Routing performance
+
+```bash
+go test -run '^$' -bench 'BenchmarkRouter_StaticRoute|BenchmarkRouter_ParameterRoute' -benchmem ./
 ```
 
-### Middleware Pipeline
+Measured output (12th Gen Intel i7-1255U, Go 1.27.4):
 
-**Pattern**: Express-like `Next()/Abort()` pattern.
-
-**Architecture**:
-```go
-type HandlerFunc func(*Context) error
-
-func Middleware() HandlerFunc {
-    return func(c *Context) error {
-        // Before handler
-        start := time.Now()
-
-        // Call next middleware/handler
-        err := c.Next()
-
-        // After handler (can access response)
-        duration := time.Since(start)
-
-        return err
-    }
-}
+```
+BenchmarkRouter_StaticRoute-12                      7048299    142.2 ns/op    0 B/op    0 allocs/op
+BenchmarkRouter_ParameterRoute-12                   9155196    213.5 ns/op    0 B/op    0 allocs/op
+BenchmarkRouter_ParameterRoute_MultipleParams-12    5002125    210.5 ns/op    0 B/op    0 allocs/op
 ```
 
-**Execution flow**:
-1. Router receives request
-2. Middleware chain executes (pre-processing)
-3. Route handler executes
-4. Middleware chain unwinds (post-processing)
-5. Response sent
-
-**Optimization**: Pre-allocated middleware chain buffer (no allocations).
-
-### RFC 9457 Problem Details
-
-**Standard error format** built into fursy:
-
-```go
-type Problem struct {
-    Type       string         `json:"type"`
-    Title      string         `json:"title"`
-    Status     int            `json:"status"`
-    Detail     string         `json:"detail,omitempty"`
-    Instance   string         `json:"instance,omitempty"`
-    Extensions map[string]any `json:"-"`  // Additional fields
-}
-```
-
-**Example response**:
-```json
-{
-  "type": "about:blank",
-  "title": "Validation Failed",
-  "status": 422,
-  "detail": "3 field(s) failed validation",
-  "errors": {
-    "name": "Name must be at least 3 characters",
-    "email": "Email must be a valid email address",
-    "age": "Age must be 18 or greater"
-  }
-}
-```
-
-**Why RFC 9457?**
-- Standardized across all APIs
-- Machine-readable error types
-- Consistent structure
-- Extension support for custom fields
-
-### OpenAPI 3.1 Generation
-
-**Automatic generation** from code:
-
-```go
-// Configure API metadata once.
-router.WithInfo(fursy.Info{
-    Title:       "My API",
-    Version:     "1.0.0",
-    Description: "API description",
-})
-
-// Document type-safe handlers inline; schemas are inferred from Box[Req, Res].
-router.POST("/users", createUser, &fursy.RouteOptions{
-    Summary:       "Create user",
-    Tags:          []string{"users"},
-    SuccessStatus: 201,
-})
-
-// Serve the generated spec at GET /openapi.json.
-router.ServeOpenAPI("/openapi.json")
-```
-
-**How it works**:
-- Introspects route definitions
-- Extracts types from generic handlers `Box[Req, Res]`
-- Generates schemas from struct tags
-- Includes validation rules
-- Produces JSON/YAML spec
-
-### Content Negotiation (RFC 9110)
-
-**Automatic format selection** based on `Accept` header:
-
-```go
-router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
-    user := getUser(c.Param("id"))
-    // Automatically picks JSON/HTML/XML/Markdown based on Accept header
-    return c.Negotiate(200, user)
-})
-```
-
-**Supported formats**:
-- JSON (`application/json`) - default
-- HTML (`text/html`) - web browsers
-- XML (`application/xml`) - legacy systems
-- Plain text (`text/plain`)
-- Markdown (`text/markdown`) - AI agents
-
-**Quality values** (q-parameter):
-```
-Accept: text/html;q=0.9, application/json;q=1.0
-// fursy automatically picks JSON (higher q-value)
-```
+The important invariant is **0 allocs/op** on these paths. Nanoseconds are environment-specific; never present them as a fixed guarantee.
 
 ---
 
-## Project Structure
+## Repository Layout
 
 ```
 fursy/
-├── .claude/                        # AI configuration (PRIVATE)
-│   ├── CLAUDE.md                  # Project config ⭐
-│   ├── STATUS.md                  # Current status ⭐⭐
-│   └── LINTER_RULES.md            # Linter checklist ⭐
+├── router.go              # Router: registration, lookup, ServeHTTP, shutdown
+├── context.go             # Context: request/response helpers, params, middleware chain
+├── box.go                 # Box[Req, Res]: type-safe context, binding, typed responses
+├── handler_generic.go     # Handler[Req, Res] and the generic-to-plain adapter
+├── group.go               # RouteGroup: prefixes, nested groups, middleware
+├── problem.go             # RFC 9457 Problem and constructors
+├── error.go               # Common HTTP error values
+├── openapi.go             # OpenAPI 3.1 document and schema generation
+├── route_info.go          # RouteInfo/RouteOptions metadata
+├── validation.go          # Validator interface and ValidationErrors
+├── version.go             # API version type, parsing, version middleware
+├── middleware.go          # HandlerFunc and middleware chain types
+├── mime.go                # MIME constants
+├── empty.go               # Empty request/response marker type
 │
-├── docs/
-│   ├── PERFORMANCE.md             # Performance benchmarks
-│   └── dev/                       # PRIVATE (in .gitignore)
-│       ├── 00_PROJECT_VISION.md
-│       ├── 02_TECHNICAL_ARCHITECTURE.md
-│       ├── 03_API_SPECIFICATION.md
-│       ├── 04_IMPLEMENTATION_PLAN.md
-│       └── kanban/                # Task management
+├── internal/
+│   ├── radix/             # Radix tree engine (tree.go, node.go)
+│   ├── binding/           # Body binding (JSON, XML, form, multipart)
+│   └── negotiate/         # Accept header parsing and q-value selection
 │
-├── internal/                       # Internal implementation (NOT in Go Docs)
-│   ├── radix/                     # Radix tree routing (87.9% coverage)
-│   │   ├── tree.go               # Main tree implementation
-│   │   ├── node.go               # Tree nodes
-│   │   └── tree_test.go
-│   ├── binding/                   # Request binding utilities
-│   └── negotiate/                 # Content negotiation
+├── middleware/            # Nine flat middleware implementations
+│   ├── logger.go
+│   ├── recovery.go
+│   ├── cors.go
+│   ├── basicauth.go
+│   ├── jwt.go
+│   ├── ratelimit.go
+│   ├── circuitbreaker.go
+│   ├── secure.go
+│   └── timeout.go
 │
-├── middleware/                     # Built-in middleware (8 total)
-│   ├── logger.go                  # log/slog logging (zero deps)
-│   ├── recovery.go                # Panic recovery (zero deps)
-│   ├── cors.go                    # CORS headers (zero deps)
-│   ├── basicauth.go               # Basic Auth (zero deps)
-│   ├── jwt.go                     # JWT auth (golang-jwt/jwt dep)
-│   ├── ratelimit.go               # Rate limiting (x/time dep)
-│   ├── circuitbreaker.go          # Circuit breaker (zero deps, 95.5%)
-│   └── secure.go                  # Security headers (zero deps, 100%)
+├── plugins/               # Separate Go modules
+│   ├── validator/
+│   ├── opentelemetry/
+│   ├── stream/
+│   └── database/
 │
-├── plugins/                        # Optional plugins (separate modules)
-│   ├── opentelemetry/             # OpenTelemetry tracing + metrics
-│   │   ├── middleware.go         # Tracing middleware (92% coverage)
-│   │   ├── metrics.go            # Metrics middleware (89.9% coverage)
-│   │   ├── go.mod                # Separate module
-│   │   └── README.md
-│   └── validator/                 # go-playground/validator integration
-│       ├── validator.go          # Validator plugin (94.3% coverage)
-│       ├── go.mod                # Separate module
-│       └── README.md
+├── examples/
+│   ├── 01-hello-world/ ... 10-production-boilerplate/
+│   └── validation/01-basic ... 06-production/
 │
-├── examples/                       # Usage examples
-│   ├── 01-hello-world/           # Basic routing
-│   ├── 02-rest-api-crud/         # Full CRUD API
-│   ├── 04-content-negotiation/   # Multi-format responses
-│   ├── 05-middleware/            # Middleware usage
-│   └── validation/               # 6 validation examples
-│       ├── 01-basic/
-│       ├── 02-rest-api-crud/
-│       ├── 03-custom-validator/
-│       ├── 04-nested-structs/
-│       ├── 05-custom-messages/
-│       └── 06-production/
-│
-├── Core files (public API - what users see in Go Docs)
-├── router.go                      # Main Router type
-├── context.go, context_base.go   # Non-generic Context
-├── context_generic.go             # Generic Box[Req, Res]
-├── handler.go, handler_generic.go # Handler types
-├── group.go                       # Route groups
-├── error.go, problem.go           # RFC 9457 errors
-├── openapi.go                     # OpenAPI generation
-├── validation.go                  # Request validation
-├── negotiate.go                   # Content negotiation
-├── version.go                     # API versioning
-│
-├── README.md                      # Public documentation
-├── go.mod                         # Module definition
-├── .gitignore
-└── llms.md                        # This file
+├── docs/PERFORMANCE.md
+├── README.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── ROADMAP.md
+├── SECURITY.md
+├── llms.txt
+└── go.mod
 ```
 
-### Key Directories
+`docs/dev/`, `.claude/`, and `tmp/` are gitignored private directories. If present in a working checkout they may contain internal notes, but they are not part of the published repository. Do not link to them from public docs.
 
-**`.claude/`** (PRIVATE):
-- AI agent configuration
-- Current status and metrics
-- Linter rules and checklist
-- NOT committed to git
+### Architecture rule
 
-**`internal/`**:
-- Implementation details
-- NOT visible in Go Docs
-- NOT importable by external packages
-- Contains radix tree, binding, negotiation logic
-
-**`middleware/`**:
-- 8 built-in middleware
-- 4 zero-dependency (logger, recovery, cors, basicauth)
-- 2 minimal deps (jwt, ratelimit)
-- 2 advanced (circuitbreaker, secure)
-
-**`plugins/`**:
-- Optional extensions
-- Separate Go modules
-- Can have dependencies
-- OpenTelemetry, Validator
-
-**`examples/`**:
-- 11 complete examples
-- Progressive complexity
-- Runnable code
-- Full documentation
+The root package is the public API and wraps `internal/`. External modules cannot import `github.com/coregx/fursy/internal/...`; only code inside the fursy module can. Keep implementation details behind the root package and the `middleware` package.
 
 ---
 
-## Core Concepts
+## Critical Files
 
-### 1. Type-Safe Generic Methods with Box[Req, Res]
+Read these first when working on the repository:
 
-**Problem**: Traditional routers have no compile-time type safety.
+1. `README.md` - user-facing overview and examples.
+2. `CHANGELOG.md` - released and unreleased changes; the only authoritative version source.
+3. `go.mod` - Go version and allowed core dependencies.
+4. `CONTRIBUTING.md` - GitHub Flow, commit style, quality gates.
+5. `llms.txt` - this guide.
+6. `examples/` - runnable, copy-pasteable usage.
+7. `plugins/*/README.md` - per-plugin APIs.
+8. `docs/PERFORMANCE.md` - benchmark narrative.
 
-**Solution**: Go 1.27 generic methods with `Box[Req, Res]` and type inference.
+For the public API, prefer `go doc -all .`, `go doc ./middleware`, and `go doc ./internal/radix` over reading from memory.
+
+---
+
+## Quick Start
+
+### Minimal application (plain handlers)
 
 ```go
-// Define request/response types
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/coregx/fursy"
+)
+
+func main() {
+    router := fursy.New()
+
+    router.Handle("GET", "/", func(c *fursy.Context) error {
+        return c.Text("Hello, fursy!")
+    })
+
+    router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
+        return c.OK(map[string]string{"id": c.Param("id")})
+    })
+
+    log.Fatal(http.ListenAndServe(":8080", router))
+}
+```
+
+`router.Handle` (and `router.HandleWithOptions`) accept a plain `fursy.HandlerFunc`. The uppercase generic methods accept only `fursy.Handler[Req, Res]`.
+
+### Type-safe handlers with automatic binding
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/coregx/fursy"
+)
+
 type CreateUserRequest struct {
     Name  string `json:"name" validate:"required,min=3"`
     Email string `json:"email" validate:"required,email"`
@@ -442,155 +248,24 @@ type UserResponse struct {
     Email string `json:"email"`
 }
 
-// Type-safe handler — type parameters inferred from handler signature
-router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-    // box.ReqBody is automatically bound, type-safe, and validated!
-    user := createUser(box.ReqBody)
-
-    // Type-safe response
-    return box.Created("/users/"+user.ID, user)
-})
-```
-
-**Benefits**:
-- Compile-time type checking
-- Automatic validation
-- Clear API contracts
-- Self-documenting code
-
-### 2. Middleware Architecture
-
-**Express-like pattern** with `Next()/Abort()`:
-
-```go
-// Logger middleware example
-func Logger() fursy.HandlerFunc {
-    return func(c *fursy.Context) error {
-        start := time.Now()
-
-        // Call next middleware/handler
-        err := c.Next()
-
-        // Log after handler executes
-        slog.Info("request",
-            "method", c.Request.Method,
-            "path", c.Request.URL.Path,
-            "status", c.Response.Status(),
-            "duration", time.Since(start),
-        )
-
-        return err
-    }
+func createUser(req *CreateUserRequest) UserResponse {
+    return UserResponse{ID: "1", Name: req.Name, Email: req.Email}
 }
 
-// Use middleware
-router.Use(Logger())
-```
+func main() {
+    router := fursy.New()
 
-**Key methods**:
-- `c.Next()` - Execute next middleware/handler
-- `c.Abort()` - Stop execution (e.g., auth failure)
-- `c.IsAborted()` - Check if aborted
+    router.POST("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+        // c.ReqBody is already bound (and validated if a validator is configured).
+        user := createUser(c.ReqBody)
+        return c.Created("/users/"+user.ID, user)
+    })
 
-### 3. Route Groups
-
-**Organize routes** with shared middleware and prefixes:
-
-```go
-router := fursy.New()
-
-// Public routes
-public := router.Group("/api/v1")
-public.Handle("GET", "/health", healthCheck)
-
-// Protected routes with JWT
-auth := public.Group("/admin")
-auth.Use(middleware.JWT(jwtSecret))
-auth.Handle("GET", "/users", listUsers)      // /api/v1/admin/users
-auth.Handle("POST", "/users", createUser)    // /api/v1/admin/users
-```
-
-**Nesting**: Groups can nest infinitely, inheriting all parent middleware.
-
-### 4. Error Handling (RFC 9457)
-
-**Standard error responses** everywhere:
-
-```go
-// Built-in helpers
-return fursy.NotFound("User not found")
-return fursy.BadRequest("Invalid email format")
-return fursy.Unauthorized("Invalid credentials")
-return fursy.ValidationError("Name is required", map[string]string{
-    "name": "Name must be at least 3 characters",
-})
-
-// Custom Problem
-return fursy.Problem{
-    Type:   "https://api.example.com/problems/rate-limit",
-    Title:  "Rate Limit Exceeded",
-    Status: 429,
-    Detail: "You have exceeded 100 requests per hour",
-    Extensions: map[string]any{
-        "retryAfter": 3600,
-    },
+    log.Fatal(http.ListenAndServe(":8080", router))
 }
 ```
 
-### 5. Validation
-
-**Automatic validation** through validator plugin:
-
-```go
-// Setup (once)
-router.SetValidator(validator.New())
-
-// Request struct with validation tags
-type CreateUserRequest struct {
-    Name     string `json:"name" validate:"required,min=3,max=50"`
-    Email    string `json:"email" validate:"required,email"`
-    Age      int    `json:"age" validate:"required,gte=18,lte=120"`
-    Password string `json:"password" validate:"required,min=8"`
-}
-
-// Handler - binding and validation are automatic!
-// Go 1.27 generic methods infer types from handler signature
-router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-    // box.ReqBody is automatically bound and validated! ✅
-    // If validation fails, RFC 9457 error (422) is returned before handler runs.
-    user := createUser(box.ReqBody)
-    return box.Created("/users/"+user.ID, user)
-})
-```
-
-**100+ validation tags**: required, email, url, uuid, min, max, gte, lte, len, etc.
-
-### 6. Content Negotiation
-
-**Multi-format responses** based on client preferences:
-
-```go
-router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
-    user := getUser(c.Param("id"))
-
-    // Option 1: Automatic selection
-    return c.Negotiate(200, user)  // Picks JSON/HTML/XML/Markdown
-
-    // Option 2: Manual check
-    if c.Accepts(fursy.MIMETextMarkdown) {
-        return c.Markdown(formatMarkdown(user))  // AI-friendly
-    }
-    return c.JSON(200, user)  // Default
-})
-```
-
-**AI agent support**: Markdown responses for better LLM understanding.
-
----
-
-## Quick Start for AI Agents
-
-### Minimal Example
+### Router with middleware and OpenAPI
 
 ```go
 package main
@@ -598,32 +273,14 @@ package main
 import (
     "log"
     "net/http"
+    "time"
+
     "github.com/coregx/fursy"
+    "github.com/coregx/fursy/middleware"
 )
 
-func main() {
-    router := fursy.New()
-
-    // Plain handler via Handle()
-    router.Handle("GET", "/", func(c *fursy.Context) error {
-        return c.Text("Hello, fursy!")
-    })
-
-    // Parametric route — plain handler via Handle()
-    router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
-        id := c.Param("id")
-        return c.OK(map[string]string{"id": id})
-    })
-
-    log.Fatal(http.ListenAndServe(":8080", router))
-}
-```
-
-### Type-Safe Example
-
-```go
-type GetUserRequest struct {
-    ID string `param:"id" validate:"required,uuid"`
+type CreateUserRequest struct {
+    Name string `json:"name"`
 }
 
 type UserResponse struct {
@@ -631,1091 +288,879 @@ type UserResponse struct {
     Name string `json:"name"`
 }
 
-// Go 1.27 generic methods — type parameters inferred from handler signature
-router.GET("/users/:id", func(box *fursy.Box[GetUserRequest, UserResponse]) error {
-    // ReqBody is automatically bound and validated
-    user := getUserByID(box.ReqBody.ID)
-    return box.OK(user)
+func main() {
+    router := fursy.New()
+
+    router.WithInfo(fursy.Info{
+        Title:   "Users API",
+        Version: "1.0.0",
+    })
+
+    router.Use(
+        middleware.Recovery(),
+        middleware.Logger(),
+        middleware.CORS(),
+        middleware.Secure(),
+        middleware.Timeout(5*time.Second),
+    )
+
+    router.POST("/users", func(c *fursy.Box[CreateUserRequest, UserResponse]) error {
+        return c.Created("/users/1", UserResponse{ID: "1", Name: c.ReqBody.Name})
+    }, &fursy.RouteOptions{
+        Summary:       "Create user",
+        Tags:          []string{"users"},
+        SuccessStatus: http.StatusCreated,
+    })
+
+    router.ServeOpenAPI("/openapi.json")
+
+    log.Fatal(http.ListenAndServe(":8080", router))
+}
+```
+
+The ordering above follows the middleware rules in [Middleware](#middleware): `Recovery` and `Logger` wrap everything; `CORS` and `Secure` run before `Timeout` so their headers survive a timeout response.
+
+---
+
+## Core Concepts
+
+### Plain handlers vs typed handlers
+
+| | Plain | Typed |
+|---|---|---|
+| Registration | `router.Handle("GET", path, fn)` | `router.GET(path, fn)` |
+| Handler type | `fursy.HandlerFunc` (`func(*Context) error`) | `fursy.Handler[Req, Res]` (`func(*Box[Req, Res]) error`) |
+| Context | `*fursy.Context` | `*fursy.Box[Req, Res]` (embeds `*Context`) |
+| Body binding | Manual (decode `c.Request.Body` yourself) | Automatic before the handler runs |
+| Validation | Manual | Automatic when `SetValidator` is configured |
+| OpenAPI types | Not inferred | `Req` and `Res` inferred from the handler |
+
+`router.GET("/path", func(c *fursy.Context) error { ... })` does not compile: the generic methods require a `Handler[Req, Res]`. Use `Handle` for plain handlers.
+
+### Box and automatic binding
+
+```go
+type Box[Req, Res any] struct {
+    *Context
+
+    ReqBody *Req // parsed, optionally validated request body
+    ResBody *Res // response body set by the typed response helpers
+}
+```
+
+`adaptGenericHandler` (in `handler_generic.go`) creates the box and calls `Bind()` before invoking the handler. `Box.Bind` is idempotent: if `ReqBody` is already set it returns nil without re-reading the body.
+
+Supported request content types (`internal/binding`):
+
+- `application/json` (also used when `Content-Type` is empty)
+- `application/xml`, `text/xml`
+- `application/x-www-form-urlencoded`
+- `multipart/form-data`
+
+Only the request body is bound. URL parameters, query values, and headers are read through `Context` methods, not through struct tags.
+
+### The Empty marker
+
+Use `fursy.Empty` when there is no request or response body:
+
+```go
+type DeleteRequest struct {
+    ID string
+}
+
+router.DELETE("/users/:id", func(c *fursy.Box[fursy.Empty, fursy.Empty]) error {
+    deleteUser(c.Param("id"))
+    return c.NoContentSuccess() // 204
 })
 ```
 
-### With Middleware
+`Empty` tells `Bind` to skip body parsing and tells OpenAPI that there is no request/response schema. A non-empty `Req` type requires a body; an empty body returns a 400 Problem.
+
+### Route groups
+
+```go
+api := router.Group("/api/v1")
+api.Use(middleware.Logger())
+
+admin := api.Group("/admin", middleware.JWT(secretBytes))
+admin.GET("/users", listUsers)
+```
+
+Middleware order is `Router.Use()` -> parent group middleware -> child group middleware -> handler. Groups can nest arbitrarily.
+
+### Middleware pipeline
+
+Middleware and handlers share the `HandlerFunc` signature:
+
+```go
+func MyMiddleware() fursy.HandlerFunc {
+    return func(c *fursy.Context) error {
+        start := time.Now()
+        err := c.Next() // run the rest of the chain
+        slog.Info("request", "method", c.Request.Method, "duration", time.Since(start))
+        return err
+    }
+}
+```
+
+- `c.Next()` executes the next handler and returns its error.
+- `c.Abort()` prevents subsequent handlers from running; it does not stop the current handler.
+- `c.IsAborted()` reports whether the chain was aborted.
+- Middleware that forgets `c.Next()` silently skips the rest of the chain. The route handler never runs and the client receives an empty 200.
+
+### Context pooling
+
+`Context` objects come from a `sync.Pool` and are reset after each request (`Router.ServeHTTP`). Never retain a `*Context` or `*Box` beyond the handler call, and never use one from a goroutine that outlives the request. This is why the Timeout middleware is cooperative instead of running handlers in another goroutine.
+
+### Convenience response methods
+
+`Context` (and therefore `Box`, which embeds it):
+
+| Method | Result |
+|---|---|
+| `OK(obj)` | 200 with JSON body |
+| `Created(obj)` | 201 with JSON body (no `Location` header) |
+| `Accepted(obj)` | 202 with JSON body |
+| `NoContent(code)` | status with no body |
+| `NoContentSuccess()` | 204 |
+| `Text(s)` | 200 `text/plain` |
+| `String(code, s)` | status `text/plain` |
+| `JSON(code, obj)` | status `application/json` |
+| `JSONIndent(code, obj, indent)` | pretty JSON |
+| `XML(code, obj)` | status `application/xml` |
+| `Blob(code, contentType, data)` | binary body |
+| `Stream(code, contentType, reader)` | stream from `io.Reader` |
+| `Markdown(content)` | 200 `text/markdown` |
+| `Redirect(code, url)` | 3xx redirect (3xx only) |
+| `SetHeader(key, value)` | response header before writing |
+| `GetHeader(key)` | request header |
+| `Param(name)`, `Query(name)`, `QueryDefault`, `QueryValues`, `Form`, `FormDefault`, `PostForm` | request data |
+| `Set(key, value)`, `Get`, `GetString`, `GetInt`, `GetBool` | per-request middleware data |
+| `RoutePattern()` | registered pattern such as `/users/:id` |
+| `APIVersion()` | version from `Api-Version` header or URL path |
+
+`Box` typed response helpers: `OK`, `Created(location, data)`, `Accepted`, `UpdatedOK`, `NoContentSuccess`, `UpdatedNoContent`, `BadRequest`, `Unauthorized`, `Forbidden`, `NotFound`, `InternalServerError`.
+
+Note that `Box.BadRequest(data)` and its siblings write a normal JSON body of type `Res`; they are not RFC 9457 Problems. Return a `fursy.Problem` (or use `Context.Problem`) when you want the standard error format.
+
+### Route patterns
+
+Supported patterns:
+
+- Static: `/users`, `/files/report.pdf`
+- Named parameter: `/users/:id` (read with `c.Param("id")`)
+- Catch-all: `/files/*path` (must be the last segment; read with `c.Param("path")`)
+
+Colons are only special at the start of a segment. Mid-segment colons are literal, which enables AIP-136 custom methods such as `/documents:commit`. There is no regex constraint syntax.
+
+Duplicate registration panics (`route already exists: ...`), as do empty methods/paths and nil handlers.
+
+Trailing slashes are significant by default. Configure with `router.WithTrailingSlash(...)`:
+
+- `fursy.IgnoreTrailingSlash` (default): `/users` and `/users/` are different routes.
+- `fursy.StripTrailingSlash`: serve the canonical handler without a redirect.
+- `fursy.RedirectTrailingSlash`: bidirectional redirect, 301 for GET and 308 for other methods.
+
+### HEAD and OPTIONS
+
+- A HEAD request falls back to the matching GET route (RFC 9110), without a body.
+- An OPTIONS request to a path registered for other methods returns 204 with an `Allow` header.
+- A known path with the wrong method returns 405 with an `Allow` header and an RFC 9457 body.
+
+### Graceful shutdown
+
+```go
+router.OnShutdown(func() {
+    db.Close()
+})
+
+if err := router.ListenAndServeWithShutdown(":8080", 25*time.Second); err != nil {
+    log.Fatal(err)
+}
+```
+
+`ListenAndServeWithShutdown` listens for SIGTERM/SIGINT, drains connections with the given timeout (default 30s), then runs callbacks in reverse registration order. `Shutdown(ctx)` is idempotent. `SetServer(*http.Server)` attaches an externally created server. Do not confuse `SetServer(*http.Server)` with `WithServer(fursy.Server)`, which only adds a URL to the OpenAPI document.
+
+### API versioning
+
+```go
+version := c.APIVersion() // Api-Version header first, then /v1/, /v2/, ...
+
+v1 := router.Group("/api/v1")
+v1.Use(fursy.RequireVersion(fursy.Version{Major: 1}))
+v1.Use(fursy.DeprecateVersion(fursy.DeprecationInfo{
+    Version: fursy.Version{Major: 1},
+    Message: "Migrate to v2",
+}))
+
+v1.Use(fursy.RequireVersion(fursy.Version{Major: 2}))
+```
+
+`ParseVersion` accepts `v1`, `v2.1`, `v3.2.1`, `1`, `2.1.0`. `ExtractVersionFromPath` recognizes `/v1/...` and `/api/v2.1/...`.
+
+---
+
+## Routing API
+
+### Router methods
+
+| Method | Purpose |
+|---|---|
+| `fursy.New()` | Create a router with pooling, 405 handling, OPTIONS handling, and a 4 MiB body limit. |
+| `Handle(method, path, HandlerFunc)` | Register a plain handler. |
+| `HandleWithOptions(method, path, HandlerFunc, *RouteOptions)` | Plain handler plus OpenAPI metadata. |
+| `GET/POST/PUT/DELETE/PATCH/HEAD/OPTIONS(path, Handler[Req,Res], ...*RouteOptions)` | Register a typed handler. |
+| `Use(...HandlerFunc)` | Append global middleware. |
+| `Group(prefix, ...HandlerFunc)` | Create a route group. |
+| `WithInfo(Info)` | Set OpenAPI `info`. |
+| `WithServer(Server)` | Add an OpenAPI server URL. |
+| `ServeOpenAPI(path)` | Register a JSON OpenAPI endpoint. |
+| `GenerateOpenAPI(Info) (*OpenAPI, error)` | Build the document in memory. |
+| `WithTrailingSlash(TrailingSlashBehavior)` | Configure trailing-slash handling. |
+| `SetValidator(Validator)` | Enable automatic validation during `Box.Bind`. |
+| `SetErrorHandler(ErrorHandler)` | Replace default error classification. |
+| `SetErrorLogger(func(error, *http.Request))` | Observe unclassified 500 errors. |
+| `SetMaxBodySize(int64)` | Change the body limit; 0 disables it. |
+| `MaxBodySize() int64` | Read the current limit. |
+| `SetServer(*http.Server)` | Attach a server for shutdown. |
+| `OnShutdown(func())` | Register a shutdown callback. |
+| `Shutdown(context.Context) error` | Drain and run callbacks. |
+| `ListenAndServeWithShutdown(addr, ...time.Duration) error` | Serve until SIGTERM/SIGINT. |
+
+`RouteGroup` exposes the same typed verbs plus `Handle`, `HandleWithOptions`, `Use`, `Group`, and typed verbs taking `...*RouteOptions`.
+
+### RouteOptions
+
+```go
+type RouteOptions struct {
+    Summary             string
+    Description         string
+    Tags                []string
+    OperationID         string
+    Deprecated          bool
+    Parameters          []RouteParameter
+    Responses           map[int]RouteResponse
+    SuccessStatus       int
+    OptionalRequestBody bool
+}
+```
+
+---
+
+## Request Binding and Validation
+
+### Automatic binding
+
+For typed handlers only, the adapter calls `Bind()` before the handler:
+
+1. `Req == fursy.Empty` -> skip.
+2. Choose a binder from `Content-Type`.
+3. Decode the body into a new `Req`.
+4. If `router.SetValidator` was called, validate the struct.
+5. Assign `c.ReqBody`.
+
+A body is required for non-`Empty` request types. For example, `Box[GetUserRequest, UserResponse]` on a GET without a body returns 400; use `Box[fursy.Empty, UserResponse]` and read `c.Param("id")`.
+
+`Bind()` is idempotent, so calling it manually is harmless but unnecessary.
+
+### Validation
+
+```go
+import "github.com/coregx/fursy/plugins/validator"
+
+router.SetValidator(validator.New())
+```
+
+`fursy.Validator` is a one-method interface:
+
+```go
+type Validator interface {
+    Validate(any) error
+}
+```
+
+The plugin uses `validate:"..."` tags from go-playground/validator. Validation failures become `fursy.ValidationErrors`; the default error handler converts them to a 422 RFC 9457 response with an `errors` extension mapping field names to messages:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Validation Failed",
+  "status": 422,
+  "detail": "One or more fields failed validation",
+  "errors": {
+    "email": "must be a valid email address"
+  }
+}
+```
+
+Validation applies to the bound body struct only. Query parameters, path parameters, and headers are not validated automatically; validate them in the handler and return a `Problem` or `ValidationErrors` yourself.
+
+### Body size limit
+
+`New()` sets a 4 MiB (`4 << 20`) global limit. `ServeHTTP` wraps the body in `http.MaxBytesReader` for every handler, plain or typed. Oversized bodies produce a 413 Problem. `SetMaxBodySize(0)` disables the limit.
+
+---
+
+## Error Handling with RFC 9457
+
+RFC 9457 Problem Details is the default error format. `Problem` marshals to `application/problem+json`:
+
+```go
+type Problem struct {
+    Type       string         `json:"type"`
+    Title      string         `json:"title"`
+    Status     int            `json:"status"`
+    Detail     string         `json:"detail,omitempty"`
+    Instance   string         `json:"instance,omitempty"`
+    Extensions map[string]any `json:"-"`
+}
+```
+
+Extension fields are flattened into the JSON object. Constructors: `NewProblem`, `BadRequest`, `Unauthorized`, `Forbidden`, `NotFound`, `MethodNotAllowed`, `Conflict`, `UnprocessableEntity`, `TooManyRequests`, `InternalServerError`, `ServiceUnavailable`, `NotAcceptable`, `ValidationProblem`.
+
+### Default error classification
+
+`defaultErrorHandler` maps errors as follows:
+
+| Error | Response |
+|---|---|
+| `Problem` | Its `Status`, same Problem body |
+| `ValidationErrors` | 422 with `errors` extension |
+| `*http.MaxBytesError` | 413 |
+| `binding.ErrUnsupportedMediaType` | 415 |
+| `binding.ErrEmptyRequestBody` | 400 |
+| `*binding.DecodeError` (JSON/XML) | 400 |
+| Anything else | 500; logged through `SetErrorLogger`, details hidden |
+
+Router-generated errors use the same format: 404, 405 (+ `Allow`), 400/413/415 from binding, and 500.
+
+Custom handling:
+
+```go
+router.SetErrorHandler(func(c *fursy.Context, err error) {
+    var problem fursy.Problem
+    if errors.As(err, &problem) {
+        _ = c.Problem(problem.WithInstance(c.Request.URL.Path))
+        return
+    }
+    _ = c.Problem(fursy.InternalServerError("internal error"))
+})
+```
+
+`SetErrorLogger(func(err error, req *http.Request))` fires only for unclassified errors that become 500; Problems, validation errors, decode errors, and body-limit errors are handled before that point.
+
+---
+
+## OpenAPI 3.1 Generation
+
+### Setup
 
 ```go
 router := fursy.New()
 
-// Global middleware
-router.Use(middleware.Logger())
-router.Use(middleware.Recovery())
+router.WithInfo(fursy.Info{
+    Title:       "Users API",
+    Version:     "1.0.0",
+    Description: "Example API",
+})
+router.WithServer(fursy.Server{
+    URL:         "https://api.example.com",
+    Description: "Production",
+})
 
-// CORS
-router.Use(middleware.CORS(middleware.CORSConfig{
-    AllowOrigins: []string{"*"},
-    AllowMethods: []string{"GET", "POST", "PUT", "DELETE"},
-}))
+router.POST("/users", createUser, &fursy.RouteOptions{
+    Summary:             "Create user",
+    Tags:                []string{"users"},
+    SuccessStatus:       http.StatusCreated,
+    OptionalRequestBody: false,
+})
 
-// Protected routes
-admin := router.Group("/admin")
-admin.Use(middleware.JWT(jwtSecret))
-admin.Handle("GET", "/users", listUsers)
+router.ServeOpenAPI("/openapi.json")
 ```
 
----
+`ServeOpenAPI` regenerates the document on every request. For production, call `GenerateOpenAPI` once and serve the cached result, or serve a pre-generated file.
 
-## Development Standards
+### What is inferred
 
-### 1. JSON: encoding/json
+- Request and response schemas from `Box[Req, Res]` types.
+- Named package types are registered once in `components.schemas` and referenced with `$ref`; recursive and mutually recursive types terminate.
+- Strings, numbers, booleans, arrays, maps, structs, embedded structs, and JSON tags.
+- `time.Time` -> `{"type":"string","format":"date-time"}`.
+- `[]byte` and named byte slices -> `{"type":"string","format":"byte"}`.
+- `json.RawMessage` -> `{}` (unconstrained).
+- `:id` and `*path` templates -> required `in: path` parameters.
+- `operationId` from method + path when not set explicitly, for example `GET /users/:id` -> `getUsersById`; collisions get a numeric suffix.
+- A 400 and a 500 response referencing the `Problem` schema, unless the route already declares those status codes.
 
-Use the standard `encoding/json` package:
+### Status codes and bodies
 
-```go
-import "encoding/json"
-```
+- `RouteOptions.SuccessStatus` sets the inferred success status; 0 means "choose from the response type".
+- 204 emits no response body.
+- A route with no inferred response type infers 204. This includes `Res == fursy.Empty` **and plain handlers registered with `Handle`/`HandleWithOptions`**, which have no response type. Set `SuccessStatus` to override (for example, 200 for a plain handler that writes JSON).
+- `OptionalRequestBody: true` marks the inferred request body as not required.
+- Explicit `RouteOptions.Responses` are merged with the inferred success response. A custom 404 does not remove the inferred 200. An explicit entry with the same status code replaces the inferred one for that status.
+- Without `ContentType`, explicit responses default to `application/json` for 2xx and `application/problem+json` for 4xx and above.
 
-Go 1.27 made json/v2 the default implementation behind the `encoding/json` import path, so the import is simply `"encoding/json"`.
+### Document output
 
-### 2. Logging: log/slog
+`GenerateOpenAPI` returns `*OpenAPI`. `WriteJSON(w)` and `WriteYAML(w)` serialize it. `ServeOpenAPI(path)` registers a GET route that writes JSON.
 
-**MUST use** structured logging:
-
-```go
-import "log/slog"
-
-// ✅ CORRECT:
-slog.Info("request processed",
-    "method", req.Method,
-    "path", req.URL.Path,
-    "duration", duration,
-)
-
-// ❌ WRONG:
-log.Printf("Request %s %s took %v", req.Method, req.URL.Path, duration)
-```
-
-### 3. Minimal Dependencies Policy
-
-**Core package** (`github.com/coregx/fursy`):
-- Routing, Context, Groups: ONLY stdlib (0 external deps)
-- Middleware exceptions (justified):
-  - `middleware/jwt.go`: `golang-jwt/jwt/v5` (JWT standard)
-  - `middleware/ratelimit.go`: `golang.org/x/time` (token bucket)
-- All other middleware: ONLY stdlib
-
-**Plugins** (`plugins/`):
-- Can have dependencies (isolated)
-- OpenTelemetry, validators, etc.
-
-**Rule**: NEVER add dependencies to core without discussion!
-
-### 4. Code Quality Standards
-
-**Follow Relica philosophy** (sister project):
-1. **Zero dependencies** (core)
-2. **Type safety** (generics where appropriate)
-3. **Comprehensive testing** (>85% coverage)
-4. **Clear API** (intuitive, well-documented)
-5. **Performance** (benchmarks for everything)
-
-### 5. Naming Conventions
-
-```go
-// Types: PascalCase
-type Router struct {}
-type Context[Req, Res any] struct {}
-
-// Functions/Methods: PascalCase (exported), camelCase (internal)
-func New() *Router
-func (r *Router) ServeHTTP(...)
-func internalHelper() {}
-
-// Constants: PascalCase or UPPER_SNAKE
-const StatusOK = 200
-const DefaultTimeout = 30 * time.Second
-```
-
-### 6. Error Handling
-
-**Always use RFC 9457**:
-
-```go
-// Built-in helpers
-return fursy.NotFound("User not found")
-return fursy.BadRequest("Invalid input")
-
-// Custom errors
-return fursy.Problem{
-    Type:   "https://example.com/problems/custom",
-    Title:  "Custom Error",
-    Status: 400,
-}
-```
-
-### 7. API Architecture Pattern
-
-**Public API = Wrapper** (clean Go Docs):
-
-```go
-// ✅ CORRECT: router.go (root package)
-package fursy
-
-import "github.com/coregx/fursy/internal/radix"
-
-type Router struct {
-    tree *radix.Tree  // Internal implementation hidden
-}
-
-func (r *Router) GET[Req, Res any](path string, handler Handler[Req, Res]) {
-    // Delegate to internal via generic method (Go 1.27+)
-    r.Handle(http.MethodGet, path, adaptGenericHandler(handler))
-}
-
-// ❌ WRONG: Exposing internal types
-type Router struct {
-    Tree *radix.Tree  // Don't export internal!
-}
-```
-
-**Why**:
-- Root package = clean, simple API for users
-- `internal/` = complex implementation, NOT in Go Docs
-- Can change implementation without breaking changes
-
----
-
-## Testing Requirements
-
-### Coverage Targets
-
-| Phase | Target | Status |
-|-------|--------|--------|
-| Phase 1 (Foundation) | >85% | ✅ 88.9% |
-| Phase 2 (API Excellence) | >88% | ✅ 88.9% |
-| Phase 3 (Production) | >90% | ✅ 88.9% core + 95.5% circuitbreaker + 100% secure |
-| Ongoing | Maintain >85% | ✅ 88.9% |
-
-### Required Commands
-
-```bash
-# Run all tests
-go test ./...
-
-# Run with race detector (REQUIRED before commit!)
-go test -race ./...
-
-# Coverage report
-go test -coverprofile=coverage.txt ./...
-go tool cover -html=coverage.txt
-
-# Run specific test
-go test -v -run TestRouter_GET ./...
-
-# Run benchmarks
-go test -bench=. -benchmem ./...
-
-# Lint (MUST be 0 issues!)
-golangci-lint run
-
-# Pre-release checks
-gofmt -l .
-golangci-lint run
-go test ./...
-```
-
-### Test Structure
-
-**Table-driven tests**:
-
-```go
-func TestRouter_GET(t *testing.T) {
-    tests := []struct {
-        name       string
-        path       string
-        wantStatus int
-        wantBody   string
-    }{
-        {
-            name:       "simple route",
-            path:       "/users",
-            wantStatus: 200,
-            wantBody:   `{"users":[]}`,
-        },
-        // More test cases...
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            // Test logic
-        })
-    }
-}
-```
-
-### Benchmark Requirements
-
-**Always benchmark critical paths**:
-
-```go
-func BenchmarkRouter_StaticRoute(b *testing.B) {
-    r := fursy.New()
-    r.Handle("GET", "/users", handler)
-
-    req := httptest.NewRequest("GET", "/users", nil)
-    w := httptest.NewRecorder()
-
-    b.ResetTimer()
-    b.ReportAllocs()
-
-    for i := 0; i < b.N; i++ {
-        r.ServeHTTP(w, req)
-    }
-}
-```
-
-**Current performance targets** (achieved):
-- Static routes: <500 ns/op ✅ (~53 ns/op)
-- Parametric routes: <500 ns/op ✅ (~75 ns/op)
-- Allocations: 0 alloc/op ✅
-- Throughput: >100k req/s ✅
-
----
-
-## Git Workflow
-
-### Branching Model
-
-**GitHub Flow** (single main branch):
-
-```bash
-main          # Production releases (v1.0.0, v1.1.0, etc.)
-  ├── feature/TASK-XXX-description
-  ├── bugfix/issue-123
-  └── hotfix/critical-fix
-```
-
-### Commit Convention
-
-**Format**: `<type>(<scope>): <subject>`
-
-**Types**:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation
-- `test`: Tests
-- `refactor`: Code refactoring
-- `perf`: Performance improvement
-- `chore`: Maintenance
-
-**Examples**:
-```bash
-feat(router): add generic Context[Req, Res]
-fix(radix): handle edge case with wildcards
-docs: update STATUS.md with Phase 3 progress
-test(router): add benchmark for parametric routes
-refactor(context): simplify error handling
-perf(radix): optimize parameter extraction
-```
-
-### Important Rules
-
-**❌ NEVER**:
-- Add `Co-Authored-By: Claude <noreply@anthropic.com>` to commits
-- Commits must look professional and from a real developer
-- Claude is already in contributors
-
-**✅ ALWAYS**:
-- Run `go test -race ./...` before commit
-- Run `golangci-lint run` (must be 0 issues)
-- Update `.claude/STATUS.md` for significant changes
-- Use clean, concise commit messages
-
-### Merge Strategy
-
-**feature → main**: Squash merge via PR
+OpenAPI generation uses metadata captured at registration. Routes registered with plain `Handle` have no request/response types, so annotate them with `HandleWithOptions` and `RouteOptions.Parameters`/`Responses` when the document matters.
 
 ---
 
 ## Middleware
 
-**8 built-in middleware** (production-ready):
+The `middleware` package contains nine implementations. Only JWT and RateLimit add external dependencies.
 
-### 1. Logger
+| Middleware | Constructor | Dependency | Behavior |
+|---|---|---|---|
+| Logger | `Logger()`, `LoggerWithConfig` | stdlib `log/slog` | Structured request logging; `SkipPaths`, `SkipFunc`. |
+| Recovery | `Recovery()`, `RecoveryWithConfig` | none | Recovers panics, logs stack, returns a 500 Problem. |
+| CORS | `CORS()`, `CORSWithConfig` | none | Preflight and actual-request CORS headers. |
+| BasicAuth | `BasicAuth(ValidatorFunc)`, `BasicAuthAccounts`, `BasicAuthWithConfig` | none | HTTP Basic authentication; stores identity under `UserContextKey` (`"User"`). |
+| JWT | `JWT(key)`, `JWTWithConfig` | `golang-jwt/jwt/v5` | Bearer token validation; stores claims under `JWTContextKey` (`"jwt"`) and the raw token under `JWTTokenContextKey` (`"jwt_token"`). |
+| RateLimit | `RateLimit(rate, burst)`, `RateLimitWithConfig` | `golang.org/x/time` | Token bucket per key; `X-RateLimit-*` and `Retry-After`; 429 Problem. |
+| CircuitBreaker | `CircuitBreaker()`, `CircuitBreakerConsecutive`, `CircuitBreakerRatio`, `CircuitBreakerTimeWindow`, `CircuitBreakerWithConfig`, `CircuitBreakerWithName` | none | Closed/Open/Half-Open states; 503 Problem when open; 4xx Problems do not trip it. |
+| Secure | `Secure()`, `SecureWithConfig`, `SecureDefaults`, `SecureStrict`, `SecureWithCSP`, `SecureWithHSTS` | none | OWASP-style security headers. |
+| Timeout | `Timeout(d)`, `TimeoutWithConfig` | none | Cooperative context deadline; 503 Problem on timeout; `ErrRequestTimeout` cause. |
 
-**Package**: `middleware.Logger()`
-**Dependencies**: Zero (uses `log/slog`)
-**Coverage**: High
+### Ordering rules
 
-**Usage**:
+1. `Recovery` should wrap everything so panics in other middleware are caught.
+2. `Logger` should run early so it sees all traffic, including 404/405 responses (the router runs global middleware for those).
+3. `CORS` must be registered globally with `router.Use()`, not on a group, and before authentication. Preflight OPTIONS requests carry no credentials; if JWT or BasicAuth runs first, the preflight receives 401 instead of CORS headers.
+4. Middleware that sets response headers (`CORS`, `Secure`, request-ID middleware) must be registered **before** `Timeout`. When a timeout produces a 503, the middleware restores the header snapshot taken before the inner chain ran; headers set inside the timeout are discarded with the handler's headers.
+5. Apply `Timeout` per group when different routes need different limits. Deadlines can only shrink; a nested Timeout cannot extend an outer one.
+
+A safe global order:
+
 ```go
-router.Use(middleware.Logger())
+router.Use(
+    middleware.Recovery(),
+    middleware.Logger(),
+    middleware.CORS(),
+    middleware.Secure(),
+    middleware.Timeout(5*time.Second),
+)
 ```
 
-**Features**:
-- Structured logging with slog
-- Request/response details
-- Duration tracking
-- Error logging
+### Logger
 
-### 2. Recovery
+```go
+router.Use(middleware.Logger())
+router.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+    Logger:    slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+    SkipPaths: []string{"/health", "/metrics"},
+}))
+```
 
-**Package**: `middleware.Recovery()`
-**Dependencies**: Zero
-**Coverage**: High
+### Recovery
 
-**Usage**:
 ```go
 router.Use(middleware.Recovery())
 ```
 
-**Features**:
-- Panic recovery
-- Stack trace logging
-- RFC 9457 error response
-- Prevents server crashes
+Panics become a 500 Problem. `RecoveryConfig` controls the logger, stack-trace printing, and buffer size. `PanicHandler()` is available as a lower-level alternative and re-panics `http.ErrAbortHandler`, matching net/http expectations.
 
-### 3. CORS
+### CORS
 
-**Package**: `middleware.CORS(config)`
-**Dependencies**: Zero
-**Coverage**: High
+`CORSConfig` fields are comma-separated strings, not slices:
 
-**IMPORTANT**: CORS middleware **must** be registered globally via `router.Use()` **and before any auth middleware** (JWT, BasicAuth). Preflight OPTIONS requests don't carry credentials — if auth runs first, preflight gets 401 instead of CORS headers.
-
-**Usage**:
 ```go
-router.Use(middleware.CORS(middleware.CORSConfig{
-    AllowOrigins: []string{"*"},
-    AllowMethods: []string{"GET", "POST", "PUT", "DELETE"},
-    AllowHeaders: []string{"Content-Type", "Authorization"},
+router.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+    AllowOrigins:     "https://app.example.com",
+    AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+    AllowHeaders:     "Content-Type,Authorization",
+    ExposeHeaders:    "X-Request-ID",
+    AllowCredentials: true,
+    MaxAge:           12 * time.Hour,
 }))
 ```
 
-**Features**:
-- Configurable origins, methods, headers
-- Credentials support
-- Max age control
+Defaults: `AllowOrigins: "*"`, `AllowMethods: "GET,HEAD,PUT,POST,DELETE,PATCH"`, `AllowHeaders: "Content-Type,Accept,Authorization"`. `AllowOrigins: "null"` disallows all origins. `AllowOrigins: "*"` together with `AllowCredentials: true` panics, because it would reflect any origin with credentials. Register globally.
 
-### 4. BasicAuth
+### BasicAuth
 
-**Package**: `middleware.BasicAuth(users)`
-**Dependencies**: Zero
-**Coverage**: High
-
-**Usage**:
 ```go
-users := map[string]string{
+router.Use(middleware.BasicAuth(middleware.BasicAuthAccounts(map[string]string{
     "admin": "secret",
-    "user":  "password",
-}
-router.Use(middleware.BasicAuth(users))
-```
+})))
 
-**Features**:
-- HTTP Basic Authentication
-- User/password validation
-- Realm support
-
-### 5. JWT
-
-**Package**: `middleware.JWT(secret)`
-**Dependencies**: `golang-jwt/jwt/v5`
-**Coverage**: 94.2%
-
-**Usage**:
-```go
-router.Use(middleware.JWT([]byte("secret")))
-```
-
-**Features**:
-- JWT token validation
-- Claims extraction
-- Custom validation
-- Bearer token support
-
-### 6. RateLimit
-
-**Package**: `middleware.RateLimit(config)`
-**Dependencies**: `golang.org/x/time`
-**Coverage**: 94.4%
-
-**Usage**:
-```go
-router.Use(middleware.RateLimit(middleware.RateLimitConfig{
-    RequestsPerSecond: 10,
-    Burst:             20,
+// Or a custom validator:
+router.Use(middleware.BasicAuth(func(c *fursy.Context, username, password string) (any, error) {
+    if username == "admin" && password == "secret" {
+        return "admin", nil
+    }
+    return nil, fursy.ErrUnauthorized
 }))
 ```
 
-**Features**:
-- Token bucket algorithm
-- Per-IP or per-user limiting
-- RFC 6585 headers (RateLimit-*)
-- 429 Too Many Requests
+`BasicAuthWithConfig` supports `Realm`, `Validator`, and `Skipper`. The identity is stored under `middleware.UserContextKey` and is read with `c.Get(...)` or `c.GetString(...)` when it is a string.
 
-### 7. CircuitBreaker
+### JWT
 
-**Package**: `middleware.CircuitBreaker(config)`
-**Dependencies**: Zero
-**Coverage**: 95.5%
-
-**Usage**:
 ```go
-router.Use(middleware.CircuitBreaker(middleware.CircuitBreakerConfig{
-    Threshold:   5,           // Open after 5 failures
-    Timeout:     30 * time.Second,
-    MaxRequests: 3,           // Half-open with 3 requests
+router.Use(middleware.JWTWithConfig(middleware.JWTConfig{
+    SigningKey:    []byte("secret"),
+    SigningMethod: "HS256",
+}))
+
+router.Handle("GET", "/me", func(c *fursy.Context) error {
+    claims := c.Get(middleware.JWTContextKey) // jwt.MapClaims by default
+    return c.OK(claims)
+})
+```
+
+Default token lookup is `header:Authorization` with the `Bearer` scheme. `JWTConfig` supports `TokenLookup` (`header:`, `query:`, `cookie:`), custom `Claims`, issuer/audience validation, and `ErrorHandler`. Always set `SigningMethod` explicitly to prevent algorithm-confusion attacks. `JWTHelper{}.GenerateToken(claims, key, method)` creates tokens for tests.
+
+### RateLimit
+
+```go
+router.Use(middleware.RateLimit(10, 20)) // 10 req/s, burst 20
+
+router.Use(middleware.RateLimitWithConfig(middleware.RateLimitConfig{
+    Rate:  100,
+    Burst: 200,
+    KeyFunc: func(c *fursy.Context) string {
+        return c.GetString("user_id")
+    },
 }))
 ```
 
-**Features**:
-- Failure threshold
-- Auto-recovery (half-open state)
-- Timeout-based reset
-- 503 Service Unavailable when open
+Defaults: `Rate` 10 req/s, `Burst` `max(1, 2*Rate)`, key from `RemoteAddr` (proxy headers are not trusted by default). `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` are set unless `NoHeaders` is true. Exceeding the limit returns 429 with `Retry-After`. Use `NewRateLimiter(config)` when you need `Stop()` to release the cleanup goroutine.
 
-### 8. Secure
+### CircuitBreaker
 
-**Package**: `middleware.Secure(config)`
-**Dependencies**: Zero
-**Coverage**: 100%
-
-**Usage**:
 ```go
-router.Use(middleware.Secure(middleware.SecureConfig{
-    ContentSecurityPolicy: "default-src 'self'",
-    HSTSMaxAge:           31536000,  // 1 year
+router.Use(middleware.CircuitBreaker()) // 5 consecutive failures, 60s open
+router.Use(middleware.CircuitBreakerConsecutive(5, 30*time.Second))
+router.Use(middleware.CircuitBreakerRatio(3, 10, 30*time.Second))
+router.Use(middleware.CircuitBreakerWithConfig(middleware.CircuitBreakerConfig{
+    ConsecutiveFailures: 5,
+    Timeout:             30 * time.Second,
+    MaxRequests:         2,
 }))
 ```
 
-**Features**:
-- OWASP 2025 compliant
-- CSP, HSTS, X-Frame-Options, etc.
-- XSS protection
-- Clickjacking prevention
+States: `StateClosed`, `StateOpen`, `StateHalfOpen`. A 4xx `Problem` is treated as a client outcome and does not trip the breaker; 5xx and transport errors do. When open, requests receive a 503 Problem.
+
+### Secure
+
+```go
+router.Use(middleware.Secure())
+router.Use(middleware.SecureWithConfig(middleware.SecureWithHSTS(31536000, false)))
+router.Use(middleware.SecureWithConfig(middleware.SecureWithCSP("default-src 'self'")))
+```
+
+`SecureDefaults()` sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `Referrer-Policy: strict-origin-when-cross-origin`. HSTS, CSP, COEP/COOP/CORP, and Permissions-Policy require explicit configuration. `SecureStrict()` enables a strict production profile and may break inline scripts or cross-origin resources.
+
+### Timeout
+
+```go
+router.Use(middleware.Timeout(5 * time.Second))
+
+router.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+    Timeout: 2 * time.Second,
+    Skipper: func(c *fursy.Context) bool {
+        return strings.HasPrefix(c.Request.URL.Path, "/events")
+    },
+    ErrorHandler: func(_ *fursy.Context, _ error) error {
+        return fursy.NewProblem(http.StatusGatewayTimeout, "Gateway Timeout", "")
+    },
+}))
+```
+
+Behavior:
+
+- Adds a deadline to `c.Request.Context()` with cause `middleware.ErrRequestTimeout`.
+- Runs the handler synchronously. No extra goroutine, so pooled `Context` objects are safe.
+- If the handler returns an error wrapping `context.DeadlineExceeded` or `ErrRequestTimeout` before writing a response, the middleware restores the pre-chain headers and returns 503 by default.
+- Written responses, `nil`, and unrelated errors pass through unchanged. Client disconnects and shorter parent deadlines are not reported as timeouts.
+- `DefaultTimeout` is 30s when the configured value is zero or negative.
+- Preserves `http.Flusher` and `http.Hijacker`.
+- Keep `http.Server` timeouts (`ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`); the request context does not bound body reads or response writes. Set `WriteTimeout` longer than the middleware timeout.
+
+Use `Skipper` for SSE, WebSocket, and other long-lived routes.
+
+---
+
+## Plugins
+
+Plugins are separate Go modules with their own `go.mod`, pinned to a released fursy version. Import paths:
+
+```go
+import "github.com/coregx/fursy/plugins/validator"
+import "github.com/coregx/fursy/plugins/opentelemetry"
+import "github.com/coregx/fursy/plugins/stream"
+import "github.com/coregx/fursy/plugins/database"
+```
+
+### validator
+
+Implements `fursy.Validator` with go-playground/validator/v10.
+
+```go
+router.SetValidator(validator.New())
+
+// Custom rules:
+v := validator.New()
+v.RegisterAlias("username", "required,min=3,max=50")
+v.RegisterCustomValidator("even", func(fl validator.FieldLevel) bool {
+    return fl.Field().Int()%2 == 0
+})
+router.SetValidator(v)
+```
+
+API: `New(opts ...*Options)`, `DefaultOptions()`, `Struct`, `Validate`, `Var`, `RegisterAlias`, `RegisterCustomValidator`, `RegisterTagNameFunc`.
+
+### opentelemetry
+
+Tracing and metrics with the OpenTelemetry SDK.
+
+```go
+router.Use(opentelemetry.Middleware("my-service"))
+router.Use(opentelemetry.Metrics("my-service"))
+
+// Configured variants:
+router.Use(opentelemetry.MiddlewareWithConfig(opentelemetry.Config{ /* ... */ }))
+router.Use(opentelemetry.MetricsWithConfig(opentelemetry.MetricsConfig{ /* ... */ }))
+```
+
+Spans use `Context.RoutePattern()` for the `http.route` attribute, so labels stay low-cardinality.
+
+### stream
+
+SSE and WebSocket support built on `github.com/coregx/stream`.
+
+```go
+hub := sse.NewHub[Notification]()
+go hub.Run()
+defer hub.Close()
+
+router.Use(stream.SSEHub(hub))
+router.Handle("GET", "/events", func(c *fursy.Context) error {
+    h, _ := stream.GetSSEHub[Notification](c)
+    return stream.SSEUpgrade(c, func(conn *sse.Conn) error {
+        h.Register(conn)
+        defer h.Unregister(conn)
+        <-conn.Done()
+        return nil
+    })
+})
+```
+
+WebSocket equivalents: `stream.WebSocketHub(hub)`, `stream.GetWebSocketHub(c)`, `stream.WebSocketUpgrade(c, handler, opts)`. Long-lived upgrade routes should be excluded from `Timeout` with `Skipper`.
+
+### database
+
+Wraps `database/sql` and shares a connection or transaction through the request context.
+
+```go
+db := database.NewDB(sqlDB)
+router.Use(database.Middleware(db))
+
+router.Handle("GET", "/users/:id", func(c *fursy.Context) error {
+    d, ok := database.GetDB(c)
+    if !ok {
+        return c.Problem(fursy.InternalServerError("database not configured"))
+    }
+    // d.QueryRow(c.Request.Context(), ...)
+    return c.OK(user)
+})
+```
+
+API: `NewDB`, `Middleware`, `TxMiddleware`, `WithTx`, `GetDB`, `GetDBOrError`, `MustGetDB`, `GetTx`, `GetTxOrError`, `MustGetTx`, `DB.DB`, `DB.BeginTx`, `DB.Exec`, `DB.Query`, `DB.QueryRow`, `DB.Ping`, `DB.Close`, and the same query methods on `*Tx` plus `Commit`/`Rollback`.
 
 ---
 
 ## Examples
 
-**11 complete examples** demonstrating all features:
+Each runnable example (the ten numbered examples and the six validation examples) is a separate Go module with `go 1.27` and a local `replace` back to this checkout (the relative path depends on nesting depth). Run an example from its own directory:
 
-### Basic Examples
+```bash
+cd examples/01-hello-world
+go run .
+```
 
-**01-hello-world** (`examples/01-hello-world/`):
-- Simple routing
-- Basic handlers
-- Query parameters
-- ~100 LOC
+| Example | What it shows |
+|---|---|
+| `01-hello-world` | Minimal router with a single GET endpoint and JSON response. |
+| `02-rest-api-crud` | Full CRUD API with typed handlers and RFC 9457 errors. |
+| `03-rest-api-with-openapi` | Generated OpenAPI: schemas and `$ref`, success statuses, groups, deprecation. |
+| `04-content-negotiation` | JSON, XML, HTML, Markdown, and plain-text responses; q-values; `Accepts`/`AcceptsAny`. |
+| `05-middleware` | Built-in middleware, custom middleware patterns, ordering, groups, auth. |
+| `06-opentelemetry` | Tracing and metrics with Jaeger and Prometheus configuration. |
+| `07-sse-notifications` | Server-Sent Events through `plugins/stream`. |
+| `08-websocket-chat` | WebSocket chat through `plugins/stream`. |
+| `09-rest-api-with-db` | SQL CRUD with `plugins/database`, transactions, and `WithTx`. |
+| `10-production-boilerplate` | Production-style DDD API with fursy and stream; `cmd/`, `internal/`, migrations, Docker. |
+| `validation/01-basic` | Minimal validator plugin setup. |
+| `validation/02-rest-api-crud` | CRUD with validation. |
+| `validation/03-custom-validator` | Custom rules and aliases. |
+| `validation/04-nested-structs` | Nested struct validation. |
+| `validation/05-custom-messages` | Custom error messages. |
+| `validation/06-production` | Validation plus JWT, logging, and production setup. |
 
-**02-rest-api-crud** (`examples/02-rest-api-crud/`):
-- Full CRUD operations
-- Type-safe handlers
-- RFC 9457 errors
-- ~340 LOC
-
-**04-content-negotiation** (`examples/04-content-negotiation/`):
-- Multi-format responses
-- Accept header handling
-- AI agent support (Markdown)
-- ~200 LOC
-
-**05-middleware** (`examples/05-middleware/`):
-- All 8 middleware
-- Route groups
-- JWT authentication
-- ~300 LOC
-
-### Validation Examples
-
-**validation/** (`examples/validation/`):
-
-6 progressive examples showing validation:
-
-1. **01-basic**: Minimal validation demo (~60 LOC)
-2. **02-rest-api-crud**: Full CRUD with validation (~340 LOC)
-3. **03-custom-validator**: Custom validation rules (~120 LOC)
-4. **04-nested-structs**: Nested struct validation (~100 LOC)
-5. **05-custom-messages**: Custom error messages (~100 LOC)
-6. **06-production**: Production-ready setup (~400 LOC)
-
-**Total**: 17 Go source files, ~1400 LOC code, ~2200 lines documentation
+The `10-production-boilerplate` example additionally uses `github.com/coregx/stream`; see its `go.mod` for the exact versions.
 
 ---
 
-## Comparison with Other Routers
+## Testing and Quality Gates
 
-### vs Gin, Echo, Fiber, Chi
+### Commands
 
-| Feature | fursy | Gin | Echo | Fiber | Chi |
-|---------|-------|-----|------|-------|-----|
-| **Type Safety** | ✅ Compile-time (`Box[Req, Res]`) | ❌ Runtime | ❌ Runtime | ❌ Runtime | ❌ Runtime |
-| **Auto Validation** | ✅ Set once, validate all | ❌ Manual | ❌ Manual | ❌ Manual | ❌ Manual |
-| **RFC 9457 Errors** | ✅ Built-in | ❌ Custom | ❌ Custom | ❌ Custom | ❌ Custom |
-| **Content Negotiation** | ✅ RFC 9110 | 🔧 Partial | 🔧 Partial | 🔧 Partial | ❌ No |
-| **OpenAPI Generation** | ✅ Built-in | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin | 🔧 Plugin |
-| **Zero Deps (core)** | ✅ Yes | ❌ No | ❌ No | ❌ No | ✅ Yes |
-| **Performance** | ⭐⭐⭐⭐⭐ ~53 ns/op | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| **Go Version** | 1.27+ | 1.13+ | 1.17+ | 1.17+ | 1.16+ |
+```bash
+# All tests
+go test ./...
 
-**fursy unique advantages**:
-1. **Type-safe generics** - Only router with compile-time type safety
-2. **RFC 9457 built-in** - Standard error format everywhere
-3. **RFC 9110 content negotiation** - Full quality value support
-4. **Minimal dependencies** - Core = stdlib only
-5. **Modern Go** - Built for Go 1.27+ (generic methods)
-6. **AI-ready** - Markdown responses for agents
+# Race detector (CI and pull-request requirement)
+go test -race ./...
 
-### vs ozzo-routing (Reference)
+# Coverage report
+go test -coverprofile=coverage.txt ./...
+go tool cover -func=coverage.txt | tail -1
 
-**fursy builds on ozzo-routing** but adds:
+# Focused test
+go test -run TestName ./...
 
-- ✅ Generic type-safe handlers (`Box[Req, Res]`)
-- ✅ RFC 9457 Problem Details (standard errors)
-- ✅ OpenAPI 3.1 generation (automatic)
-- ✅ Better performance (<500ns vs ~38μs)
-- ✅ Modern Go 1.27+ features (generic methods)
+# Benchmarks
+go test -bench=. -benchmem ./...
 
-**Preserved from ozzo**:
-- ✅ Middleware pipeline architecture
-- ✅ Zero dependencies (core)
-- ✅ Clean, simple API
+# Lint (must report no issues)
+golangci-lint run
 
----
+# Formatting check (must print nothing)
+gofmt -l .
+```
 
-## Key Files Reference
+### Project requirements
 
-### Core Routing
+`CONTRIBUTING.md` requires, for a pull request:
 
-**`router.go`**:
-- Main Router type
-- Route registration (GET, POST, PUT, DELETE, etc.)
-- ServeHTTP implementation
-- Wrapper over `internal/radix`
+- Formatted code (`gofmt -l .` empty).
+- `golangci-lint run` clean.
+- All tests pass with `go test -race ./...`.
+- New code has tests.
+- Benchmarks for performance-critical code.
+- Documentation updated when applicable; released changes are recorded in `CHANGELOG.md`.
+- Conventional Commits.
+- No external dependencies in the core package.
 
-**`internal/radix/tree.go`**:
-- Radix tree implementation
-- Zero-allocation routing
-- Parameter extraction
-- 87.9% coverage
+The repository's current measured coverage is in [Measured Repository State](#measured-repository-state). Do not lower it to make a change pass; add tests for the new behavior.
 
-**`internal/radix/node.go`**:
-- Tree node structure
-- Static/param/wildcard nodes
-- Edge list management
+Plugins and examples are separate Go modules. `go test ./...` at the repository root covers the root module only; run plugin tests from each `plugins/*/` directory.
 
-### Context Types
+### Test style
 
-**`context.go`, `context_base.go`**:
-- Non-generic Context type
-- Request/response helpers
-- Parameter/query access
-- Convenience methods (OK, Created, etc.)
-
-**`context_generic.go`**:
-- Generic Box[Req, Res] type
-- Type-safe request/response
-- Automatic binding and validation
-- Generic convenience methods
-
-### Handlers
-
-**`handler.go`**:
-- HandlerFunc (non-generic)
-- Middleware signature
-
-**`handler_generic.go`**:
-- Generic Handler[Req, Res]
-- Type-safe handler signature
-
-### Route Groups
-
-**`group.go`**:
-- Group type
-- Nested grouping
-- Middleware inheritance
-- Prefix management
-
-### Error Handling
-
-**`error.go`**:
-- Error helpers
-- Status code constants
-
-**`problem.go`**:
-- RFC 9457 Problem type
-- Standard error responses
-- Extension support
-
-### Features
-
-**`openapi.go`**:
-- OpenAPI 3.1 generation
-- Type introspection
-- Schema generation
-
-**`validation.go`**:
-- Validation interface
-- Pluggable validators
-- Error formatting
-
-**`negotiate.go`**:
-- Content negotiation
-- Accept header parsing
-- Quality value handling
-
-**`version.go`**:
-- API versioning
-- Version extraction
-
-### Middleware
-
-**`middleware/logger.go`**: Structured logging
-**`middleware/recovery.go`**: Panic recovery
-**`middleware/cors.go`**: CORS headers
-**`middleware/basicauth.go`**: Basic Auth
-**`middleware/jwt.go`**: JWT authentication
-**`middleware/ratelimit.go`**: Rate limiting
-**`middleware/circuitbreaker.go`**: Circuit breaker
-**`middleware/secure.go`**: Security headers
-
-### Plugins
-
-**`plugins/opentelemetry/middleware.go`**: Tracing
-**`plugins/opentelemetry/metrics.go`**: Metrics
-**`plugins/validator/validator.go`**: Validation
+Tests use table-driven subtests (`tests := []struct{...}` plus `t.Run`). Benchmarks call `b.ReportAllocs()`. Fuzz targets live beside the code they exercise. Race-detector runs are expected in CI; do not claim a change is verified if only `go build` was run.
 
 ---
 
-## Performance Metrics
+## Git and Contribution Workflow
 
-### Routing Performance
+`CONTRIBUTING.md` defines GitHub Flow:
 
-**Static routes**:
-- ~53 ns/op ✅
-- 0 alloc/op ✅
+```
+main                  # production-ready, tagged releases
+  ├── feat/*          # features
+  ├── fix/*           # bug fixes
+  └── chore/*         # maintenance
+```
 
-**Parametric routes**:
-- ~75 ns/op ✅ (1 param)
-- 0 alloc/op for all ✅
+Rules:
 
-### Context Operations
+- `main` is the only long-lived branch. All pull requests target `main`.
+- Never push directly to `main`; use a pull request.
+- Small self-contained changes may be one commit; larger features use a feature branch.
+- Conventional Commits: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, optionally with a scope.
+- Keep commit messages professional and focused on the change.
+- Semantic versioning: `0.y.0` for features, `0.y.z` for fixes before 1.0; major/minor/patch after 1.0. Breaking changes are allowed in 0.x releases.
 
-**Parameter extraction**:
-- 3.7 ns/op ✅
-- 0 allocs/op ✅
-
-**Query parsing**:
-- 21.8 ns/op ✅
-- 0 allocs/op ✅
-
-**Response rendering**:
-- String: 145 ns/op, 2 allocs
-- JSON: 2512 ns/op, 18 allocs (encoder overhead)
-
-### Middleware Performance
-
-**Logger middleware**:
-- ~200 ns/op overhead
-- 0 allocs/op (slog)
-
-**Full middleware chain** (8 middleware):
-- ~1.7M req/s throughput
-- Minimal overhead per middleware
-
-### Comparison with httprouter
-
-**fursy** achieves similar performance to httprouter (industry benchmark) while adding:
-- Type-safe handlers
-- RFC 9457 errors
-- OpenAPI generation
-- Content negotiation
-- Validation
-
-**See**: `docs/PERFORMANCE.md` for complete benchmarks (19 benchmarks total).
+Released versions are recorded in `CHANGELOG.md`; tags and releases are created by maintainers (see `CONTRIBUTING.md`).
 
 ---
 
 ## Common Gotchas
 
-### 1. JSON: encoding/json
+1. **`router.GET` needs a generic handler.** `router.GET(path, func(c *fursy.Context) error {...})` does not compile. Use `router.Handle("GET", path, fn)` for plain handlers.
 
-```go
-import "encoding/json"
-```
+2. **Automatic binding is only for `Box[Req, Res]`.** Plain handlers decode the body themselves. `Box.Bind` is called by the adapter and is idempotent; there is no need to call it manually.
 
-Go 1.27 made json/v2 the default implementation behind the `encoding/json` import path, so the import is simply `"encoding/json"`.
+3. **`Req` is the body type, not params/query.** `fursy.Box[GetUserRequest, Res]` on a GET expects a request body. For routes without a body, use `fursy.Box[fursy.Empty, Res]` and read `c.Param(...)` / `c.Query(...)`. Struct tags for binding are `json`, `xml`, and `form`; `param` and `query` tags are not interpreted.
 
-### 2. MUST use log/slog for logging
+4. **Never retain the Context.** Contexts and boxes come from a pool and are reset after `ServeHTTP`. Do not store them, and do not touch them from a goroutine that outlives the request.
 
-```go
-// ❌ WRONG:
-import "log"
-log.Printf("message")
+5. **Timeout is cooperative.** It sets a context deadline; it does not kill the handler. Long-running work must pass `c.Request.Context()` to database drivers and HTTP clients, or select on `ctx.Done()`. Use `Skipper` for SSE/WebSocket routes.
 
-// ✅ CORRECT:
-import "log/slog"
-slog.Info("message", "key", value)
-```
+6. **CORS/Secure before Timeout.** Timeout restores the header snapshot taken before the inner chain runs; headers set by middleware inside Timeout are discarded on a 503.
 
-### 3. ALWAYS read LINTER_RULES.md before coding
+7. **CORS is global, not per-group.** Preflight OPTIONS requests are handled by the router before group middleware. Register `CORS` with `router.Use()` and before JWT/BasicAuth.
 
-**Location**: `.claude/LINTER_RULES.md`
+8. **The body limit is 4 MiB for all handlers.** `SetMaxBodySize` applies to plain and typed handlers; `0` disables it. Oversized bodies get 413.
 
-**Critical rules**:
-- Use `s == ""` instead of `len(s) == 0`
-- All comments must end with period
-- Add package comment to every file
-- No if-else after return
-- Use `errors.Is()` for error comparison
+9. **Validation needs `SetValidator`.** Without a validator, binding still happens but no `validate` tags run. Validation covers the body struct only.
 
-**8-point checklist** - use it before every commit!
+10. **OpenAPI infers 204 for routes with no response type.** This includes `Box[Req, Empty]` and plain handlers. Set `RouteOptions.SuccessStatus` when a plain handler returns a body (for example, 200).
 
-### 4. internal/ packages are NOT importable externally
+11. **`WithServer` is not `SetServer`.** `WithServer(fursy.Server)` adds a URL to the OpenAPI document. `SetServer(*http.Server)` attaches the real HTTP server for graceful shutdown.
 
-```go
-// ❌ CANNOT DO (from external package):
-import "github.com/coregx/fursy/internal/radix"
-// Error: use of internal package not allowed
+12. **Duplicate routes panic.** Registering the same method and path twice panics with `route already exists`. So do empty methods/paths and nil handlers.
 
-// ✅ USE PUBLIC API:
-import "github.com/coregx/fursy"
-```
+13. **No regex constraints.** Only static segments, `:param`, and trailing `*catchAll` are supported. Mid-segment colons are literal (AIP-136).
 
-**Why**: `internal/` is Go special directory - prevents external imports.
+14. **JWT signing method must be explicit in production.** `JWTConfig.SigningMethod` defaults to `HS256`; set it to the expected algorithm so tokens signed with another algorithm are rejected.
 
-### 5. ALWAYS run race detector before commit
+15. **Rate limiting defaults to `RemoteAddr`.** `X-Forwarded-For` is not trusted by default. If you run behind a trusted proxy, set `KeyFunc` and validate the proxy yourself.
 
-```bash
-# ❌ INSUFFICIENT:
-go test ./...
+16. **Negotiate does not render Markdown or HTML.** `Context.Negotiate` offers JSON, XML, and plain text. Use `c.Accepts(fursy.MIMETextMarkdown)` plus `c.Markdown(...)` for Markdown, and write the HTML body yourself.
 
-# ✅ REQUIRED:
-go test -race ./...
-```
+17. **Keep `http.Server` timeouts.** The Timeout middleware bounds handler work via the request context, not socket reads/writes. Configure `ReadHeaderTimeout`, `ReadTimeout`, and `WriteTimeout` separately.
 
-**Why**: Catches data races that normal tests miss.
-
-### 6. Coverage must be >85%
-
-```bash
-# Check coverage
-go test -coverprofile=coverage.txt ./...
-go tool cover -func=coverage.txt | grep total
-```
-
-**Current**: 88.9% (exceeds target) ✅
-
-### 7. Golangci-lint MUST pass with 0 issues
-
-```bash
-golangci-lint run
-# Output: MUST be clean (no issues)
-```
-
-**Current**: 0 issues ✅
-
-### 8. Never add dependencies to core without discussion
-
-**Core** (`github.com/coregx/fursy/`):
-- Routing, Context, Groups: ONLY stdlib
-- Middleware exceptions: jwt (golang-jwt/jwt), ratelimit (x/time)
-- Everything else: ONLY stdlib
-
-**Plugins** (`plugins/`):
-- Can have dependencies (isolated)
-
-### 9. Commit messages - no AI attribution
-
-```bash
-# ❌ WRONG:
-git commit -m "feat: add feature
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-
-# ✅ CORRECT:
-git commit -m "feat: add feature"
-```
-
-**Why**: Commits must look professional. Claude is already in contributors.
-
-### 10. Empty type for Box[Req, Res]
-
-**When no request/response body needed**:
-
-```go
-type Empty struct{}
-
-// DELETE with no body — type parameters inferred from handler signature
-router.DELETE("/users/:id", func(box *fursy.Box[Empty, Empty]) error {
-    deleteUser(box.Param("id"))
-    return box.NoContentSuccess()  // 204
-})
-```
-
-### 11. ReqBody is automatically bound — no manual Bind() needed
-
-The framework's `adaptGenericHandler` calls `Bind()` automatically before your handler runs.
-`ReqBody` is already populated and validated when your handler executes.
-
-```go
-router.POST("/users", func(box *fursy.Box[CreateUserRequest, UserResponse]) error {
-    // ✅ CORRECT: ReqBody is already bound and validated
-    req := box.ReqBody
-    user := createUser(req)
-    return box.Created("/users/"+user.ID, user)
-})
-```
-
-### 12. Middleware order matters
-
-```go
-router := fursy.New()
-
-// ✅ CORRECT ORDER:
-router.Use(middleware.Recovery())  // 1. Catch panics first
-router.Use(middleware.Logger())    // 2. Log everything
-router.Use(middleware.CORS())      // 3. CORS before auth
-router.Use(middleware.JWT(secret)) // 4. Auth last
-
-// ❌ WRONG ORDER:
-router.Use(middleware.JWT(secret)) // Panic after JWT = no logging!
-router.Use(middleware.Logger())
-router.Use(middleware.Recovery())
-```
-
-### 13. CORS must be global, not per-group
-
-```go
-// ❌ WRONG: CORS on a group — preflight OPTIONS returns 405!
-api := router.Group("/api")
-api.Use(middleware.CORS())          // Group middleware is unreachable for preflight
-api.Handle("GET", "/users", handler)
-// OPTIONS /api/users → 405 Method Not Allowed
-
-// ✅ CORRECT: CORS on the router — preflight handled automatically
-router.Use(middleware.CORS())       // Global middleware runs for all OPTIONS
-api := router.Group("/api")
-api.Handle("GET", "/users", handler)
-// OPTIONS /api/users → 204 No Content (with CORS headers)
-```
-
-**Why**: Preflight OPTIONS requests hit a path with no registered OPTIONS route.
-The router's fallback only runs router-level middleware, not group middleware
-(which is embedded inside route handler wrappers). This matches Gin, Echo, Chi.
+18. **`internal/` is not importable.** External modules must use the root package and `middleware`; `internal/radix`, `internal/binding`, and `internal/negotiate` are implementation details.
 
 ---
 
-## Contributing Guidelines
+## Key Files Reference
 
-### Before Starting Work
-
-1. **Read STATUS.md** (`.claude/STATUS.md`)
-   - Current status
-   - Active tasks
-   - Known issues
-
-2. **Read LINTER_RULES.md** (`.claude/LINTER_RULES.md`)
-   - 8-point checklist
-   - 31 common errors
-   - Code standards
-
-3. **Read CLAUDE.md** (`.claude/CLAUDE.md`)
-   - Project configuration
-   - Architecture decisions
-   - Workflow
-
-4. **Check Kanban** (`docs/dev/kanban/`)
-   - See what's in progress
-   - Pick task from backlog
-
-### Development Process
-
-1. **Create feature branch**:
-   ```bash
-   git checkout main
-   git checkout -b feature/TASK-XXX-description
-   ```
-
-2. **Write tests first** (TDD):
-   ```bash
-   # Write test
-   go test -v -run TestNewFeature ./...
-
-   # Implement feature
-   # ...
-
-   # Verify test passes
-   go test -v -run TestNewFeature ./...
-   ```
-
-3. **Run full test suite**:
-   ```bash
-   go test -race ./...
-   ```
-
-4. **Check coverage** (must be >85%):
-   ```bash
-   go test -coverprofile=coverage.txt ./...
-   go tool cover -func=coverage.txt | grep total
-   ```
-
-5. **Lint** (must be 0 issues):
-   ```bash
-   golangci-lint run
-   ```
-
-6. **Update STATUS.md** (for significant changes):
-   ```bash
-   # Update metrics, progress, etc.
-   vim .claude/STATUS.md
-   ```
-
-7. **Commit**:
-   ```bash
-   git add .
-   git commit -m "feat(scope): description"
-   ```
-
-8. **Push and merge**:
-   ```bash
-   git push origin feature/TASK-XXX-description
-   # Create PR to main (squash merge)
-   ```
-
-### Pre-Release Checklist
-
-**Before any release**:
-
-```bash
-# Full validation
-gofmt -l .                    # Formatting
-golangci-lint run              # Linting (0 issues)
-go test -race ./...            # Tests + race detector
-go test -coverprofile=c.out ./... # Coverage check
-# - Linter
-# - Build verification
-```
-
-### Code Review Standards
-
-**Every PR must**:
-- Pass all tests
-- Pass race detector
-- Have >85% coverage
-- Pass linter (0 issues)
-- Follow naming conventions
-- Include benchmarks (for performance-critical code)
-- Update STATUS.md (if significant)
-
----
-
-## Quick Reference
-
-### Essential Commands
-
-```bash
-# Testing
-go test ./...                              # All tests
-go test -race ./...                        # With race detector ⭐
-go test -coverprofile=coverage.txt ./...  # Coverage
-go test -v -run TestName ./...            # Specific test
-go test -bench=. -benchmem ./...          # Benchmarks
-
-# Linting
-golangci-lint run                          # Lint (MUST be 0 issues) ⭐
-
-# Build
-go build ./...                             # All packages
-```
-
-### File Locations
-
-- **STATUS.md**: `.claude/STATUS.md` ⭐⭐
-- **LINTER_RULES.md**: `.claude/LINTER_RULES.md` ⭐
-- **CLAUDE.md**: `.claude/CLAUDE.md`
-- **Performance**: `docs/PERFORMANCE.md`
-- **Examples**: `examples/`
-- **Middleware**: `middleware/`
-- **Plugins**: `plugins/`
-
-### Import Statements
-
-```go
-// Core
-import "github.com/coregx/fursy"
-
-// Middleware (built-in)
-import "github.com/coregx/fursy/middleware"
-
-// Plugins (separate modules)
-import "github.com/coregx/fursy/plugins/opentelemetry"
-import "github.com/coregx/fursy/plugins/validator"
-```
-
-### Key URLs
-
-- **Repository**: `github.com/coregx/fursy`
-- **Organization**: `github.com/coregx`
-- **Sister Project**: [Relica](https://github.com/coregx/relica)
-- **Go Docs**: (will be) `pkg.go.dev/github.com/coregx/fursy`
+| File | Contents |
+|---|---|
+| `router.go` | `Router`, registration, lookup, `ServeHTTP`, 404/405/OPTIONS, error dispatch, shutdown. |
+| `context.go` | `Context`, params, query/form, response helpers, middleware chain, version access. |
+| `box.go` | `Box[Req, Res]`, `Bind`, typed response helpers. |
+| `handler_generic.go` | `Handler[Req, Res]`, `adaptGenericHandler`, empty-type detection. |
+| `group.go` | `RouteGroup`, nested prefixes, group middleware, typed verbs. |
+| `problem.go` | `Problem`, constructors, extension flattening, `ValidationProblem`. |
+| `validation.go` | `Validator`, `ValidationError(s)`, field maps. |
+| `openapi.go` | Document types, schema registry, generation, JSON/YAML output. |
+| `route_info.go` | `RouteInfo`, `RouteOptions`, `RouteParameter`, `RouteResponse`. |
+| `version.go` | `Version`, parsing, path extraction, `RequireVersion`, `DeprecateVersion`. |
+| `middleware.go` | `HandlerFunc`, `Middleware`. |
+| `mime.go` | MIME constants used by negotiation and responses. |
+| `empty.go` | `Empty` marker type. |
+| `internal/radix/tree.go` | Radix tree insertion, lookup, wildcard handling. |
+| `internal/radix/node.go` | Node types and child management. |
+| `internal/binding/binding.go` | Content-type binders and form mapping. |
+| `internal/negotiate/negotiate.go` | RFC 9110 Accept parsing and selection. |
+| `middleware/*.go` | The nine middleware implementations. |
+| `plugins/*/` | Separate modules; each has its own README and `go.mod`. |
+| `examples/*/` | Runnable examples, each its own module. |
+| `CHANGELOG.md` | Released and unreleased changes. |
+| `CONTRIBUTING.md` | Workflow and quality requirements. |
 
 ---
 
 ## Summary for AI Agents
 
-### What is fursy?
-
-**fursy** is a production-ready HTTP router for Go 1.27+ that uniquely combines:
-
-1. **Type-safe generic methods** `router.POST()` with `Box[Req, Res]` - First in Go ecosystem (Go 1.27+)
-2. **RFC 9457 Problem Details** - Standard error format everywhere
-3. **OpenAPI 3.1 generation** - Automatic from code
-4. **Minimal dependencies** - Core = stdlib only
-5. **~53 ns/op routing** - Zero-allocation, 0 alloc/op
-6. **8 production middleware** - Logger, Recovery, CORS, BasicAuth, JWT, RateLimit, CircuitBreaker, Secure
-7. **RFC 9110 content negotiation** - Multi-format responses including Markdown for AI agents
-
-### Current Status (2025-11-17)
-
-- **v0.1.0** released (rebranded from FURY)
-- **v0.2.0** released (Documentation & Examples - 11 examples, llms.md, middleware docs)
-- **88.9% test coverage** (150+ tests, 19 benchmarks)
-- **0 linter issues** (golangci-lint strict)
-- **Phase 3 complete** (Foundation, API Excellence, Production Features)
-- **Phase 4 ready** (Ecosystem: docs, community, plugins)
-
-### How AI Agents Should Work
-
-1. **ALWAYS read STATUS.md first** (`.claude/STATUS.md`)
-2. **ALWAYS read LINTER_RULES.md before coding** (`.claude/LINTER_RULES.md`)
-3. **MUST use `encoding/json`** (Go 1.27 json/v2 is the default behind this import path)
-4. **MUST use `log/slog`** (not `log`)
-5. **MUST run `go test -race`** before commit
-6. **MUST pass `golangci-lint run`** with 0 issues
-7. **NO `Co-Authored-By: Claude`** in commits
-8. **Maintain >85% coverage** (currently 94.6%)
-9. **Use `router.POST()` for typed handlers** (Go 1.27 generic methods with type inference)
-10. **Use `router.Handle("GET", path, handler)` for plain handlers** (non-generic `*Context`)
-
-### Key Differentiators
-
-**Why fursy is unique**:
-- Only Go router with compile-time type-safe generic methods (Go 1.27+)
-- Only router with built-in RFC 9457 (standard error format)
-- Only router with full RFC 9110 content negotiation including AI agent support
-- Minimal dependencies while providing production features
-- Modern Go 1.27+ design with generic methods from the ground up
-
-### Where to Look
-
-- **Current work**: `.claude/STATUS.md` → "Current Work" section
-- **Code standards**: `.claude/LINTER_RULES.md` → 8-point checklist
-- **Examples**: `examples/` → 11 complete examples
-- **Performance**: `docs/PERFORMANCE.md` → 19 benchmarks
-- **API docs**: Code comments (godoc style)
-
----
-
-**Version**: 2.0
-**Last Updated**: 2026-09-10
-**Project Version**: see CHANGELOG.md for current version
-**For Questions**: See `.claude/STATUS.md` and `.claude/CLAUDE.md`
+1. **Read `CHANGELOG.md` for the current version.** Do not hardcode a version; this file intentionally does not.
+2. **Use `Handle` for plain handlers and the uppercase verbs for typed handlers.** They are not interchangeable.
+3. **Use `fursy.Empty` for bodyless request or response types.** A non-empty `Req` requires a body.
+4. **Let the framework bind and validate.** Do not call `Bind` manually in a typed handler; `ReqBody` is ready.
+5. **Return `fursy.Problem` for RFC 9457 errors.** `Box.BadRequest` and friends write typed JSON, not Problems.
+6. **Read params, query, and headers from `Context`, not from the body struct.**
+7. **Never retain a `Context` or `Box`.** They are pooled and reset.
+8. **Register `Recovery` and `Logger` first, `CORS` and `Secure` before `Timeout`, and `CORS` before auth.**
+9. **Keep the 4 MiB body limit in mind** and raise it deliberately with `SetMaxBodySize`.
+10. **Run `go test ./...`, `go test -race ./...`, `gofmt -l .`, and `golangci-lint run` before proposing a change.**
+11. **Prefer `go doc -all .` and the examples over memory** when the API is in doubt.
+12. **Update `CHANGELOG.md` and the relevant README when behavior or the public API changes.**
