@@ -1,0 +1,78 @@
+name: Setup golangci-lint
+description: >-
+  Pinned golangci-lint from the Actions cache, checked by sha256 on every run and by its SLSA
+  attestation on a cache miss. Puts golangci-lint on PATH; run golangci-lint-action after it with
+  `install-mode: none`.
+
+# Why (gogpu, 2026-11-08): golangci-lint-action downloads the release asset on every job and every
+# run (src/install.ts: tc.downloadTool, no cache lookup), and the runner image has no golangci-lint.
+# That day the linux-amd64 tarball's download URL returned HTTP 504 for over an hour while
+# githubstatus was green, and every lint job went red. With the gate required, one CDN fault on
+# one asset blocks every PR of every repo on the standard. Here the release is touched only on a
+# cache miss, through two routes: the API asset route (`gh release download`), which served the
+# file while the CDN URL returned 504, then the CDN URL.
+# Linux x64 runners only: every lint job of the standard runs on ubuntu-latest, and lint-targets
+# switches GOOS for the linter, not for this binary.
+
+inputs:
+  version:
+    description: golangci-lint version without the v, e.g. 2.15.0
+    required: true
+  sha256:
+    description: >-
+      sha256 of golangci-lint-<version>-linux-amd64.tar.gz (the release's checksums.txt, or
+      `gh api repos/golangci/golangci-lint/releases/tags/v<version> --jq '.assets[].digest'`)
+    required: true
+
+outputs:
+  cache-hit:
+    description: "'true' when the tarball came from the Actions cache"
+    value: ${{ steps.cache.outputs.cache-hit }}
+  path:
+    description: directory holding the golangci-lint binary (also added to PATH)
+    value: ${{ steps.install.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the runner
+      if: runner.os != 'Linux' || runner.arch != 'X64'
+      shell: bash
+      run: |
+        echo "setup-golangci-lint supports Linux x64 runners only, got ${{ runner.os }}/${{ runner.arch }}"
+        exit 1
+
+    # restore + an explicit save after the checks (gogpu/.github cdb7bd4), so only a verified
+    # tarball is ever cached and nothing depends on a post step inside a composite action.
+    - name: Restore the pinned tarball
+      id: cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/golangci-lint-dl
+        key: golangci-lint-${{ inputs.version }}-${{ runner.os }}-${{ runner.arch }}-${{ inputs.sha256 }}
+
+    - name: Download and verify provenance (cache miss)
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ inputs.version }}
+      run: bash "$GITHUB_ACTION_PATH/setup.sh" download
+
+    - name: Check sha256 and install
+      id: install
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        SHA256: ${{ inputs.sha256 }}
+      run: |
+        bash "$GITHUB_ACTION_PATH/setup.sh" install
+        "$RUNNER_TEMP/golangci-lint-bin/golangci-lint" version
+        echo "path=$RUNNER_TEMP/golangci-lint-bin" >> "$GITHUB_OUTPUT"
+
+    - name: Save the verified tarball (cache miss)
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/golangci-lint-dl
+        key: golangci-lint-${{ inputs.version }}-${{ runner.os }}-${{ runner.arch }}-${{ inputs.sha256 }}

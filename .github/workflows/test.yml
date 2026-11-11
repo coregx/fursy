@@ -2,15 +2,13 @@ name: Tests
 
 # Testing Strategy:
 # - Tests run on Linux, macOS, and Windows (cross-platform HTTP router)
-# - Go 1.27+ required (matches go.mod requirement)
-# - Minimal dependencies (core routing: stdlib only, middleware: jwt + x/time)
-# - Plugins and examples are built/tested in a separate matrix job
+# - Go 1.27 is the go.mod floor; test-minimum tests exactly that line
+# - Plugins and examples are separate modules, built and tested here
 #
-# Branch Strategy (GitHub Flow):
-# - feature/*, release/*, hotfix/* branches: Development work
-# - main branch: Production-ready code only (protected)
-# - Pull requests: Must pass all tests before merge
-# - Push to main triggers tests as final validation after merge
+# The ruleset requires ONE check, the "Required checks" gate at the end: jobs and the
+# matrix can change without touching the ruleset. A new required job goes into the gate's
+# `needs`. Tools are pinned (new-repo-go references/versions.md §2); an unpinned action or
+# linter breaks every PR at once when its tag moves.
 
 on:
   push:
@@ -20,22 +18,38 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
+env:
+  # Never download a newer Go behind our back: each job must run the Go it asked for,
+  # or the minimum test proves nothing.
+  GOTOOLCHAIN: local
+  # golangci-lint is pinned, checksum-verified, and cached by the local action below.
+  GOLANGCI_LINT_VERSION: 2.15.0
+  GOLANGCI_LINT_SHA256: 9b7fe6a6bf6334b98decf8d86b11415ea7889afdabdd1959fdce23af2a9ebcea
+
 jobs:
   # Unit tests - Cross-platform
   unit-tests:
     name: Unit Tests - ${{ matrix.os }} - Go ${{ matrix.go-version }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write # Codecov OIDC — only this job needs it
     strategy:
+      # Each OS's -race result is separate evidence; one failing OS must not cancel the rest.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ['1.27']  # Match go.mod requirement
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: ${{ matrix.go-version }}
         cache: true
@@ -56,29 +70,67 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.27'
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
+        use_oidc: true
         files: ./coverage.txt
         flags: unittests
         name: codecov-unit
         fail_ci_if_error: false
-        verbose: true
+
+  # The go.mod `go` line is a promise to every importer. This job tests exactly that line,
+  # not the stable alias.
+  test-minimum:
+    name: Test - ubuntu-latest - Go minimum
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - id: gomod
+      run: echo "go=$(awk '$1 == "go" { print $2; exit }' go.mod)" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: ${{ steps.gomod.outputs.go }}
+        cache: true
+
+    - run: go version
+    - run: go test -count=1 ./...
+
+  # 32-bit builds catch size assumptions (len/int, unsafe.Sizeof) that 64-bit tests miss.
+  build-386:
+    name: Build - linux 386
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - run: GOARCH=386 go build ./...
+    - run: GOARCH=386 go test -count=1 ./...
 
   # Plugin tests - build and test each plugin module
   plugins:
     name: Plugin - ${{ matrix.plugin }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         plugin: [database, opentelemetry, stream, validator]
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: '1.27'
         cache: true
@@ -98,10 +150,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: '1.27'
         cache: true
@@ -123,46 +175,84 @@ jobs:
         done
         echo "All examples built successfully."
 
-  # Security vulnerability check
+  # Informational: not in the gate, so a new CVE with no fixed version does not block
+  # unrelated PRs. The action installs govulncheck @latest on purpose: the vulnerability
+  # data must be current. Releases are protected by the blocking govulncheck in release.yml.
   govulncheck:
     name: Vulnerability Check
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.27'
-        cache: true
-
-    - name: Install govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
     - name: Run govulncheck
-      run: govulncheck ./...
+      uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+      with:
+        go-version-input: stable
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: false  # Strict for production library
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.27'
+        go-version: stable
         cache: true
 
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v8
+    # Pinned, sha256-checked binary from the Actions cache; the release is downloaded
+    # only on a cache miss (.github/actions/setup-golangci-lint/action.yml says why).
+    - uses: ./.github/actions/setup-golangci-lint
       with:
-        version: latest
+        version: ${{ env.GOLANGCI_LINT_VERSION }}
+        sha256: ${{ env.GOLANGCI_LINT_SHA256 }}
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      with:
+        install-mode: none
+        args: --timeout=5m
+
+  # The Lint job type-checks only linux files. With GOOS/GOARCH in the environment and
+  # CGO off, go/packages loads exactly that target's files, so darwin/windows-only code
+  # is linted without a macOS or Windows runner.
+  lint-targets:
+    name: Lint - ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: windows, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: stable
+        cache: true
+
+    - uses: ./.github/actions/setup-golangci-lint
+      with:
+        version: ${{ env.GOLANGCI_LINT_VERSION }}
+        sha256: ${{ env.GOLANGCI_LINT_SHA256 }}
+
+    # GOOS/GOARCH only on the lint step: the binary above stays linux/amd64.
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: "0"
+      with:
+        install-mode: none
         args: --timeout=5m
 
   # Formatting check
@@ -172,12 +262,13 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.27'
+        # stable, never the go.mod minimum: gofmt's output changes between Go releases.
+        go-version: stable
         cache: true
 
     - name: Check formatting
@@ -189,4 +280,32 @@ jobs:
           echo "Run 'go fmt ./...' to fix formatting issues."
           exit 1
         fi
-        echo "All files are properly formatted ✓"
+        echo "All files are properly formatted"
+
+    - name: go mod tidy
+      run: |
+        go mod tidy
+        if [ -n "$(git status --porcelain -- go.mod go.sum)" ]; then
+          echo "go mod tidy changed go.mod/go.sum (a new untracked go.sum counts):"
+          git status --porcelain -- go.mod go.sum
+          git diff -- go.mod go.sum
+          exit 1
+        fi
+
+  # The one required check. `if: always()` and the explicit result loop matter: a job that
+  # is skipped (for example because a job it needs failed) counts as passed for a required
+  # check, so a gate without them can let a red PR through.
+  required:
+    name: Required checks
+    if: always()
+    needs: [unit-tests, test-minimum, build-386, plugins, examples, lint, lint-targets, formatting]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Every required job succeeded
+      env:
+        RESULTS: ${{ join(needs.*.result, ' ') }}
+      run: |
+        echo "results: $RESULTS"
+        for r in $RESULTS; do
+          if [ "$r" != success ]; then echo "a required job ended with: $r"; exit 1; fi
+        done
