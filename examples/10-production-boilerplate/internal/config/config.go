@@ -20,8 +20,8 @@ type Config struct {
 	JWTSecret     []byte
 	JWTExpiration time.Duration
 
-	// CORS settings
-	CORSOrigins []string
+	// CORS settings: comma-separated list of allowed origins.
+	CORSOrigins string
 }
 
 // Load loads configuration from environment variables.
@@ -38,7 +38,7 @@ func Load() *Config {
 		DatabaseDSN:   getEnv("DATABASE_DSN", "./data/app.db"),
 		JWTSecret:     []byte(getEnv("JWT_SECRET", "your-super-secret-jwt-key-change-in-production")),
 		JWTExpiration: jwtExpiration,
-		CORSOrigins:   []string{getEnv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8080")},
+		CORSOrigins:   getEnv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8080"),
 	}
 }
 

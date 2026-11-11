@@ -84,7 +84,9 @@ func main() {
 	// Global middleware
 	router.Use(middleware.Logger())
 	router.Use(middleware.Recovery())
-	router.Use(middleware.CORS())
+	router.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: cfg.CORSOrigins,
+	}))
 
 	// Health check endpoint
 	router.Handle("GET", "/health", func(c *fursy.Context) error {
