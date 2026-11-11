@@ -161,7 +161,7 @@ func TestService_Register(t *testing.T) {
 				Password: "SecurePass123",
 				Name:     "",
 			},
-			wantErr: errors.New("name is required"),
+			wantErr: errors.New("name cannot be empty"),
 		},
 	}
 

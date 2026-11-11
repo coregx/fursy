@@ -27,12 +27,12 @@ func (api *API) RegisterRoutes(r *fursy.Router, authMiddleware fursy.HandlerFunc
 	protected := r.Group("/api")
 	protected.Use(authMiddleware)
 	{
-		protected.Handle("GET", "/chat/ws", api.websocket)
+		protected.GET("/chat/ws", api.websocket)
 	}
 }
 
 // websocket handles WebSocket chat connection.
-func (api *API) websocket(c *fursy.Context) error {
+func (api *API) websocket(c *fursy.Box[fursy.Empty, fursy.Empty]) error {
 	// Get user info from context
 	userID := auth.GetUserID(c.Request.Context())
 
