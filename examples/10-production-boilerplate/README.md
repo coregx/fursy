@@ -1,8 +1,8 @@
 # Production Boilerplate - DDD Architecture
 
-> **Complete, production-ready REST API** with real-time features demonstrating modern Go development practices using **fursy + stream + Relica**.
+> **Complete, production-ready REST API** with real-time features demonstrating modern Go development practices using **fursy + stream + SQLite (database/sql)**.
 
-[![Go Version](https://img.shields.io/badge/Go-1.25+-blue.svg)](https://go.dev)
+[![Go Version](https://img.shields.io/badge/Go-1.27+-blue.svg)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -16,7 +16,7 @@ This is a **reference implementation** of a production-ready REST API showcasing
 - **Type-safe HTTP routing** with fursy
 - **Real-time communications** (SSE + WebSocket)
 - **JWT Authentication** & Authorization
-- **Database persistence** with Relica
+- **Database persistence** with database/sql and SQLite
 - **RFC 9457 Problem Details** for errors
 - **Docker support** for deployment
 
@@ -562,7 +562,6 @@ go build ./cmd/api
 - [Go Project Layout](https://github.com/golang-standards/project-layout)
 - [fursy Documentation](https://github.com/coregx/fursy)
 - [stream Documentation](https://github.com/coregx/stream)
-- [Relica Documentation](https://github.com/coregx/relica)
 
 ---
 
@@ -589,7 +588,7 @@ For questions or issues:
 **Built with**:
 - [fursy](https://github.com/coregx/fursy) - Fast Universal Routing SYstem
 - [stream](https://github.com/coregx/stream) - SSE + WebSocket library
-- [Relica](https://github.com/coregx/relica) - Fluent SQL query builder
+- [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) - Pure-Go SQLite driver
 - Go 1.27+ modern features
 
 **Status**: Production-ready reference implementation ✅
