@@ -438,7 +438,7 @@ router.Use(middleware.CircuitBreakerWithConfig(middleware.CircuitBreakerConfig{
 Request timeout with RFC 9457 error responses.
 
 ```go
-// Recommended order: Recovery → Logger → Timeout → your other middleware
+// Recommended order: Recovery → Logger → CORS → Secure → Timeout → your other middleware
 router.Use(middleware.Recovery(), middleware.Logger())
 router.Use(middleware.Timeout(5 * time.Second)) // zero or negative → DefaultTimeout (30s)
 
@@ -464,6 +464,8 @@ router.GET("/report", func(c *fursy.Box[Req, Res]) error {
     // ...
 })
 ```
+
+Middleware that sets response headers (CORS, Secure, request IDs) must be registered **before** `Timeout`: headers set by middleware running inside the timeout are discarded with the handler's when a 503 is written.
 
 The timeout is **cooperative**: the deadline is set on `c.Request.Context()` and only stops work that honors it (database drivers, HTTP clients, `select` on `ctx.Done()`). Handlers are not moved to a separate goroutine, because fursy reuses pooled `Context` objects as soon as a request returns.
 
@@ -523,7 +525,7 @@ uploads := router.Group("/uploads", middleware.Timeout(5*time.Minute))
 
 ### Learn More
 
-- **[Middleware Examples](examples/05-middleware/)** - Complete examples for all 8 middleware
+- **[Middleware Examples](examples/05-middleware/)** - Complete examples for all 9 middleware
 - **[Middleware Source](middleware/)** - Middleware implementations with tests
 
 ---
