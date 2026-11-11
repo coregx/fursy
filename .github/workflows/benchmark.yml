@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  GOTOOLCHAIN: local
+
 jobs:
   benchmark:
     name: Benchmark
@@ -12,10 +15,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: '1.27'
         cache: true
@@ -26,7 +29,7 @@ jobs:
         cat benchmark_results.txt
 
     - name: Store benchmark result
-      uses: benchmark-action/github-action-benchmark@v1
+      uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
       continue-on-error: true  # gh-pages branch created on first run
       if: github.ref == 'refs/heads/main'
       with:
