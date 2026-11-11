@@ -190,8 +190,7 @@ fursy/
 ├── internal/             # Internal implementation (not in Go docs)
 │   ├── radix/           # Radix tree routing engine
 │   ├── binding/         # Request body binding (JSON, XML, form)
-│   ├── negotiate/       # Content negotiation
-│   └── validation/      # Validation internals
+│   └── negotiate/       # Content negotiation
 ├── middleware/           # Built-in middleware (flat package, not subdirs)
 │   ├── logger.go        # log/slog logging
 │   ├── recovery.go      # Panic recovery
@@ -200,6 +199,7 @@ fursy/
 │   ├── jwt.go           # JWT authentication
 │   ├── ratelimit.go     # Rate limiting
 │   ├── circuitbreaker.go # Circuit breaker
+│   ├── timeout.go       # Cooperative request timeout
 │   └── secure.go        # Security headers (OWASP)
 ├── plugins/              # Optional plugins (can have dependencies)
 │   ├── opentelemetry/   # Tracing + metrics

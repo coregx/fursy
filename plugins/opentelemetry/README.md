@@ -61,7 +61,9 @@ func main() {
 		return c.String(200, "User 123")
 	})
 
-	router.Start(":8080")
+	if err := router.ListenAndServeWithShutdown(":8080"); err != nil {
+		log.Fatal(err)
+	}
 }
 ```
 
@@ -103,7 +105,9 @@ func main() {
 	// - http.server.request.size (Histogram)
 	// - http.server.response.size (Histogram)
 
-	router.Start(":8080")
+	if err := router.ListenAndServeWithShutdown(":8080"); err != nil {
+		log.Fatal(err)
+	}
 }
 ```
 

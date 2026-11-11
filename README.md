@@ -1257,7 +1257,7 @@ We welcome contributions! Please see:
 **Development Requirements**:
 - Go 1.27+
 - golangci-lint
-- Follow git-flow branching model
+- GitHub Flow: feature branch → PR → main (no direct pushes)
 
 **Want to help?**
 - ⭐ Star the repo
