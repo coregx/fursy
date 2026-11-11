@@ -1,7 +1,7 @@
 // Package main demonstrates all built-in and custom middleware in fursy.
 //
 // This example showcases:
-//   - All 8 built-in middleware (Logger, Recovery, CORS, BasicAuth, JWT, RateLimit, CircuitBreaker, Secure)
+//   - All 9 built-in middleware (Logger, Recovery, CORS, BasicAuth, JWT, RateLimit, CircuitBreaker, Secure, Timeout)
 //   - Custom middleware patterns (RequestID, Timing, Authentication)
 //   - Middleware ordering best practices
 //   - Group-level middleware
@@ -295,6 +295,24 @@ func main() {
 	})
 
 	// ===========================================
+	// TIMEOUT DEMO
+	// ===========================================
+
+	timed := router.Group("/timed")
+
+	// Cooperative timeout: the handler must honor the request context.
+	timed.Use(middleware.Timeout(2 * time.Second))
+
+	timed.Handle("GET", "/slow", func(c *fursy.Context) error {
+		select {
+		case <-time.After(10 * time.Second):
+			return c.String(http.StatusOK, "done")
+		case <-c.Request.Context().Done():
+			return c.Request.Context().Err() // the middleware turns this into a 503 Problem
+		}
+	})
+
+	// ===========================================
 	// START SERVER
 	// ===========================================
 
@@ -318,6 +336,9 @@ func main() {
 	slog.Info("")
 	slog.Info("  Circuit Breaker:")
 	slog.Info("    GET  /circuit/flaky     - Flaky service (fails 3 times, then succeeds)")
+	slog.Info("")
+	slog.Info("  Timeout:")
+	slog.Info("    GET  /timed/slow        - Cooperative 2s timeout (503)")
 	slog.Info("")
 	slog.Info("Visit: http://localhost:8080")
 
