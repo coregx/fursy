@@ -50,8 +50,7 @@ func (api *API) register(c *fursy.Box[RegisterRequest, UserResponse]) error {
 		return MapError(c.Context, err)
 	}
 
-	// Todo: fix this dummy url.
-	return c.Created("/api/users/me", ToResponse(user))
+	return c.Context.Created(ToResponse(user))
 }
 
 // login handles user login.
