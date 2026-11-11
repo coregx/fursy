@@ -1,74 +1,57 @@
-# FURSY .gitignore
+# Private — never committed (global rule; never `git add -f` these)
+.claude/
+.pm/
+.reference.md
+docs/dev/
+tmp/
+reference/
 
-# MCP config (local paths)
-.mcp.json
-
-# GODE knowledge graph (local)
+# AI/IDE tooling state
 .gode/
+.goda/
+.goco/
+.mcp.json
+.idea/
+.vscode/
+*.swp
+*~
 
-# Binaries
+# Build and test artifacts
 *.exe
+*.exe~
+*.wasm
 *.dll
 *.so
 *.dylib
 *.test
 *.out
-
-# Coverage
+*.prof
+coverage.out
 coverage.txt
 coverage.html
-coverage.out
-coverage_*.txt
-*.cov
-
-# Go workspace
-go.work
-
-# Dependencies
-vendor/
-
-# Build
-bin/
-dist/
-build/
+*.log
+*.bak
+*.orig
+/bin/
+/dist/
+/build/
 
 # Example binaries (built from example dirs)
 examples/**/rest-api-with-openapi
 examples/**/hello-world
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
+# Go workspace (local overrides only)
+go.work
+go.work.sum
 
-# Private docs (IMPORTANT!)
-docs/dev/
-INDEX.md
+# Dependencies
+vendor/
 
-# Private Claude config (IMPORTANT!)
-.claude/
-.goco/
-.goda/
-
-# Temp
-*.tmp
-*.log
-tmp/
-benchmark_results.txt
+# Environment and secrets
+.env
+.env.*
+!.env.example
 
 # OS
+.DS_Store
 Thumbs.db
-
-# Private notes
-NOTES.md
-TODO.md
-SCRATCH.md
-TASK-*.md
-
-# Env
-.env
-.env.local
-.env.*.local
